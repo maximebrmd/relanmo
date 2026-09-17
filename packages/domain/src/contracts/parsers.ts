@@ -1211,6 +1211,10 @@ function parseEligibilitySnapshot(value: unknown): EligibilitySnapshot {
 
 export function parseEligibilityCheck(value: unknown): EligibilityCheck {
   const record = expectRecord(value, "eligibilityCheck");
+  const accountId = parseAccountId(readRequired(record, "accountId"));
+  const campaignId = parseCampaignId(readRequired(record, "campaignId"));
+  const prospectId = parseProspectId(readRequired(record, "prospectId"));
+  const tenantId = parseTenantId(readRequired(record, "tenantId"));
   const snapshot = parseEligibilitySnapshot(readRequired(record, "snapshot"));
   const step = parseSequenceStep(readRequired(record, "step"));
   if (snapshot.duePlan !== null && snapshot.duePlan.step !== step) {
@@ -1218,13 +1222,23 @@ export function parseEligibilityCheck(value: unknown): EligibilityCheck {
       "eligibility step must match the due-plan step"
     );
   }
+  if (
+    snapshot.suppression !== null &&
+    (snapshot.suppression.accountId !== accountId ||
+      snapshot.suppression.prospectId !== prospectId ||
+      snapshot.suppression.tenantId !== tenantId)
+  ) {
+    throw new ContractValidationError(
+      "eligibility suppression must match its tenant, account and prospect"
+    );
+  }
   return Object.freeze({
-    accountId: parseAccountId(readRequired(record, "accountId")),
-    campaignId: parseCampaignId(readRequired(record, "campaignId")),
-    prospectId: parseProspectId(readRequired(record, "prospectId")),
+    accountId,
+    campaignId,
+    prospectId,
     snapshot,
     step,
-    tenantId: parseTenantId(readRequired(record, "tenantId")),
+    tenantId,
   });
 }
 

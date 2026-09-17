@@ -300,6 +300,32 @@ describe("domain contract fixtures", () => {
     ).toThrow();
   });
 
+  it("binds eligibility suppression to its outer tenant and subject", () => {
+    const suppression = {
+      accountId: "account_demo",
+      prospectId: "prospect_demo",
+      reason: "CUSTOMER_REQUEST",
+      recordedAt: timestamp,
+      tenantId: "tenant_demo",
+    };
+
+    for (const [field, value] of [
+      ["accountId", "account_other"],
+      ["prospectId", "prospect_other"],
+      ["tenantId", "tenant_other"],
+    ] as const) {
+      expect(() =>
+        parseEligibilityCheck({
+          ...eligibilityCheckFixture,
+          snapshot: {
+            ...eligibilityCheckFixture.snapshot,
+            suppression: { ...suppression, [field]: value },
+          },
+        })
+      ).toThrow();
+    }
+  });
+
   it("validates Europe/Paris business windows and due-plan closure order", () => {
     const dstFacingConfiguration = parseBusinessWindowConfiguration({
       businessTimeZone: "Europe/Paris",
