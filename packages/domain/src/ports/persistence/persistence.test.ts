@@ -694,6 +694,12 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       outcome: "DENIED",
       reason: "ENTITLEMENT_UNAVAILABLE",
     };
+    const denialAfterStyleChange: AuthorizeSendResult = {
+      action: invitationWithoutNoteActionFixture,
+      observedAt: timestamp,
+      outcome: "DENIED",
+      reason: "STALE_VERSION",
+    };
     const denialReasons = [
       "ACTION_NOT_READY",
       "ACCOUNT_UNHEALTHY",
@@ -716,6 +722,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(denialAfterEntitlementRemoval.reason).toBe(
       "ENTITLEMENT_UNAVAILABLE"
     );
+    expect(denialAfterStyleChange.reason).toBe("STALE_VERSION");
     expect(denialReasons).toHaveLength(14);
   });
 
@@ -752,8 +759,15 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       receipt,
       reservation,
     };
+    const contradictoryReceipt: RecordSendOutcomeResult = {
+      action: uncertainSendActionFixture,
+      existingReceipt: receipt,
+      outcome: "CONFLICTING_RECEIPT",
+      reservation,
+    };
 
     expect(result.reservation.state).toBe("RETAINED_UNKNOWN");
+    expect(contradictoryReceipt.outcome).toBe("CONFLICTING_RECEIPT");
     expect(UNKNOWN_OUTCOME_POLICY.releaseQuota).toBe(false);
     expect(UNKNOWN_OUTCOME_POLICY.retryWithoutReconciliation).toBe(false);
   });
