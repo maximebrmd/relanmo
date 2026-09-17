@@ -214,6 +214,11 @@ export type ClaimBotEligibilityResult =
   | Readonly<{
       outcome: "HUMAN_OWNED";
       ownership: PairOwnershipRecord;
+    }>
+  | Readonly<{
+      current: PairOwnershipRecord;
+      expectedRevision: number;
+      outcome: "REVISION_CONFLICT";
     }>;
 
 export type MarkHumanOwnershipInput = Readonly<{

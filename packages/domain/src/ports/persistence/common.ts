@@ -43,6 +43,13 @@ export type PersistenceError = Readonly<{
   retryable: boolean;
 }>;
 
+/** Tenant scope failures are authorization failures, never not-found results. */
+export const TENANT_SCOPE_MISMATCH_ERROR: PersistenceError = {
+  code: "FORBIDDEN",
+  detail: "TENANT_SCOPE_MISMATCH",
+  retryable: false,
+};
+
 export type PersistenceSuccess<Value> = Readonly<{
   ok: true;
   value: Value;
@@ -70,7 +77,12 @@ export type PersistencePrincipal =
       workerId: PersistenceWorkerId;
     }>;
 
-/** Membership and RLS scope is established before a transaction is opened. */
+/**
+ * Membership and RLS scope is established before a transaction is opened.
+ * `tenantId` is authoritative: every tenant-bearing input and nested record
+ * passed to a repository must equal it. Implementations must return
+ * `TENANT_SCOPE_MISMATCH_ERROR` before reading or writing on a mismatch.
+ */
 export type TenantTransactionScope = Readonly<{
   principal: PersistencePrincipal;
   requestId: string | null;
@@ -111,7 +123,8 @@ export type PersistenceTransactionWork<Value> = (
 /**
  * The only boundary that may create a PersistenceTransaction. A false result
  * or thrown database error must roll back; only an `ok: true` work result may
- * commit.
+ * commit. Implementations validate the authoritative tenant scope before any
+ * repository read or write, including nested record tenant IDs.
  */
 export interface PersistenceTransactionRunner {
   run: <Value>(

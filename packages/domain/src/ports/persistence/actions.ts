@@ -128,6 +128,11 @@ export type CreateActionResult =
   | Readonly<{
       existingAction: ActionRecord;
       outcome: "IDENTITY_CONFLICT";
+    }>
+  | Readonly<{
+      attemptedAction: ActionIdentity;
+      existingAction: ActionRecord;
+      outcome: "IMMUTABLE_CONFLICT";
     }>;
 
 export type ListUnknownActionsInput = Readonly<
@@ -252,6 +257,8 @@ export type RecordSendOutcomeResult =
 /**
  * Actions have immutable identity and append-only attempts/receipts/events.
  * The current Action lifecycle is a projection updated only by guarded methods.
+ * `IMMUTABLE_CONFLICT` means the same action ID was presented with different
+ * payload or source-version data; it must never overwrite the existing row.
  */
 export interface ActionRepository {
   create: (
@@ -331,6 +338,13 @@ export type AccountLeaseRecord = Readonly<{
   owner: PersistenceWorkerId;
   tenantId: TenantId;
 }>;
+
+/** A fence is strictly monotonic per tenant/account and never resets. */
+export const ACCOUNT_LEASE_FENCE_POLICY = {
+  monotonicPerAccount: true,
+  resetOnExpiry: false,
+  resetOnRelease: false,
+} as const;
 
 export type AcquireAccountLeaseInput = Readonly<{
   accountId: AccountId;
@@ -413,6 +427,7 @@ export type QuotaReservationRecord = Readonly<{
   bucket: QuotaBucket;
   campaignId: CampaignId;
   createdAt: UtcTimestamp;
+  fence: number;
   periodEnd: UtcTimestamp;
   periodStart: UtcTimestamp;
   reservationId: QuotaReservationId;
@@ -427,6 +442,7 @@ export type ReserveQuotaInput = Readonly<{
   actionId: ActionId;
   bucket: QuotaBucket;
   campaignId: CampaignId;
+  fence: number;
   periodEnd: UtcTimestamp;
   periodStart: UtcTimestamp;
   reservationId: QuotaReservationId;
@@ -471,7 +487,13 @@ export type SettleQuotaResult =
   | Readonly<{
       outcome: "ALREADY_SETTLED";
       reservation: QuotaReservationRecord;
+    }>
+  | Readonly<{
+      outcome: "FENCE_MISMATCH";
+      reservation: QuotaReservationRecord;
     }>;
+
+/** Settlement may mutate a reservation only when its lease fence still owns it. */
 
 export interface QuotaRepository {
   reserve: (
@@ -545,6 +567,8 @@ export type AuthorizeSendResult =
       attempt: SendAttemptRecord;
       outcome: "ALREADY_IN_FLIGHT";
     }>;
+
+/** `ALREADY_IN_FLIGHT` is not new send permission for a second worker. */
 
 /**
  * This is the sole send gate. In one transaction it locks entitlement, account,

@@ -8,6 +8,8 @@ Every repository method receives `PersistenceTransaction`. Only a `PersistenceTr
 
 The callback returns a `PersistenceResult`; the runner rolls back on `ok: false` (or a thrown database error) and commits only an `ok: true` result.
 
+`tx.scope.tenantId` is the authoritative tenant. Every tenant-bearing input and nested record must match it; a mismatch returns the shared `TENANT_SCOPE_MISMATCH_ERROR` (`FORBIDDEN`) before any read or write. A caller cannot use a customer-supplied tenant ID to widen the transaction scope.
+
 Provider/network calls are outside the transaction. A worker authorizes and records an action using these ports, performs the provider call, then records a receipt using the action fence. An exception or timeout after the provider call is `UNKNOWN`, not permission to retry.
 
 ## Lock protocol
@@ -21,10 +23,13 @@ The order is shared by campaign/style mutations, reply/manual takeover and send 
 ## Safety guarantees
 
 - The action identity carries tenant + account + prospect + campaign + campaign version + step, while `getByStep` also checks the stable tenant/account/prospect/campaign/step key across versions so a campaign edit cannot replay a completed step. The action payload and source versions are immutable.
+- Reusing an action ID with a changed payload or source-version snapshot is an `IMMUTABLE_CONFLICT`; reusing the stable step key across campaign versions returns the existing action instead of creating a new send.
 - Pair ownership is one account/prospect row and survives campaign changes; a new campaign cannot reset `HUMAN_OWNED` to `BOT_ELIGIBLE`.
 - `stopIncoming` persists the inbox event and message, marks the pair and conversation human-owned, invalidates future `READY` actions, and enqueues workflow-stop and customer-notification events in the same transaction. The event is persisted before any model classification. Attachment-only inbound messages are messages because attachments are sufficient.
-- `recordManualTakeover` compares an outgoing provider event with the send ledger while holding the account/pair/action locks. An exact ledger match is a bot echo; an unmatched owner message takes over; an inconclusive match holds the account for reconciliation.
+- Inbox envelopes carry a dedupe identity, canonical payload fingerprint and bounded scope for incoming, outgoing and unrecognized provider events. Unsafe normalization is quarantined with its evidence and affected account hold status; it is never represented as a successfully normalized message.
+- `recordManualTakeover` atomically persists and deduplicates the outgoing envelope before comparing it with the send ledger while holding the account/pair/action locks. An exact ledger match is a bot echo; an unmatched owner message takes over; an inconclusive match holds the account for reconciliation; redelivery returns `DUPLICATE` without repeating side effects.
 - `authorize` re-reads ownership, suppression, health, campaign activation, entitlement, due time, versions, quota and the lease fence, then transitions a unique `READY` action to `IN_FLIGHT` and creates its attempt and reservation atomically. A committed reply stop makes new authorization deny. An already authorized provider request remains an external race and is recorded.
+- Account lease fences increase strictly for each tenant/account acquisition and never reset after expiry or release. Quota reservations retain the lease fence; settlement rejects a stale fence explicitly.
 - A lease expiry does not prove a send did not happen. `UNKNOWN` actions and their quota reservations remain held (`RETAINED_UNKNOWN`) until provider evidence resolves them; they are never blindly retried.
 - Inbox, outbox, billing, usage and audit records use explicit dedupe keys or IDs and expose visible quarantine/dead-letter outcomes.
 

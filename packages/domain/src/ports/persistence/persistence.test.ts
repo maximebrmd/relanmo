@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { ActionIdentity } from "../../contracts/action";
 import {
   attachmentOnlyInboundEventFixture,
   attachmentOnlyInboundMessageFixture,
@@ -15,12 +16,14 @@ import {
   parseCampaignVersionId,
   parseConversationId,
   parseMessageId,
+  parseModelVersion,
   parseProspectId,
   parseSendAttemptId,
   parseTenantId,
   parseUserId,
 } from "../../contracts/ids";
 import type { OutboxEventId } from "../../contracts/ids";
+import type { OutboundMessage } from "../../contracts/message";
 import {
   parseAccountProspectOwnership,
   parseAction,
@@ -34,14 +37,23 @@ import { workflowIdFor } from "../../contracts/workflow";
 import type {
   AccountLeaseRecord,
   ActionRepository,
+  AcquireAccountLeaseResult,
   ConfirmedActionRecord,
   AuthorizeSendResult,
   CreateActionResult,
+  GetActionByStepInput,
+  GetActionByStepResult,
+  MarkExpiredUnknownResult,
   QuotaReservationRecord,
   RecordSendOutcomeResult,
+  RenewAccountLeaseResult,
+  ReleaseAccountLeaseResult,
+  SendAuthorizationDenialReason,
   SendAttemptRecord,
   SendReceiptRecord,
+  SettleQuotaResult,
 } from "./actions";
+import { ACCOUNT_LEASE_FENCE_POLICY } from "./actions";
 import type {
   CampaignDefinition,
   SaveCampaignVersionInput,
@@ -53,20 +65,29 @@ import type {
   CurrentVersionGuard,
   InboxEventId,
   PersistenceConnectionId,
+  PersistenceResult,
   PersistenceTransaction,
   PersistenceWorkerId,
   QuotaReservationId,
   SendReceiptId,
 } from "./common";
-import { UNKNOWN_OUTCOME_POLICY } from "./common";
+import { TENANT_SCOPE_MISMATCH_ERROR, UNKNOWN_OUTCOME_POLICY } from "./common";
 import type { StoredMessage, ConversationRecord } from "./conversations";
 import type {
+  AcknowledgeInboxResult,
+  AcknowledgeOutboxResult,
   AtomicReplyStopInput,
   AtomicReplyStopRepository,
   AtomicReplyStopResult,
   CustomerNotificationOutboxEvent,
+  EnqueueOutboxResult,
+  InboxIncomingEvent,
   InboxEventRecord,
+  InboxOutgoingEvent,
+  InboxUnrecognizedEvent,
   ManualTakeoverResult,
+  QuarantineInboxEventResult,
+  RecordInboxEventResult,
   WorkflowStopOutboxEvent,
 } from "./events";
 import type {
@@ -76,6 +97,7 @@ import type {
 
 const timestamp = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const tenantId = parseTenantId("tenant_demo");
+const otherTenantId = parseTenantId("tenant_other");
 const accountId = parseAccountId("account_demo");
 const prospectId = parseProspectId("prospect_demo");
 
@@ -101,6 +123,59 @@ function testTransaction(): PersistenceTransaction {
   } as PersistenceTransaction;
 }
 
+function outgoingBotEchoMessage(): OutboundMessage {
+  const message = outgoingBotEchoMessageFixture;
+  if (message.direction !== "OUTBOUND") {
+    throw new Error("fixture must include an outbound message");
+  }
+  return message;
+}
+
+const incomingInboxEvent: InboxIncomingEvent = {
+  canonicalPayloadFingerprint: attachmentOnlyInboundEventFixture.dedupeKey,
+  dedupeKey: attachmentOnlyInboundEventFixture.dedupeKey,
+  kind: "INCOMING_MESSAGE",
+  message: attachmentOnlyInboundEventFixture.message,
+  observedAt: attachmentOnlyInboundEventFixture.receivedAt,
+  providerEventId: attachmentOnlyInboundEventFixture.message.providerMessageId,
+  scope: {
+    accountId,
+    conversationId: attachmentOnlyInboundEventFixture.message.conversationId,
+    prospectId,
+    tenantId,
+  },
+};
+
+const outgoingInboxEvent: InboxOutgoingEvent = {
+  canonicalPayloadFingerprint: "canonical-outgoing-bot-echo-1",
+  dedupeKey: "provider-event-outgoing-bot-echo-1",
+  kind: "OUTGOING_MESSAGE",
+  message: outgoingBotEchoMessage(),
+  observedAt: timestamp,
+  providerEventId: outgoingBotEchoMessage().providerMessageId,
+  scope: {
+    accountId,
+    conversationId: outgoingBotEchoMessage().conversationId,
+    prospectId,
+    tenantId,
+  },
+};
+
+const unrecognizedInboxEvent: InboxUnrecognizedEvent = {
+  canonicalPayloadFingerprint: "canonical-unrecognized-event-1",
+  dedupeKey: "provider-event-unrecognized-1",
+  kind: "UNRECOGNIZED",
+  message: null,
+  observedAt: timestamp,
+  providerEventId: null,
+  scope: {
+    accountId,
+    conversationId: null,
+    prospectId: null,
+    tenantId,
+  },
+};
+
 const pairOwnership: PairOwnershipRecord = {
   accountProspect: parseAccountProspectOwnership({
     accountId,
@@ -118,8 +193,9 @@ const pairOwnership: PairOwnershipRecord = {
 };
 
 const inboxEvent: InboxEventRecord = {
+  availableAt: timestamp,
   dedupeKey: attachmentOnlyInboundEventFixture.dedupeKey,
-  event: attachmentOnlyInboundEventFixture,
+  event: incomingInboxEvent,
   eventId: testPersistenceId<InboxEventId>("inbox_attachment_1"),
   attempt: 0,
   lastError: null,
@@ -130,6 +206,40 @@ const inboxEvent: InboxEventRecord = {
   state: "PROCESSED",
   tenantId,
 };
+
+const outgoingInboxRecord: InboxEventRecord = {
+  availableAt: timestamp,
+  dedupeKey: outgoingInboxEvent.dedupeKey,
+  event: outgoingInboxEvent,
+  eventId: testPersistenceId<InboxEventId>("inbox_outgoing_1"),
+  attempt: 1,
+  lastError: null,
+  lease: null,
+  processedAt: timestamp,
+  quarantinedAt: null,
+  receivedAt: timestamp,
+  state: "PROCESSED",
+  tenantId,
+};
+
+const unrecognizedInboxRecord: InboxEventRecord = {
+  availableAt: timestamp,
+  dedupeKey: unrecognizedInboxEvent.dedupeKey,
+  event: unrecognizedInboxEvent,
+  eventId: testPersistenceId<InboxEventId>("inbox_unrecognized_1"),
+  attempt: 1,
+  lastError: "UNKNOWN_MAPPING",
+  lease: null,
+  processedAt: null,
+  quarantinedAt: timestamp,
+  receivedAt: timestamp,
+  state: "QUARANTINED",
+  tenantId,
+};
+
+function tenantMismatch<Value>(): PersistenceResult<Value> {
+  return { error: TENANT_SCOPE_MISMATCH_ERROR, ok: false };
+}
 
 const storedAttachmentMessage: StoredMessage = {
   dedupeKey: attachmentOnlyInboundEventFixture.dedupeKey,
@@ -252,6 +362,60 @@ function consumerAtomicReplyFake() {
 }
 
 describe("persistence identity and revision contracts", () => {
+  it("rejects direct and nested tenant mismatches before repository access", async () => {
+    let accessed = 0;
+    const tx = testTransaction();
+    const repository: Pick<ActionRepository, "create" | "get"> = {
+      create: (input, transaction) => {
+        if (input.action.tenantId !== transaction.scope.tenantId) {
+          return Promise.resolve(tenantMismatch());
+        }
+        accessed += 1;
+        return Promise.resolve({
+          ok: true,
+          value: {
+            action: invitationWithoutNoteActionFixture,
+            outcome: "CREATED",
+          },
+        });
+      },
+      get: (input, transaction) => {
+        if (input.tenantId !== transaction.scope.tenantId) {
+          return Promise.resolve(tenantMismatch());
+        }
+        accessed += 1;
+        return Promise.resolve({ ok: true, value: { action: null } });
+      },
+    };
+
+    const directMismatch = await repository.get(
+      {
+        actionId: invitationWithoutNoteActionFixture.actionId,
+        tenantId: otherTenantId,
+      },
+      tx
+    );
+    const nestedMismatch = await repository.create(
+      {
+        action: {
+          ...invitationWithoutNoteActionFixture,
+          tenantId: otherTenantId,
+        },
+      },
+      tx
+    );
+
+    expect(directMismatch).toEqual({
+      error: TENANT_SCOPE_MISMATCH_ERROR,
+      ok: false,
+    });
+    expect(nestedMismatch).toEqual({
+      error: TENANT_SCOPE_MISMATCH_ERROR,
+      ok: false,
+    });
+    expect(accessed).toBe(0);
+  });
+
   it("represents duplicate actions without creating a second logical step", () => {
     const created = {
       action: invitationWithoutNoteActionFixture,
@@ -266,6 +430,49 @@ describe("persistence identity and revision contracts", () => {
     expect(duplicate.outcome).toBe("ALREADY_EXISTS");
   });
 
+  it("keeps immutable payloads and completed steps stable across campaign versions", () => {
+    const { payload } = uncertainSendActionFixture;
+    if (payload.kind !== "DIRECT_MESSAGE") {
+      throw new Error("fixture must include a direct-message payload");
+    }
+    const attemptedAction = {
+      ...uncertainSendActionFixture,
+      payload: { ...payload, text: "Changed immutable fixture payload" },
+      sourceVersions: {
+        ...uncertainSendActionFixture.sourceVersions,
+        model: parseModelVersion("claude-sonnet-4-6"),
+      },
+    } satisfies ActionIdentity;
+    const immutableConflict = {
+      attemptedAction,
+      existingAction: uncertainSendActionFixture,
+      outcome: "IMMUTABLE_CONFLICT",
+    } satisfies CreateActionResult;
+    const lookup: GetActionByStepInput = {
+      accountId,
+      campaignId: uncertainSendActionFixture.campaignId,
+      prospectId,
+      step: "DM1",
+      tenantId,
+    };
+    const completedAcrossVersion = {
+      action: confirmedBotEchoAction(),
+    } satisfies GetActionByStepResult;
+
+    expect(immutableConflict.attemptedAction.actionId).toBe(
+      immutableConflict.existingAction.actionId
+    );
+    expect(immutableConflict.attemptedAction.payload).not.toEqual(
+      immutableConflict.existingAction.payload
+    );
+    expect(immutableConflict.outcome).toBe("IMMUTABLE_CONFLICT");
+    expect(lookup.campaignId).toBe(completedAcrossVersion.action.campaignId);
+    expect(completedAcrossVersion.action.state).toBe("CONFIRMED");
+    expect(completedAcrossVersion.action.campaignVersionId).not.toBe(
+      parseCampaignVersionId("campaign_version_alpha_2")
+    );
+  });
+
   it("keeps one human owner for the account/prospect pair across campaigns", () => {
     const result = {
       outcome: "HUMAN_OWNED",
@@ -276,6 +483,24 @@ describe("persistence identity and revision contracts", () => {
     expect(result.ownership.accountProspect.tenantId).toBe(tenantId);
     expect(result.ownership.accountProspect.accountId).toBe(accountId);
     expect(result.ownership.accountProspect.prospectId).toBe(prospectId);
+  });
+
+  it("returns a stale ownership revision instead of accepting a concurrent bot claim", () => {
+    const conflict: ClaimBotEligibilityResult = {
+      current: pairOwnership,
+      expectedRevision: 1,
+      outcome: "REVISION_CONFLICT",
+    };
+    const laterCampaignClaim: ClaimBotEligibilityResult = {
+      outcome: "HUMAN_OWNED",
+      ownership: pairOwnership,
+    };
+
+    expect(conflict.current.revision).toBe(2);
+    expect(conflict.expectedRevision).not.toBe(conflict.current.revision);
+    expect(laterCampaignClaim.ownership.accountProspect).toEqual(
+      conflict.current.accountProspect
+    );
   });
 
   it("uses the same current-version guard for optimistic mutation and authorization", () => {
@@ -335,7 +560,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     const { calls, repository } = consumerAtomicReplyFake();
     const tx = testTransaction();
     const input: AtomicReplyStopInput = {
-      event: attachmentOnlyInboundEventFixture,
+      event: incomingInboxEvent,
       eventId: inboxEvent.eventId,
       stoppedAt: timestamp,
       tenantId,
@@ -358,9 +583,27 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(result.value.outboxEvents[0]?.payload.type).toBe("STOP_WORKFLOW");
   });
 
+  it("quarantines an unrecognized envelope with bounded evidence and an account hold", () => {
+    const result: QuarantineInboxEventResult = {
+      accountId,
+      event: unrecognizedInboxRecord,
+      holdAccount: true,
+      outcome: "QUARANTINED",
+      reason: "UNKNOWN_MAPPING",
+    };
+
+    expect(result.event.event.kind).toBe("UNRECOGNIZED");
+    expect(result.event.event.message).toBeNull();
+    expect(result.event.event.canonicalPayloadFingerprint).toBe(
+      "canonical-unrecognized-event-1"
+    );
+    expect(result.holdAccount).toBe(true);
+  });
+
   it("makes bot echoes, owner takeovers and inconclusive matches distinct", () => {
     const action = confirmedBotEchoAction();
     const echo: ManualTakeoverResult = {
+      event: outgoingInboxRecord,
       match: {
         action,
         attempt: {
@@ -387,6 +630,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     };
     const held: ManualTakeoverResult = {
       accountId,
+      event: outgoingInboxRecord,
       holdAccount: true,
       message: echo.message,
       outboxEvents: [notificationOutboxEvent],
@@ -399,6 +643,82 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(held.reason).toBe("INCONCLUSIVE_BOT_ECHO");
   });
 
+  it("deduplicates incoming, outgoing and outbox redeliveries", () => {
+    const duplicateIncoming: RecordInboxEventResult = {
+      event: inboxEvent,
+      outcome: "DUPLICATE",
+    };
+    const duplicateOutgoingEcho: ManualTakeoverResult = {
+      event: outgoingInboxRecord,
+      outcome: "DUPLICATE",
+      priorOutcome: "BOT_ECHO_CONFIRMED",
+    };
+    const duplicateOwnerTakeover: ManualTakeoverResult = {
+      event: outgoingInboxRecord,
+      outcome: "DUPLICATE",
+      priorOutcome: "TAKEN_OVER",
+    };
+    const duplicateOutbox: EnqueueOutboxResult = {
+      event: stopOutboxEvent,
+      outcome: "DUPLICATE",
+    };
+    const acknowledgedInbox: AcknowledgeInboxResult = {
+      event: inboxEvent,
+      outcome: "ALREADY_PROCESSED",
+    };
+    const acknowledgedOutbox: AcknowledgeOutboxResult = {
+      event: stopOutboxEvent,
+      outcome: "ALREADY_DELIVERED",
+    };
+
+    expect(duplicateIncoming.event.event.dedupeKey).toBe(
+      incomingInboxEvent.dedupeKey
+    );
+    expect(duplicateOutgoingEcho.priorOutcome).toBe("BOT_ECHO_CONFIRMED");
+    expect(duplicateOwnerTakeover.priorOutcome).toBe("TAKEN_OVER");
+    expect(duplicateOutbox.event.eventId).toBe(stopOutboxEvent.eventId);
+    expect(acknowledgedInbox.outcome).toBe("ALREADY_PROCESSED");
+    expect(acknowledgedOutbox.outcome).toBe("ALREADY_DELIVERED");
+  });
+
+  it("makes reply-stop commit ordering and all authorization holds explicit", () => {
+    const denialAfterReply: AuthorizeSendResult = {
+      action: invitationWithoutNoteActionFixture,
+      observedAt: timestamp,
+      outcome: "DENIED",
+      reason: "HUMAN_OWNED",
+    };
+    const denialAfterEntitlementRemoval: AuthorizeSendResult = {
+      action: invitationWithoutNoteActionFixture,
+      observedAt: timestamp,
+      outcome: "DENIED",
+      reason: "ENTITLEMENT_UNAVAILABLE",
+    };
+    const denialReasons = [
+      "ACTION_NOT_READY",
+      "ACCOUNT_UNHEALTHY",
+      "CAMPAIGN_INACTIVE",
+      "ENTITLEMENT_UNAVAILABLE",
+      "HUMAN_OWNED",
+      "INCOMING_MESSAGE",
+      "LEASE_UNAVAILABLE",
+      "NOT_DUE",
+      "OUTSIDE_SEND_WINDOW",
+      "QUOTA_UNAVAILABLE",
+      "RECONCILIATION_REQUIRED",
+      "STALE_VERSION",
+      "SUPPRESSED",
+      "UNKNOWN_SEND",
+    ] satisfies readonly SendAuthorizationDenialReason[];
+
+    expect(atomicStopResult.outcome).toBe("STOPPED");
+    expect(denialAfterReply.reason).toBe("HUMAN_OWNED");
+    expect(denialAfterEntitlementRemoval.reason).toBe(
+      "ENTITLEMENT_UNAVAILABLE"
+    );
+    expect(denialReasons).toHaveLength(14);
+  });
+
   it("retains quota for an unknown outcome and makes blind retry policy explicit", () => {
     const reservation: QuotaReservationRecord = {
       accountId,
@@ -406,6 +726,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       bucket: "MESSAGES",
       campaignId: uncertainSendActionFixture.campaignId,
       createdAt: timestamp,
+      fence: 7,
       periodEnd: parseUtcTimestamp("2026-09-18T00:00:00.000Z"),
       periodStart: timestamp,
       reservationId: testPersistenceId<QuotaReservationId>("quota_unknown_1"),
@@ -435,6 +756,82 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(result.reservation.state).toBe("RETAINED_UNKNOWN");
     expect(UNKNOWN_OUTCOME_POLICY.releaseQuota).toBe(false);
     expect(UNKNOWN_OUTCOME_POLICY.retryWithoutReconciliation).toBe(false);
+  });
+});
+
+describe("lease, quota and uncertain-send safety contracts", () => {
+  it("uses increasing reacquisition fences and rejects stale settlement", () => {
+    const firstLease: AccountLeaseRecord = {
+      accountId,
+      acquiredAt: timestamp,
+      expiresAt: timestamp,
+      fence: 7,
+      leaseId: testPersistenceId<AccountLeaseId>("lease_worker_a"),
+      owner: testPersistenceId<PersistenceWorkerId>("worker_a"),
+      tenantId,
+    };
+    const secondLease: AccountLeaseRecord = {
+      ...firstLease,
+      fence: 8,
+      leaseId: testPersistenceId<AccountLeaseId>("lease_worker_b"),
+      owner: testPersistenceId<PersistenceWorkerId>("worker_b"),
+    };
+    const firstAcquisition = {
+      lease: firstLease,
+      outcome: "ACQUIRED",
+    } satisfies AcquireAccountLeaseResult;
+    const secondAcquisition = {
+      lease: secondLease,
+      outcome: "ACQUIRED",
+    } satisfies AcquireAccountLeaseResult;
+    const staleRenew: RenewAccountLeaseResult = {
+      current: secondLease,
+      outcome: "FENCE_MISMATCH",
+    };
+    const staleRelease: ReleaseAccountLeaseResult = {
+      outcome: "FENCE_MISMATCH",
+    };
+    const retainedReservation: QuotaReservationRecord = {
+      accountId,
+      actionId: uncertainSendActionFixture.actionId,
+      bucket: "MESSAGES",
+      campaignId: uncertainSendActionFixture.campaignId,
+      createdAt: timestamp,
+      fence: secondLease.fence,
+      periodEnd: parseUtcTimestamp("2026-09-18T00:00:00.000Z"),
+      periodStart: timestamp,
+      reservationId: testPersistenceId<QuotaReservationId>(
+        "quota_stale_fence_1"
+      ),
+      state: "RETAINED_UNKNOWN",
+      tenantId,
+      units: 1,
+      updatedAt: timestamp,
+    };
+    const staleOutcome: RecordSendOutcomeResult = {
+      action: uncertainSendActionFixture,
+      outcome: "STALE_FENCE",
+      reservation: retainedReservation,
+    };
+    const staleSettlement: SettleQuotaResult = {
+      outcome: "FENCE_MISMATCH",
+      reservation: retainedReservation,
+    };
+    const unknownAfterExpiry: MarkExpiredUnknownResult = {
+      action: uncertainSendActionFixture,
+      outcome: "ALREADY_UNKNOWN",
+      reservation: retainedReservation,
+    };
+
+    expect(ACCOUNT_LEASE_FENCE_POLICY.monotonicPerAccount).toBe(true);
+    expect(secondAcquisition.lease.fence).toBeGreaterThan(
+      firstAcquisition.lease.fence
+    );
+    expect(staleRenew.outcome).toBe("FENCE_MISMATCH");
+    expect(staleRelease.outcome).toBe("FENCE_MISMATCH");
+    expect(staleOutcome.outcome).toBe("STALE_FENCE");
+    expect(staleSettlement.outcome).toBe("FENCE_MISMATCH");
+    expect(unknownAfterExpiry.reservation.state).toBe("RETAINED_UNKNOWN");
   });
 });
 
@@ -475,6 +872,7 @@ describe("port-shape checks", () => {
       bucket: "INVITATIONS",
       campaignId: action.campaignId,
       createdAt: timestamp,
+      fence: 4,
       periodEnd: timestamp,
       periodStart: timestamp,
       reservationId: testPersistenceId<QuotaReservationId>("quota_4"),
@@ -501,12 +899,18 @@ describe("port-shape checks", () => {
       authorized: { action, attempt, lease, reservation },
       outcome: "AUTHORIZED",
     };
+    const secondWorker: AuthorizeSendResult = {
+      action,
+      attempt,
+      outcome: "ALREADY_IN_FLIGHT",
+    };
     const pair: AccountProspectKey = { accountId, prospectId, tenantId };
 
     expect(actionRepository.create).toBeTypeOf("function");
     expect(authorization.outcome).toBe("AUTHORIZED");
     expect(authorization.authorized.action.state).toBe("IN_FLIGHT");
     expect(authorization.authorized.reservation.state).toBe("HELD");
+    expect(secondWorker.outcome).toBe("ALREADY_IN_FLIGHT");
     expect(pair.tenantId).toBe(tenantId);
   });
 });

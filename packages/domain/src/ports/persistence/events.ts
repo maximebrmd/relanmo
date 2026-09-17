@@ -9,10 +9,7 @@ import type {
   UserId,
   WorkflowId,
 } from "../../contracts/ids";
-import type {
-  IncomingMessageEvent,
-  OutboundMessage,
-} from "../../contracts/message";
+import type { InboundMessage, OutboundMessage } from "../../contracts/message";
 import type { OwnershipReason } from "../../contracts/ownership";
 import type { UtcTimestamp } from "../../contracts/values";
 import type { OutboxEventKind } from "../../contracts/workflow";
@@ -35,6 +32,60 @@ export const INBOX_EVENT_STATES = [
 ] as const;
 export type InboxEventState = (typeof INBOX_EVENT_STATES)[number];
 
+export const INBOX_EVENT_KINDS = [
+  "INCOMING_MESSAGE",
+  "OUTGOING_MESSAGE",
+  "UNRECOGNIZED",
+] as const;
+export type InboxEventKind = (typeof INBOX_EVENT_KINDS)[number];
+
+/**
+ * Provider-neutral scope survives normalization failures. A null field means
+ * the provider event could not be safely mapped; the authoritative tenant for
+ * storage still comes from the transaction scope and input tenantId.
+ */
+export type InboxEventScope = Readonly<{
+  accountId: AccountId | null;
+  conversationId: ConversationId | null;
+  prospectId: ProspectId | null;
+  tenantId: TenantId | null;
+}>;
+
+type InboxEventEnvelopeBase = Readonly<{
+  canonicalPayloadFingerprint: string;
+  dedupeKey: string;
+  observedAt: UtcTimestamp;
+  providerEventId: string | null;
+  scope: InboxEventScope;
+}>;
+
+export type InboxIncomingEvent = Readonly<
+  InboxEventEnvelopeBase & {
+    kind: "INCOMING_MESSAGE";
+    message: InboundMessage;
+  }
+>;
+
+export type InboxOutgoingEvent = Readonly<
+  InboxEventEnvelopeBase & {
+    kind: "OUTGOING_MESSAGE";
+    message: OutboundMessage;
+  }
+>;
+
+/** Unrecognized events retain only bounded, non-secret mapping evidence. */
+export type InboxUnrecognizedEvent = Readonly<
+  InboxEventEnvelopeBase & {
+    kind: "UNRECOGNIZED";
+    message: null;
+  }
+>;
+
+export type InboxEventEnvelope =
+  | InboxIncomingEvent
+  | InboxOutgoingEvent
+  | InboxUnrecognizedEvent;
+
 export type InboxProcessingLease = Readonly<{
   expiresAt: UtcTimestamp;
   fence: number;
@@ -42,8 +93,9 @@ export type InboxProcessingLease = Readonly<{
 }>;
 
 export type InboxEventRecord = Readonly<{
+  availableAt: UtcTimestamp;
   dedupeKey: string;
-  event: IncomingMessageEvent;
+  event: InboxEventEnvelope;
   eventId: InboxEventId;
   attempt: number;
   lastError: string | null;
@@ -56,8 +108,9 @@ export type InboxEventRecord = Readonly<{
 }>;
 
 export type RecordInboxEventInput = Readonly<{
+  availableAt: UtcTimestamp;
   dedupeKey: string;
-  event: IncomingMessageEvent;
+  event: InboxEventEnvelope;
   eventId: InboxEventId;
   receivedAt: UtcTimestamp;
   tenantId: TenantId;
@@ -74,14 +127,18 @@ export type RecordInboxEventResult =
     }>;
 
 export type QuarantineInboxEventInput = Readonly<{
+  event: InboxEventEnvelope;
   eventId: InboxEventId;
   reason: "MALFORMED" | "UNKNOWN_MAPPING" | "TENANT_MISMATCH";
   tenantId: TenantId;
 }>;
 
 export type QuarantineInboxEventResult = Readonly<{
+  accountId: AccountId | null;
   event: InboxEventRecord;
+  holdAccount: boolean;
   outcome: "QUARANTINED";
+  reason: QuarantineInboxEventInput["reason"];
 }>;
 
 export type ClaimInboxInput = Readonly<{
@@ -334,7 +391,7 @@ export interface OutboxRepository {
 }
 
 export type AtomicReplyStopInput = Readonly<{
-  event: IncomingMessageEvent;
+  event: InboxIncomingEvent;
   eventId: InboxEventId;
   stoppedAt: UtcTimestamp;
   tenantId: TenantId;
@@ -372,9 +429,8 @@ export type AtomicReplyStopResult =
     }>;
 
 export type ManualTakeoverInput = Readonly<{
+  event: InboxOutgoingEvent;
   eventId: InboxEventId;
-  message: OutboundMessage;
-  observedAt: UtcTimestamp;
   tenantId: TenantId;
 }>;
 
@@ -385,12 +441,14 @@ export type ManualBotEchoMatch = Readonly<{
 
 export type ManualTakeoverResult =
   | Readonly<{
+      event: InboxEventRecord;
       match: ManualBotEchoMatch;
       message: StoredMessage;
       outcome: "BOT_ECHO_CONFIRMED";
     }>
   | Readonly<{
       conversation: ConversationRecord;
+      event: InboxEventRecord;
       invalidatedActionIds: readonly ActionId[];
       message: StoredMessage;
       outboxEvents: readonly [
@@ -403,6 +461,7 @@ export type ManualTakeoverResult =
     }>
   | Readonly<{
       accountId: AccountId;
+      event: InboxEventRecord;
       holdAccount: true;
       message: StoredMessage;
       outboxEvents: readonly [
@@ -411,15 +470,25 @@ export type ManualTakeoverResult =
       ];
       outcome: "HELD_FOR_RECONCILIATION";
       reason: "INCONCLUSIVE_BOT_ECHO";
+    }>
+  | Readonly<{
+      event: InboxEventRecord;
+      outcome: "DUPLICATE";
+      priorOutcome:
+        | "BOT_ECHO_CONFIRMED"
+        | "HELD_FOR_RECONCILIATION"
+        | "TAKEN_OVER";
     }>;
 
 /**
  * The two control operations are aggregate transaction boundaries. They must
- * persist inbox/message, pair ownership, READY invalidation and outbox rows
- * together; after a committed stop, authorization cannot create IN_FLIGHT work.
- * An outgoing provider event is matched against the ledger inside this same
- * transaction: exact matches are bot echoes, unmatched owner messages take the
- * pair over, and inconclusive matches hold the account for reconciliation.
+ * persist the durable envelope/inbox row, message, pair ownership,
+ * READY invalidation and outbox rows together; after a committed stop,
+ * authorization cannot create IN_FLIGHT work. An outgoing provider event is
+ * matched against the ledger inside this same transaction: exact matches are
+ * bot echoes, unmatched owner messages take the pair over, and inconclusive
+ * matches hold the account for reconciliation. Re-delivery returns DUPLICATE
+ * after the first decision instead of repeating the side effects.
  */
 export interface AtomicReplyStopRepository {
   recordManualTakeover: (
