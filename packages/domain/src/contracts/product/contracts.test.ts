@@ -9,11 +9,13 @@ import {
   billingPendingViewFixture,
   billingRedirectViewFixture,
   billingViewFixture,
+  campaignListViewFixture,
   campaignPausedStateFixture,
   campaignViewFixture,
   conversationTimelineViewFixture,
   draftPreviewViewFixture,
   linkedinConnectionViewFixture,
+  linkedinManuallyPausedAccountFixture,
   linkedinLoadingStateFixture,
   metricsEmptyStateFixture,
   metricsViewFixture,
@@ -35,6 +37,7 @@ import {
   parseBillingQuery,
   parseBillingRedirectView,
   parseBillingViewState,
+  parseCampaignView,
   parseCampaignCommand,
   parseCampaignListViewState,
   parseCampaignQuery,
@@ -43,12 +46,14 @@ import {
   parseConversationTimelineViewState,
   parseDraftPreviewView,
   parseLinkedInCommand,
+  parseLinkedInAccountView,
   parseLinkedInConnectionViewState,
   parseMetricsQuery,
   parseMetricsViewState,
   parseOnboardingViewState,
   parsePageInfo,
   parsePipelineQuery,
+  parsePipelineRowView,
   parsePipelineViewState,
   parseProfileCommand,
   parseProfileViewState,
@@ -114,15 +119,7 @@ describe("product DTO fixtures", () => {
     ).toBe("READY");
     expect(
       parseCampaignListViewState({
-        data: {
-          items: [campaignViewFixture],
-          page: {
-            cursor: null,
-            hasMore: false,
-            nextCursor: null,
-            totalCount: 1,
-          },
-        },
+        data: campaignListViewFixture,
         status: "READY",
       }).status
     ).toBe("READY");
@@ -401,6 +398,177 @@ describe("product DTO invalid cases", () => {
         () => profileViewFixture
       )
     ).toThrow();
+    expect(
+      parseProductError({
+        code: "VALIDATION_FAILED",
+        field: "profile.input.offer",
+        retryable: false,
+        revision: null,
+      }).field
+    ).toBe("profile.input.offer");
+    expect(() =>
+      parseProductError({
+        code: "VALIDATION_FAILED",
+        field: "a".repeat(97),
+        retryable: false,
+        revision: null,
+      })
+    ).toThrow();
+    expect(() =>
+      parseProductError({
+        code: "VALIDATION_FAILED",
+        field: "accessToken=secret",
+        retryable: false,
+        revision: null,
+      })
+    ).toThrow();
+    expect(() =>
+      parseProductError({
+        code: "VALIDATION_FAILED",
+        field: "provider.response",
+        retryable: false,
+        revision: null,
+      })
+    ).toThrow();
+  });
+
+  it("rejects fabricated safety assertions and mixed-tenant aggregates", () => {
+    const missingActivationAssertion = (() => {
+      const {
+        activationAuthorizesBoundedSequence:
+          _activationAuthorizesBoundedSequence,
+        ...rest
+      } = campaignViewFixture;
+      void _activationAuthorizesBoundedSequence;
+      return rest;
+    })();
+    expect(() => parseCampaignView(missingActivationAssertion)).toThrow();
+    expect(() =>
+      parseCampaignView({
+        ...campaignViewFixture,
+        activationAuthorizesBoundedSequence: false,
+      })
+    ).toThrow();
+
+    const missingReplyStopAssertion = (() => {
+      const { stopOnReply: _stopOnReply, ...rest } = campaignViewFixture;
+      void _stopOnReply;
+      return rest;
+    })();
+    expect(() => parseCampaignView(missingReplyStopAssertion)).toThrow();
+    expect(() =>
+      parseCampaignView({
+        ...campaignViewFixture,
+        stopOnReply: false,
+      })
+    ).toThrow();
+
+    expect(() =>
+      parseOnboardingViewState({
+        data: {
+          ...onboardingViewFixture,
+          profile: { ...profileViewFixture, tenantId: "tenant_other" },
+        },
+        status: "READY",
+      })
+    ).toThrow();
+    expect(() =>
+      parseCampaignListViewState({
+        data: {
+          ...campaignListViewFixture,
+          items: [
+            campaignViewFixture,
+            { ...campaignViewFixture, tenantId: "tenant_other" },
+          ],
+        },
+        status: "READY",
+      })
+    ).toThrow();
+    expect(() =>
+      parsePipelineViewState({
+        data: {
+          ...pipelinePageFixture,
+          items: [
+            pipelinePageFixture.items[0],
+            { ...pipelinePageFixture.items[1], tenantId: "tenant_other" },
+          ],
+        },
+        status: "READY",
+      })
+    ).toThrow();
+  });
+
+  it("requires safe LinkedIn status and pause combinations", () => {
+    expect(linkedinManuallyPausedAccountFixture.pauseReason).toBe(
+      "ACCOUNT_MANUAL_PAUSE"
+    );
+    expect(() =>
+      parseLinkedInAccountView({
+        ...linkedinManuallyPausedAccountFixture,
+        outboundPaused: false,
+        pauseReason: null,
+        status: "DISCONNECTED",
+      })
+    ).toThrow();
+    expect(() =>
+      parseLinkedInAccountView({
+        ...linkedinManuallyPausedAccountFixture,
+        outboundPaused: false,
+        pauseReason: null,
+        health: "DEGRADED",
+        status: "RESTRICTED",
+      })
+    ).toThrow();
+    expect(() =>
+      parseLinkedInAccountView({
+        ...linkedinManuallyPausedAccountFixture,
+        outboundPaused: false,
+        pauseReason: null,
+        health: "DEGRADED",
+        reconciliationRequired: true,
+        status: "RECONCILING",
+      })
+    ).toThrow();
+  });
+
+  it("stops active automation for replies and unknown sends", () => {
+    expect(() =>
+      parsePipelineRowView({
+        ...pipelinePageFixture.items[0],
+        nextDueAt: null,
+        nextStep: null,
+        stage: "REPLIED",
+      })
+    ).toThrow();
+    expect(() =>
+      parseConversationTimelineViewState({
+        data: {
+          ...conversationTimelineViewFixture,
+          automation: "ACTIVE",
+          handover: null,
+          ownership: "BOT_ELIGIBLE",
+          pauseReason: null,
+        },
+        status: "READY",
+      })
+    ).toThrow();
+    expect(() =>
+      parseConversationTimelineViewState({
+        data: {
+          ...conversationTimelineViewFixture,
+          automation: "ACTIVE",
+          handover: null,
+          lastIncomingAt: null,
+          messages: {
+            ...conversationTimelineViewFixture.messages,
+            items: [conversationTimelineViewFixture.messages.items[0]],
+          },
+          ownership: "BOT_ELIGIBLE",
+          pauseReason: null,
+        },
+        status: "READY",
+      })
+    ).toThrow();
   });
 
   it("rejects unsafe or semantically inconsistent DTOs", () => {
@@ -467,5 +635,27 @@ describe("product DTO invalid cases", () => {
         tenantId: "tenant_demo",
       })
     ).toThrow();
+    expect(
+      parseBillingCommand({
+        kind: "START_CHECKOUT",
+        returnTo: "/settings/billing?from=checkout",
+        tenantId: "tenant_demo",
+      }).returnTo
+    ).toBe("/settings/billing?from=checkout");
+    for (const returnTo of [
+      "/\\host",
+      "/%5Chost",
+      "/%2F%2Fhost",
+      "/%252F%252Fhost",
+      "//host",
+    ]) {
+      expect(() =>
+        parseBillingCommand({
+          kind: "START_CHECKOUT",
+          returnTo,
+          tenantId: "tenant_demo",
+        })
+      ).toThrow();
+    }
   });
 });

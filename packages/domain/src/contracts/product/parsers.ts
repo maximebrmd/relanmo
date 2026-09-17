@@ -2,6 +2,7 @@
 
 import { ACTION_UNKNOWN_REASONS } from "../action";
 import { ELIGIBILITY_REASON_CODES } from "../eligibility";
+import type { TenantId } from "../ids";
 import {
   parseAccountId,
   parseCampaignId,
@@ -22,6 +23,7 @@ import {
   MESSAGE_SOURCES,
 } from "../message";
 import { OWNERSHIP_KINDS } from "../ownership";
+import type { OwnershipKind } from "../ownership";
 import { parseBusinessWindowConfiguration } from "../parsers";
 import {
   ContractValidationError,
@@ -75,7 +77,11 @@ import {
   parseTenantSelector,
   PRODUCT_PAUSE_REASONS,
 } from "./common";
-import type { ProductPage, ProductViewState } from "./common";
+import type {
+  ProductPage,
+  ProductPauseReason,
+  ProductViewState,
+} from "./common";
 import {
   LINKEDIN_COMMAND_KINDS,
   LINKEDIN_CONNECTION_STATUSES,
@@ -85,6 +91,7 @@ import type {
   LinkedInAccountView,
   LinkedInCapabilities,
   LinkedInCommand,
+  LinkedInConnectionStatus,
   LinkedInConnectionStartView,
   LinkedInConnectionView,
 } from "./connection";
@@ -146,6 +153,7 @@ export {
   parseProductCommandResult,
   parseProductError,
   parseProductViewState,
+  parseRelativeReturnPath,
 } from "./common";
 
 function member<const T extends readonly string[]>(
@@ -158,6 +166,13 @@ function member<const T extends readonly string[]>(
     throw new ContractValidationError(`${path} has an unsupported value`);
   }
   return parsed;
+}
+
+function literalTrue(value: unknown, path: string): true {
+  if (!expectBoolean(value, path)) {
+    throw new ContractValidationError(`${path} must be true`);
+  }
+  return true;
 }
 
 function nullable<T>(value: unknown, parser: (input: unknown) => T): T | null {
@@ -290,27 +305,54 @@ export function parseProfileView(value: unknown): ProfileView {
 
 export function parseOnboardingView(value: unknown): OnboardingView {
   const record = expectRecord(value, "onboarding");
+  const completedAt = nullable(
+    readRequired(record, "completedAt"),
+    parseUtcTimestamp
+  );
+  const currentStep = member(
+    readRequired(record, "currentStep"),
+    ONBOARDING_STEPS,
+    "onboarding.currentStep"
+  );
+  const profile = nullable(readRequired(record, "profile"), parseProfileView);
+  const revision = parseRevision(
+    readRequired(record, "revision"),
+    "onboarding.revision"
+  );
+  const status = member(
+    readRequired(record, "status"),
+    ONBOARDING_STATUSES,
+    "onboarding.status"
+  );
+  const tenantId = parseTenantId(readRequired(record, "tenantId"));
+  if (profile !== null && profile.tenantId !== tenantId) {
+    throw new ContractValidationError(
+      "onboarding profile must belong to the view tenant"
+    );
+  }
+  if (status === "COMPLETE") {
+    if (
+      completedAt === null ||
+      currentStep !== "READY" ||
+      profile === null ||
+      !profile.onboardingComplete
+    ) {
+      throw new ContractValidationError(
+        "complete onboarding requires a ready, completed profile"
+      );
+    }
+  } else if (completedAt !== null || currentStep === "READY") {
+    throw new ContractValidationError(
+      "incomplete onboarding cannot report completion"
+    );
+  }
   return Object.freeze({
-    completedAt: nullable(
-      readRequired(record, "completedAt"),
-      parseUtcTimestamp
-    ),
-    currentStep: member(
-      readRequired(record, "currentStep"),
-      ONBOARDING_STEPS,
-      "onboarding.currentStep"
-    ),
-    profile: nullable(readRequired(record, "profile"), parseProfileView),
-    revision: parseRevision(
-      readRequired(record, "revision"),
-      "onboarding.revision"
-    ),
-    status: member(
-      readRequired(record, "status"),
-      ONBOARDING_STATUSES,
-      "onboarding.status"
-    ),
-    tenantId: parseTenantId(readRequired(record, "tenantId")),
+    completedAt,
+    currentStep,
+    profile,
+    revision,
+    status,
+    tenantId,
   });
 }
 
@@ -528,6 +570,19 @@ export function parseCampaignInput(value: unknown): CampaignInput {
 
 export function parseCampaignView(value: unknown): CampaignView {
   const record = expectRecord(value, "campaign");
+  const activationAuthorizesBoundedSequence = literalTrue(
+    readRequired(record, "activationAuthorizesBoundedSequence"),
+    "campaign.activationAuthorizesBoundedSequence"
+  );
+  const activatedAt = nullable(
+    readRequired(record, "activatedAt"),
+    parseUtcTimestamp
+  );
+  const campaignId = parseCampaignId(readRequired(record, "campaignId"));
+  const campaignVersionId = nullable(
+    readRequired(record, "campaignVersionId"),
+    parseCampaignVersionId
+  );
   const outboundPaused = expectBoolean(
     readRequired(record, "outboundPaused"),
     "campaign.outboundPaused"
@@ -540,6 +595,20 @@ export function parseCampaignView(value: unknown): CampaignView {
     CAMPAIGN_STATUSES,
     "campaign.status"
   );
+  const pausedAt = nullable(
+    readRequired(record, "pausedAt"),
+    parseUtcTimestamp
+  );
+  const revision = parseRevision(
+    readRequired(record, "revision"),
+    "campaign.revision"
+  );
+  const stopOnReply = literalTrue(
+    readRequired(record, "stopOnReply"),
+    "campaign.stopOnReply"
+  );
+  const tenantId = parseTenantId(readRequired(record, "tenantId"));
+  const updatedAt = parseUtcTimestamp(readRequired(record, "updatedAt"));
   if (outboundPaused !== (pauseReason !== null)) {
     throw new ContractValidationError(
       "campaign pauseReason must match outboundPaused"
@@ -555,29 +624,38 @@ export function parseCampaignView(value: unknown): CampaignView {
       "paused campaigns must report paused outbound work"
     );
   }
+  if (
+    (status === "ACTIVE" || status === "PAUSED" || status === "COMPLETED") &&
+    (activatedAt === null || campaignVersionId === null)
+  ) {
+    throw new ContractValidationError(
+      "activated campaigns must include activation and version history"
+    );
+  }
+  if (status === "ACTIVE" && pausedAt !== null) {
+    throw new ContractValidationError(
+      "active campaigns cannot report a pause timestamp"
+    );
+  }
+  if (status === "PAUSED" && pausedAt === null) {
+    throw new ContractValidationError(
+      "paused campaigns must report a pause timestamp"
+    );
+  }
   return Object.freeze({
     ...parseCampaignInputAt(record, "campaign"),
-    activationAuthorizesBoundedSequence: true,
-    activatedAt: nullable(
-      readRequired(record, "activatedAt"),
-      parseUtcTimestamp
-    ),
-    campaignId: parseCampaignId(readRequired(record, "campaignId")),
-    campaignVersionId: nullable(
-      readRequired(record, "campaignVersionId"),
-      parseCampaignVersionId
-    ),
+    activationAuthorizesBoundedSequence,
+    activatedAt,
+    campaignId,
+    campaignVersionId,
     outboundPaused,
     pauseReason,
-    pausedAt: nullable(readRequired(record, "pausedAt"), parseUtcTimestamp),
-    revision: parseRevision(
-      readRequired(record, "revision"),
-      "campaign.revision"
-    ),
+    pausedAt,
+    revision,
     status,
-    stopOnReply: true,
-    tenantId: parseTenantId(readRequired(record, "tenantId")),
-    updatedAt: parseUtcTimestamp(readRequired(record, "updatedAt")),
+    stopOnReply,
+    tenantId,
+    updatedAt,
   });
 }
 
@@ -657,8 +735,109 @@ function parseLinkedInCapabilitiesAt(
   });
 }
 
+function requiredLinkedInPauseReason(
+  status: LinkedInConnectionStatus
+): ProductPauseReason | null {
+  if (
+    status === "DISCONNECTED" ||
+    status === "WAITING_FOR_AUTH" ||
+    status === "RECONNECT_REQUIRED"
+  ) {
+    return "ACCOUNT_DISCONNECTED";
+  }
+  if (status === "CHALLENGE_REQUIRED" || status === "RESTRICTED") {
+    return "ACCOUNT_RESTRICTED";
+  }
+  if (status === "RECONCILING") {
+    return "ACCOUNT_RECONCILIATION";
+  }
+  return null;
+}
+
+function validateLinkedInStatus(
+  status: LinkedInConnectionStatus,
+  health: LinkedInAccountView["health"],
+  outboundPaused: boolean,
+  pauseReason: ProductPauseReason | null,
+  reconciliationRequired: boolean
+): void {
+  if (status !== "CONNECTED" && health === "HEALTHY") {
+    throw new ContractValidationError(
+      "non-connected LinkedIn accounts cannot report healthy status"
+    );
+  }
+  const requiredPauseReason = requiredLinkedInPauseReason(status);
+  if (
+    requiredPauseReason !== null &&
+    (!outboundPaused || pauseReason !== requiredPauseReason)
+  ) {
+    throw new ContractValidationError(
+      `LinkedIn ${status.toLowerCase()} accounts must preserve their pause reason`
+    );
+  }
+  if (status === "RECONCILING" && !reconciliationRequired) {
+    throw new ContractValidationError(
+      "reconciling LinkedIn accounts must require reconciliation"
+    );
+  }
+}
+
+function validateConnectedLinkedInOutbound(
+  health: LinkedInAccountView["health"],
+  capabilities: LinkedInCapabilities,
+  outboundPaused: boolean,
+  pauseReason: ProductPauseReason | null,
+  reconciliationRequired: boolean
+): void {
+  const readyForOutbound =
+    health === "HEALTHY" &&
+    !reconciliationRequired &&
+    capabilities.canInvite === true &&
+    capabilities.canMessage === true;
+  if (
+    !readyForOutbound &&
+    (!outboundPaused || pauseReason !== "ACCOUNT_RECONCILIATION")
+  ) {
+    throw new ContractValidationError(
+      "unready connected LinkedIn accounts must pause outbound work"
+    );
+  }
+  if (
+    readyForOutbound &&
+    outboundPaused &&
+    pauseReason !== "ACCOUNT_MANUAL_PAUSE"
+  ) {
+    throw new ContractValidationError(
+      "ready connected LinkedIn accounts may only use a manual pause"
+    );
+  }
+}
+
 export function parseLinkedInAccountView(value: unknown): LinkedInAccountView {
   const record = expectRecord(value, "linkedinAccount");
+  const accountId = parseAccountId(readRequired(record, "accountId"));
+  const capabilities = parseLinkedInCapabilitiesAt(
+    readRequired(record, "capabilities"),
+    "linkedinAccount.capabilities"
+  );
+  const connectedAt = nullable(
+    readRequired(record, "connectedAt"),
+    parseUtcTimestamp
+  );
+  const displayName = parseNullableProductText(
+    readRequired(record, "displayName"),
+    "linkedinAccount.displayName",
+    240
+  );
+  const health = member(
+    readRequired(record, "health"),
+    LINKEDIN_HEALTH_STATUSES,
+    "linkedinAccount.health"
+  );
+  const lastCheckedAt = nullable(
+    readRequired(record, "lastCheckedAt"),
+    parseUtcTimestamp
+  );
   const outboundPaused = expectBoolean(
     readRequired(record, "outboundPaused"),
     "linkedinAccount.outboundPaused"
@@ -671,46 +850,51 @@ export function parseLinkedInAccountView(value: unknown): LinkedInAccountView {
       "linkedinAccount pauseReason must match outboundPaused"
     );
   }
-  return Object.freeze({
-    accountId: parseAccountId(readRequired(record, "accountId")),
-    capabilities: parseLinkedInCapabilitiesAt(
-      readRequired(record, "capabilities"),
-      "linkedinAccount.capabilities"
-    ),
-    connectedAt: nullable(
-      readRequired(record, "connectedAt"),
-      parseUtcTimestamp
-    ),
-    displayName: parseNullableProductText(
-      readRequired(record, "displayName"),
-      "linkedinAccount.displayName",
-      240
-    ),
-    health: member(
-      readRequired(record, "health"),
-      LINKEDIN_HEALTH_STATUSES,
-      "linkedinAccount.health"
-    ),
-    lastCheckedAt: nullable(
-      readRequired(record, "lastCheckedAt"),
-      parseUtcTimestamp
-    ),
+  const reconciliationRequired = expectBoolean(
+    readRequired(record, "reconciliationRequired"),
+    "linkedinAccount.reconciliationRequired"
+  );
+  const revision = parseRevision(
+    readRequired(record, "revision"),
+    "linkedinAccount.revision"
+  );
+  const status = member(
+    readRequired(record, "status"),
+    LINKEDIN_CONNECTION_STATUSES,
+    "linkedinAccount.status"
+  );
+  const tenantId = parseTenantId(readRequired(record, "tenantId"));
+  // Outbound is active only for a connected, healthy, capable and reconciled account.
+  // Every other provider state has a stable pause reason for the customer UI.
+  validateLinkedInStatus(
+    status,
+    health,
     outboundPaused,
     pauseReason,
-    reconciliationRequired: expectBoolean(
-      readRequired(record, "reconciliationRequired"),
-      "linkedinAccount.reconciliationRequired"
-    ),
-    revision: parseRevision(
-      readRequired(record, "revision"),
-      "linkedinAccount.revision"
-    ),
-    status: member(
-      readRequired(record, "status"),
-      LINKEDIN_CONNECTION_STATUSES,
-      "linkedinAccount.status"
-    ),
-    tenantId: parseTenantId(readRequired(record, "tenantId")),
+    reconciliationRequired
+  );
+  if (status === "CONNECTED") {
+    validateConnectedLinkedInOutbound(
+      health,
+      capabilities,
+      outboundPaused,
+      pauseReason,
+      reconciliationRequired
+    );
+  }
+  return Object.freeze({
+    accountId,
+    capabilities,
+    connectedAt,
+    displayName,
+    health,
+    lastCheckedAt,
+    outboundPaused,
+    pauseReason,
+    reconciliationRequired,
+    revision,
+    status,
+    tenantId,
   });
 }
 
@@ -1070,13 +1254,51 @@ export function parsePipelineRowView(value: unknown): PipelineRowView {
       "human handover rows must be human-owned"
     );
   }
+  const stage = member(
+    readRequired(record, "stage"),
+    PIPELINE_STAGES,
+    "pipelineRow.stage"
+  );
   const unknownActionCount = parseNonNegativeCount(
     readRequired(record, "unknownActionCount"),
     "pipelineRow.unknownActionCount"
   );
+  const holdReasons = expectArrayOf(
+    readRequired(record, "holdReasons"),
+    (item, itemPath) => member(item, ELIGIBILITY_REASON_CODES, itemPath),
+    "pipelineRow.holdReasons",
+    10
+  );
+  const nextDueAt = nullable(
+    readRequired(record, "nextDueAt"),
+    parseUtcTimestamp
+  );
+  const nextStep = nullable(readRequired(record, "nextStep"), (input) =>
+    member(
+      input,
+      ["INVITATION", "DM1", "DM2", "DM3", "DM4", "DM5"] as const,
+      "pipelineRow.nextStep"
+    )
+  );
   if (unknownActionCount > 0 && automation === "ACTIVE") {
     throw new ContractValidationError(
       "rows with unknown actions cannot report active automation"
+    );
+  }
+  if (unknownActionCount > 0 && !holdReasons.includes("UNKNOWN_SEND")) {
+    throw new ContractValidationError(
+      "rows with unknown actions must expose an UNKNOWN_SEND hold"
+    );
+  }
+  if (
+    stage === "REPLIED" &&
+    (ownership !== "HUMAN_OWNED" ||
+      automation !== "HUMAN_HANDOVER" ||
+      nextDueAt !== null ||
+      nextStep !== null)
+  ) {
+    throw new ContractValidationError(
+      "replied pipeline rows must be handed over without future automation"
     );
   }
   return Object.freeze({
@@ -1111,31 +1333,16 @@ export function parsePipelineRowView(value: unknown): PipelineRowView {
       "pipelineRow.headline",
       500
     ),
-    holdReasons: expectArrayOf(
-      readRequired(record, "holdReasons"),
-      (item, itemPath) => member(item, ELIGIBILITY_REASON_CODES, itemPath),
-      "pipelineRow.holdReasons",
-      10
-    ),
+    holdReasons,
     lastActivityAt: nullable(
       readRequired(record, "lastActivityAt"),
       parseUtcTimestamp
     ),
-    nextDueAt: nullable(readRequired(record, "nextDueAt"), parseUtcTimestamp),
-    nextStep: nullable(readRequired(record, "nextStep"), (input) =>
-      member(
-        input,
-        ["INVITATION", "DM1", "DM2", "DM3", "DM4", "DM5"] as const,
-        "pipelineRow.nextStep"
-      )
-    ),
+    nextDueAt,
+    nextStep,
     ownership,
     prospectId: parseProspectId(readRequired(record, "prospectId")),
-    stage: member(
-      readRequired(record, "stage"),
-      PIPELINE_STAGES,
-      "pipelineRow.stage"
-    ),
+    stage,
     tenantId: parseTenantId(readRequired(record, "tenantId")),
     unknownActionCount,
   });
@@ -1158,8 +1365,35 @@ function parseProductPageAt<T>(
   });
 }
 
+function parseTenantScopedProductPageAt<
+  T extends Readonly<{ tenantId: TenantId }>,
+>(
+  value: unknown,
+  itemParser: (input: unknown) => T,
+  path: string
+): ProductPage<T> & Readonly<{ tenantId: TenantId }> {
+  const record = expectRecord(value, path);
+  const tenantId = parseTenantId(readRequired(record, "tenantId"));
+  const items = expectArrayOf(
+    readRequired(record, "items"),
+    (item) => itemParser(item),
+    `${path}.items`,
+    50
+  );
+  if (items.some((item) => item.tenantId !== tenantId)) {
+    throw new ContractValidationError(
+      `${path} items must belong to the view tenant`
+    );
+  }
+  return Object.freeze({
+    items,
+    page: parsePageInfo(readRequired(record, "page")),
+    tenantId,
+  });
+}
+
 export function parseCampaignListView(value: unknown): CampaignListView {
-  return parseProductPageAt(value, parseCampaignView, "campaigns");
+  return parseTenantScopedProductPageAt(value, parseCampaignView, "campaigns");
 }
 
 export function parseCampaignListViewState(
@@ -1169,7 +1403,11 @@ export function parseCampaignListViewState(
 }
 
 export function parsePipelinePageView(value: unknown): PipelinePageView {
-  return parseProductPageAt(value, parsePipelineRowView, "pipeline");
+  return parseTenantScopedProductPageAt(
+    value,
+    parsePipelineRowView,
+    "pipeline"
+  );
 }
 
 export function parsePipelineViewState(
@@ -1312,6 +1550,88 @@ function parseTimelineUnknownOutcome(
   });
 }
 
+function validateConversationOwnership(
+  ownership: OwnershipKind,
+  automation: ConversationTimelineView["automation"],
+  handover: ConversationHandoverView | null
+): void {
+  if (ownership === "HUMAN_OWNED" && handover === null) {
+    throw new ContractValidationError(
+      "human-owned conversations must explain the LinkedIn handover"
+    );
+  }
+  if (automation === "HUMAN_HANDOVER" && ownership !== "HUMAN_OWNED") {
+    throw new ContractValidationError(
+      "human handover conversations must be human-owned"
+    );
+  }
+}
+
+function validateConversationPauseState(
+  automation: ConversationTimelineView["automation"],
+  pauseReason: ProductPauseReason | null
+): void {
+  if (
+    (automation === "PAUSED" || automation === "HUMAN_HANDOVER") &&
+    pauseReason === null
+  ) {
+    throw new ContractValidationError(
+      "paused or handed-over conversations must include a pause reason"
+    );
+  }
+  if (automation === "ACTIVE" && pauseReason !== null) {
+    throw new ContractValidationError(
+      "active conversations cannot include a pause reason"
+    );
+  }
+}
+
+function validateConversationReplyStop(
+  automation: ConversationTimelineView["automation"],
+  ownership: OwnershipKind,
+  handover: ConversationHandoverView | null,
+  pauseReason: ProductPauseReason | null,
+  replyStopTriggered: boolean
+): void {
+  if (!replyStopTriggered) {
+    return;
+  }
+  if (
+    automation !== "HUMAN_HANDOVER" ||
+    ownership !== "HUMAN_OWNED" ||
+    handover === null ||
+    pauseReason !== "HUMAN_HANDOVER"
+  ) {
+    throw new ContractValidationError(
+      "incoming messages require a human handover before more outreach"
+    );
+  }
+}
+
+function validateConversationUnknownOutcomes(
+  automation: ConversationTimelineView["automation"],
+  pauseReason: ProductPauseReason | null,
+  unknownOutcomes: readonly TimelineUnknownOutcomeView[],
+  replyStopTriggered: boolean
+): void {
+  if (unknownOutcomes.length === 0) {
+    return;
+  }
+  if (automation === "ACTIVE") {
+    throw new ContractValidationError(
+      "unknown send outcomes cannot report active automation"
+    );
+  }
+  if (
+    pauseReason !== "UNKNOWN_SEND" &&
+    !(replyStopTriggered && pauseReason === "HUMAN_HANDOVER")
+  ) {
+    throw new ContractValidationError(
+      "unknown send outcomes must expose an outbound hold"
+    );
+  }
+}
+
 export function parseConversationTimelineView(
   value: unknown
 ): ConversationTimelineView {
@@ -1329,16 +1649,7 @@ export function parseConversationTimelineView(
   const handover = nullable(readRequired(record, "handover"), (input) =>
     parseConversationHandover(input)
   );
-  if (ownership === "HUMAN_OWNED" && handover === null) {
-    throw new ContractValidationError(
-      "human-owned conversations must explain the LinkedIn handover"
-    );
-  }
-  if (automation === "HUMAN_HANDOVER" && ownership !== "HUMAN_OWNED") {
-    throw new ContractValidationError(
-      "human handover conversations must be human-owned"
-    );
-  }
+  validateConversationOwnership(ownership, automation, handover);
   const pauseReason = nullable(readRequired(record, "pauseReason"), (input) =>
     parseProductPauseReason(input, "conversationTimeline.pauseReason")
   );
@@ -1348,28 +1659,45 @@ export function parseConversationTimelineView(
     "conversationTimeline.unknownOutcomes",
     20
   );
-  if (
-    (automation === "PAUSED" || automation === "HUMAN_HANDOVER") &&
-    pauseReason === null
-  ) {
+  const lastIncomingAt = nullable(
+    readRequired(record, "lastIncomingAt"),
+    parseUtcTimestamp
+  );
+  const messages = parseProductPageAt(
+    readRequired(record, "messages"),
+    parseTimelineMessageView,
+    "conversationTimeline.messages"
+  );
+  const hasVisibleIncomingMessage = messages.items.some(
+    (message) => message.direction === "INBOUND"
+  );
+  const replyStopTriggered =
+    lastIncomingAt !== null || hasVisibleIncomingMessage;
+  if (hasVisibleIncomingMessage && lastIncomingAt === null) {
     throw new ContractValidationError(
-      "paused or handed-over conversations must include a pause reason"
+      "visible inbound messages require conversationTimeline.lastIncomingAt"
     );
   }
-  if (automation === "ACTIVE" && pauseReason !== null) {
-    throw new ContractValidationError(
-      "active conversations cannot include a pause reason"
-    );
-  }
+  validateConversationPauseState(automation, pauseReason);
+  validateConversationReplyStop(
+    automation,
+    ownership,
+    handover,
+    pauseReason,
+    replyStopTriggered
+  );
+  validateConversationUnknownOutcomes(
+    automation,
+    pauseReason,
+    unknownOutcomes,
+    replyStopTriggered
+  );
   return Object.freeze({
     accountId: parseAccountId(readRequired(record, "accountId")),
     automation,
     conversationId: parseConversationId(readRequired(record, "conversationId")),
     handover,
-    lastIncomingAt: nullable(
-      readRequired(record, "lastIncomingAt"),
-      parseUtcTimestamp
-    ),
+    lastIncomingAt,
     linkedinConversationUrl: parseLinkedInUrl(
       readRequired(record, "linkedinConversationUrl"),
       "conversationTimeline.linkedinConversationUrl"
@@ -1378,11 +1706,7 @@ export function parseConversationTimelineView(
       readRequired(record, "linkedinProfileUrl"),
       "conversationTimeline.linkedinProfileUrl"
     ),
-    messages: parseProductPageAt(
-      readRequired(record, "messages"),
-      parseTimelineMessageView,
-      "conversationTimeline.messages"
-    ),
+    messages,
     ownership,
     pauseReason,
     prospectId: parseProspectId(readRequired(record, "prospectId")),

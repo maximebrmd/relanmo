@@ -3,13 +3,14 @@ import {
   DEFAULT_SEQUENCE_PLAN,
 } from "../values";
 import type { BillingRedirectView, BillingView } from "./billing";
-import type { CampaignView } from "./campaign";
+import type { CampaignListView, CampaignView } from "./campaign";
 import type { ProductViewState } from "./common";
 import type { LinkedInConnectionView, LinkedInAccountView } from "./connection";
 import type { MetricsView } from "./metrics";
 import {
   parseBillingRedirectView,
   parseBillingView,
+  parseCampaignListView,
   parseCampaignView,
   parseConversationTimelineView,
   parseDraftPreviewView,
@@ -145,10 +146,32 @@ export const linkedinRestrictedAccountFixture: LinkedInAccountView =
     tenantId: "tenant_demo",
   });
 
+export const linkedinManuallyPausedAccountFixture: LinkedInAccountView =
+  parseLinkedInAccountView({
+    accountId: "account_manual_pause",
+    capabilities: {
+      canInvite: true,
+      canMessage: true,
+      canReadMessages: true,
+      canSearch: true,
+    },
+    connectedAt: PRODUCT_FIXTURE_TIME,
+    displayName: "Compte mis en pause manuellement",
+    health: "HEALTHY",
+    lastCheckedAt: PRODUCT_FIXTURE_TIME,
+    outboundPaused: true,
+    pauseReason: "ACCOUNT_MANUAL_PAUSE",
+    reconciliationRequired: false,
+    revision: 4,
+    status: "CONNECTED",
+    tenantId: "tenant_demo",
+  });
+
 export const linkedinConnectionViewFixture: LinkedInConnectionView =
   parseLinkedInConnectionView({
     accounts: [
       linkedinConnectedAccountFixture,
+      linkedinManuallyPausedAccountFixture,
       linkedinRestrictedAccountFixture,
     ],
     selectedAccountId: "account_demo",
@@ -191,6 +214,17 @@ export const campaignViewFixture: CampaignView = parseCampaignView({
   stopOnReply: true,
   tenantId: "tenant_demo",
   updatedAt: PRODUCT_FIXTURE_TIME,
+});
+
+export const campaignListViewFixture: CampaignListView = parseCampaignListView({
+  items: [campaignViewFixture],
+  page: {
+    cursor: null,
+    hasMore: false,
+    nextCursor: null,
+    totalCount: 1,
+  },
+  tenantId: "tenant_demo",
 });
 
 export const pausedCampaignViewFixture: CampaignView = parseCampaignView({
@@ -292,6 +326,7 @@ export const pipelinePageFixture: PipelinePageView = parsePipelinePageView({
     nextCursor: null,
     totalCount: 2,
   },
+  tenantId: "tenant_demo",
 });
 
 export const pipelineEmptyStateFixture: ProductViewState<PipelinePageView> = {

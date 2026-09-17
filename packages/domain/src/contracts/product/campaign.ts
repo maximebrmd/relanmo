@@ -108,7 +108,8 @@ export type CampaignCommand =
   | ActivateCampaignCommand
   | PauseCampaignCommand;
 
-export type CampaignListView = ProductPage<CampaignView>;
+export type CampaignListView = ProductPage<CampaignView> &
+  Readonly<{ tenantId: TenantId }>;
 export type CampaignQuery =
   | Readonly<
       TenantSelector & {

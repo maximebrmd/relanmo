@@ -100,7 +100,8 @@ export type PipelineRowView = Readonly<{
   headline: string | null;
 }>;
 
-export type PipelinePageView = ProductPage<PipelineRowView>;
+export type PipelinePageView = ProductPage<PipelineRowView> &
+  Readonly<{ tenantId: TenantId }>;
 export type PipelineViewResult = ProductViewState<PipelinePageView>;
 
 export type PipelineQueryHandler = (

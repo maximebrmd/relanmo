@@ -20,7 +20,6 @@ import {
   expectBoolean,
   expectInteger,
   expectNonEmptyString,
-  expectNullableString,
   expectRecord,
   expectString,
   isMember,
@@ -68,6 +67,12 @@ export type ProductError = Readonly<{
   revision: RevisionConflict | null;
 }>;
 
+const PRODUCT_ERROR_FIELD_PATTERN =
+  /^[a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*){0,5}$/u;
+const PRODUCT_ERROR_FORBIDDEN_FIELD_PATTERN =
+  /(?:^|\.)(?:accessToken|apiKey|cause|credential|password|provider|rawResponse|refreshToken|secret|token)(?:\.|$)/iu;
+const PRODUCT_ERROR_FIELD_MAXIMUM = 96;
+
 export type RevisionGuard = Readonly<{ expectedRevision: number }>;
 
 export type ProductCommandSuccess<T> = Readonly<{
@@ -96,6 +101,7 @@ export type ProductViewStatus = (typeof PRODUCT_VIEW_STATUSES)[number];
 
 export const PRODUCT_PAUSE_REASONS = [
   "ACCOUNT_DISCONNECTED",
+  "ACCOUNT_MANUAL_PAUSE",
   "ACCOUNT_RESTRICTED",
   "ACCOUNT_RECONCILIATION",
   "CAMPAIGN_PAUSED",
@@ -330,13 +336,22 @@ export function parseProductError(value: unknown): ProductError {
       "only REVISION_CONFLICT errors may include revision details"
     );
   }
+  const fieldValue = readRequired(record, "field");
+  const field = isNull(fieldValue)
+    ? null
+    : parseProductText(fieldValue, "error.field", PRODUCT_ERROR_FIELD_MAXIMUM);
+  if (
+    field !== null &&
+    (!PRODUCT_ERROR_FIELD_PATTERN.test(field) ||
+      PRODUCT_ERROR_FORBIDDEN_FIELD_PATTERN.test(field))
+  ) {
+    throw new ContractValidationError(
+      "error.field must be a bounded UI field path"
+    );
+  }
   return Object.freeze({
     code,
-    field: expectNullableString(
-      readRequired(record, "field"),
-      "error.field",
-      false
-    ),
+    field,
     retryable: expectBoolean(
       readRequired(record, "retryable"),
       "error.retryable"
@@ -430,9 +445,26 @@ export function parseProductViewState<T>(
 
 export function parseRelativeReturnPath(value: unknown): string {
   const parsed = parseProductText(value, "returnTo", 256);
-  if (!parsed.startsWith("/") || parsed.startsWith("//")) {
+  const trustedOrigin = "https://app.relanmo.internal";
+  if (
+    !parsed.startsWith("/") ||
+    parsed.startsWith("//") ||
+    parsed.includes("\\") ||
+    /%(?:25)*(?:2f|5c)/iu.test(parsed)
+  ) {
     throw new ContractValidationError(
       "returnTo must be an internal absolute path"
+    );
+  }
+  let resolved: URL;
+  try {
+    resolved = new URL(parsed, trustedOrigin);
+  } catch {
+    throw new ContractValidationError("returnTo must be a valid URL path");
+  }
+  if (resolved.origin !== trustedOrigin || !resolved.pathname.startsWith("/")) {
+    throw new ContractValidationError(
+      "returnTo must resolve to the application origin"
     );
   }
   return parsed;
