@@ -1,0 +1,16 @@
+{
+  "extends": "@relanmo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"],
+      "@relanmo/*": ["../../packages/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ]
+}

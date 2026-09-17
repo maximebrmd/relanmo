@@ -1,0 +1,14 @@
+{
+  "name": "@relanmo/domain",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "devDependencies": {
+    "@relanmo/typescript-config": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}
