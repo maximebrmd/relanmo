@@ -449,8 +449,7 @@ export function parseRelativeReturnPath(value: unknown): string {
   if (
     !parsed.startsWith("/") ||
     parsed.startsWith("//") ||
-    parsed.includes("\\") ||
-    /%(?:25)*(?:2f|5c)/iu.test(parsed)
+    parsed.includes("\\")
   ) {
     throw new ContractValidationError(
       "returnTo must be an internal absolute path"
@@ -467,5 +466,6 @@ export function parseRelativeReturnPath(value: unknown): string {
       "returnTo must resolve to the application origin"
     );
   }
+  // Preserve encoded path/query data; callers must not decode and reinterpret it.
   return parsed;
 }

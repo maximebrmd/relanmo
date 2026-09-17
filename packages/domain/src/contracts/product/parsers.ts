@@ -1301,6 +1301,14 @@ export function parsePipelineRowView(value: unknown): PipelineRowView {
       "replied pipeline rows must be handed over without future automation"
     );
   }
+  if (
+    (stage === "SUPPRESSED" || holdReasons.includes("SUPPRESSED")) &&
+    (automation === "ACTIVE" || nextDueAt !== null || nextStep !== null)
+  ) {
+    throw new ContractValidationError(
+      "suppressed pipeline rows cannot have active or future automation"
+    );
+  }
   return Object.freeze({
     accountId: parseAccountId(readRequired(record, "accountId")),
     automation,
@@ -1553,8 +1561,17 @@ function parseTimelineUnknownOutcome(
 function validateConversationOwnership(
   ownership: OwnershipKind,
   automation: ConversationTimelineView["automation"],
-  handover: ConversationHandoverView | null
+  handover: ConversationHandoverView | null,
+  lastIncomingAt: ConversationTimelineView["lastIncomingAt"]
 ): void {
+  if (
+    handover !== null &&
+    (ownership !== "HUMAN_OWNED" || automation !== "HUMAN_HANDOVER")
+  ) {
+    throw new ContractValidationError(
+      "required handovers must be human-owned and handed over"
+    );
+  }
   if (ownership === "HUMAN_OWNED" && handover === null) {
     throw new ContractValidationError(
       "human-owned conversations must explain the LinkedIn handover"
@@ -1563,6 +1580,11 @@ function validateConversationOwnership(
   if (automation === "HUMAN_HANDOVER" && ownership !== "HUMAN_OWNED") {
     throw new ContractValidationError(
       "human handover conversations must be human-owned"
+    );
+  }
+  if (handover?.reason === "INCOMING_MESSAGE" && lastIncomingAt === null) {
+    throw new ContractValidationError(
+      "incoming-message handovers require incoming conversation state"
     );
   }
 }
@@ -1649,7 +1671,6 @@ export function parseConversationTimelineView(
   const handover = nullable(readRequired(record, "handover"), (input) =>
     parseConversationHandover(input)
   );
-  validateConversationOwnership(ownership, automation, handover);
   const pauseReason = nullable(readRequired(record, "pauseReason"), (input) =>
     parseProductPauseReason(input, "conversationTimeline.pauseReason")
   );
@@ -1662,6 +1683,12 @@ export function parseConversationTimelineView(
   const lastIncomingAt = nullable(
     readRequired(record, "lastIncomingAt"),
     parseUtcTimestamp
+  );
+  validateConversationOwnership(
+    ownership,
+    automation,
+    handover,
+    lastIncomingAt
   );
   const messages = parseProductPageAt(
     readRequired(record, "messages"),

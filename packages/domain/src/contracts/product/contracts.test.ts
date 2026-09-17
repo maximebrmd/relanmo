@@ -569,6 +569,44 @@ describe("product DTO invalid cases", () => {
         status: "READY",
       })
     ).toThrow();
+    const outboundOnlyMessages = {
+      ...conversationTimelineViewFixture.messages,
+      items: [conversationTimelineViewFixture.messages.items[0]],
+      page: {
+        ...conversationTimelineViewFixture.messages.page,
+        totalCount: 1,
+      },
+    };
+    expect(() =>
+      parseConversationTimelineViewState({
+        data: {
+          ...conversationTimelineViewFixture,
+          automation: "PAUSED",
+          handover: conversationTimelineViewFixture.handover,
+          lastIncomingAt: null,
+          messages: outboundOnlyMessages,
+          ownership: "BOT_ELIGIBLE",
+          pauseReason: "ACCOUNT_MANUAL_PAUSE",
+          unknownOutcomes: [],
+        },
+        status: "READY",
+      })
+    ).toThrow();
+    expect(() =>
+      parseConversationTimelineViewState({
+        data: {
+          ...conversationTimelineViewFixture,
+          automation: "HUMAN_HANDOVER",
+          handover: conversationTimelineViewFixture.handover,
+          lastIncomingAt: null,
+          messages: outboundOnlyMessages,
+          ownership: "HUMAN_OWNED",
+          pauseReason: "HUMAN_HANDOVER",
+          unknownOutcomes: [],
+        },
+        status: "READY",
+      })
+    ).toThrow();
   });
 
   it("rejects unsafe or semantically inconsistent DTOs", () => {
@@ -611,6 +649,21 @@ describe("product DTO invalid cases", () => {
       })
     ).toThrow();
     expect(() =>
+      parsePipelineViewState({
+        data: {
+          ...pipelinePageFixture,
+          items: [
+            {
+              ...pipelinePageFixture.items[0],
+              holdReasons: ["SUPPRESSED"],
+              stage: "SUPPRESSED",
+            },
+          ],
+        },
+        status: "READY",
+      })
+    ).toThrow();
+    expect(() =>
       parseConversationTimelineViewState({
         data: {
           ...conversationTimelineViewFixture,
@@ -643,12 +696,19 @@ describe("product DTO invalid cases", () => {
       }).returnTo
     ).toBe("/settings/billing?from=checkout");
     for (const returnTo of [
-      "/\\host",
-      "/%5Chost",
+      "/settings/billing?plan=pro%2Fannual",
+      "/settings/%5C-data",
       "/%2F%2Fhost",
-      "/%252F%252Fhost",
-      "//host",
     ]) {
+      expect(
+        parseBillingCommand({
+          kind: "START_CHECKOUT",
+          returnTo,
+          tenantId: "tenant_demo",
+        }).returnTo
+      ).toBe(returnTo);
+    }
+    for (const returnTo of ["/\\host", "//host"]) {
       expect(() =>
         parseBillingCommand({
           kind: "START_CHECKOUT",
