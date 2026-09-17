@@ -91,7 +91,10 @@ import type {
   RecordInboxEventResult,
   WorkflowStopOutboxEvent,
 } from "./events";
-import { validateInboxEventScope } from "./events";
+import {
+  accountIdsToHoldForInboxEvent,
+  validateInboxEventScope,
+} from "./events";
 import type {
   ClaimBotEligibilityInput,
   ClaimBotEligibilityResult,
@@ -637,7 +640,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
 
   it("quarantines an unrecognized envelope with bounded evidence and an account hold", () => {
     const result: QuarantineInboxEventResult = {
-      accountId,
+      affectedAccountIds: [accountId],
       event: unrecognizedInboxRecord,
       holdAccount: true,
       outcome: "QUARANTINED",
@@ -649,6 +652,9 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(result.event.event.canonicalPayloadFingerprint).toBe(
       "canonical-unrecognized-event-1"
     );
+    expect(
+      accountIdsToHoldForInboxEvent(unrecognizedInboxEvent, tenantId)
+    ).toEqual([accountId]);
     expect(result.holdAccount).toBe(true);
   });
 
@@ -688,7 +694,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     }
 
     const quarantined: QuarantineInboxEventResult = {
-      accountId,
+      affectedAccountIds: [otherAccountId, accountId],
       event: {
         ...inboxEvent,
         event: mismatchedAccount,
@@ -701,11 +707,11 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       reason: "IDENTITY_MISMATCH",
     };
     const noKnownAccount: QuarantineAccountOutcome = {
-      accountId: null,
+      affectedAccountIds: [],
       holdAccount: false,
     };
     const manualQuarantine: ManualTakeoverResult = {
-      accountId,
+      affectedAccountIds: [accountId],
       event: { ...outgoingInboxRecord, event: mismatchedOutgoing },
       holdAccount: true,
       outcome: "QUARANTINED",
@@ -713,9 +719,24 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     };
 
     expect(quarantined.reason).toBe("IDENTITY_MISMATCH");
-    expect(quarantined.accountId).toBe(accountId);
+    expect(accountIdsToHoldForInboxEvent(mismatchedAccount, tenantId)).toEqual([
+      otherAccountId,
+      accountId,
+    ]);
+    expect(
+      accountIdsToHoldForInboxEvent(
+        {
+          ...mismatchedAccount,
+          scope: { ...mismatchedAccount.scope, tenantId: otherTenantId },
+        },
+        tenantId
+      )
+    ).toEqual([accountId]);
+    expect(quarantined.affectedAccountIds).toEqual([otherAccountId, accountId]);
     expect(quarantined.holdAccount).toBe(true);
+    expect(noKnownAccount.affectedAccountIds).toEqual([]);
     expect(noKnownAccount.holdAccount).toBe(false);
+    expect(manualQuarantine.affectedAccountIds).toEqual([accountId]);
     expect(manualQuarantine.outcome).toBe("QUARANTINED");
   });
 

@@ -133,6 +133,32 @@ export function validateInboxEventScope(
     : { mismatches, valid: false };
 }
 
+/**
+ * Returns every account candidate that is valid within the authoritative
+ * tenant. The scope candidate is listed before the normalized message
+ * candidate; duplicates are removed without crossing tenant boundaries. The
+ * caller must pass tx.scope.tenantId, never a customer-supplied tenant ID.
+ */
+export function accountIdsToHoldForInboxEvent(
+  event: InboxEventEnvelope,
+  authoritativeTenantId: TenantId
+): readonly AccountId[] {
+  const candidates: AccountId[] = [];
+  if (
+    event.scope.tenantId === authoritativeTenantId &&
+    event.scope.accountId !== null
+  ) {
+    candidates.push(event.scope.accountId);
+  }
+  if (
+    event.kind !== "UNRECOGNIZED" &&
+    event.message.tenantId === authoritativeTenantId
+  ) {
+    candidates.push(event.message.accountId);
+  }
+  return [...new Set(candidates)];
+}
+
 export type InboxProcessingLease = Readonly<{
   expiresAt: UtcTimestamp;
   fence: number;
@@ -184,14 +210,23 @@ export type QuarantineInboxEventInput = Readonly<{
   tenantId: TenantId;
 }>;
 
-/** A known affected account can never be quarantined without a hold. */
+/**
+ * An affected account can never be quarantined without a hold. The tuple is
+ * the exact, deduplicated set of account rows the transaction must hold.
+ */
 export type QuarantineAccountOutcome =
   | Readonly<{
-      accountId: AccountId;
+      /**
+       * Every distinct account candidate valid in the authoritative tenant,
+       * in the deterministic scope-first order returned by
+       * accountIdsToHoldForInboxEvent. All IDs are held atomically.
+       */
+      affectedAccountIds: readonly [AccountId, ...AccountId[]];
       holdAccount: true;
     }>
   | Readonly<{
-      accountId: null;
+      /** No account candidate was valid in the authoritative tenant. */
+      affectedAccountIds: readonly [];
       holdAccount: false;
     }>;
 
@@ -253,8 +288,9 @@ export type ListInboxDeadLettersResult = Readonly<{
 /**
  * Inbox persistence is a durable first step; no model classification belongs
  * in this port. Implementations validate normalized scope/message identity
- * before state changes and commit quarantine plus a known-account hold
- * atomically.
+ * before state changes and commit quarantine plus a hold for every account in
+ * the result's affectedAccountIds atomically. accountIdsToHoldForInboxEvent
+ * defines the tenant-filtered candidate set for that result.
  */
 export interface InboxRepository {
   acknowledge: (
@@ -560,7 +596,8 @@ export type ManualTakeoverResult =
  * matched against the ledger inside this same transaction: exact matches are
  * bot echoes, unmatched owner messages take the pair over, and inconclusive
  * matches hold the account for reconciliation. A scope mismatch is
- * quarantined with the known-account hold instead of choosing an identity.
+ * quarantined with holds for every affected account instead of choosing an
+ * identity. The affected account set is tenant-filtered and deduplicated.
  * Re-delivery returns DUPLICATE after the first decision instead of repeating
  * the side effects.
  */
