@@ -19,7 +19,8 @@
     "typecheck": "turbo run typecheck",
     "typecheck:fresh": "node tooling/commands/typecheck-fresh.mjs",
     "verify:install": "bun install --frozen-lockfile",
-    "verify:node": "node tooling/commands/node-smoke.mjs"
+    "verify:node": "node tooling/commands/node-smoke.mjs",
+    "verify:production": "node tooling/commands/production-node-smoke.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

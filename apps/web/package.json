@@ -17,7 +17,7 @@
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
-    "@types/node": "25.3.5",
+    "@types/node": "24.13.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "postcss": "8.5.28",

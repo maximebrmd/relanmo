@@ -54,6 +54,7 @@ bun run --filter @relanmo/domain typecheck
 | Fresh typecheck | `bun run typecheck:fresh` | Clears generated outputs, regenerates Next route types, then runs Turbo with `--force`. |
 | Builds | `bun run build` | Builds all affected workspace targets through Turbo. |
 | Node smoke | `bun run verify:node` | Compiles the worker TypeScript entry and executes `dist/index.js` with Node. |
+| Production Node smoke | `bun run verify:production` | Builds and starts `app` and `api` through their explicit Node Next.js entrypoints, then probes them locally. |
 | Baseline tests | `bun run test` | Runs the current workspace test scripts; pass-with-no-tests is intentional until test tasks land. |
 
 `typecheck:fresh` removes only generated `.next/`, `.turbo/`, `dist/` and
@@ -78,6 +79,29 @@ The current worker entry is deliberately a shell; the smoke proves Node can
 execute compiled TypeScript, not that a live Temporal worker or provider is
 configured. The test command currently has no test files in the scaffold and
 does not claim coverage or live integration proof.
+
+Production starts for the server apps are explicit Node commands:
+
+```sh
+bun run --filter app start
+bun run --filter api start
+```
+
+Both scripts invoke `node node_modules/next/dist/bin/next start`. The static
+`web` and `docs` apps use the `serve` CLI for their generated `out/` folders;
+they do not force Bun. `verify:production` builds `app` and `api`, launches
+those exact Node entrypoints on temporary localhost ports, probes `/` and
+`/health`, and shuts them down. Use `RELANMO_NODE_BIN` to make that smoke use
+an explicitly installed Node 24 binary.
+
+The runtime declaration exception is deliberate: every workspace that declares
+`@types/node` pins it to the latest published Node 24 line,
+`24.13.5`, even though newer Node-major declarations exist. This prevents
+strict TypeScript from approving Node 25-only APIs while production is pinned
+to Node `24.21.0`. It is the only dependency held below the newest major for
+runtime compatibility; the [Node type metadata](https://registry.npmjs.org/@types%2fnode)
+and [Node.js release policy](https://nodejs.org/en/about/previous-releases)
+support the exception.
 
 The docs build remains on `next build --webpack` as established by P001:
 Fumadocs' generated Turbopack query rules are not accepted by this pinned
