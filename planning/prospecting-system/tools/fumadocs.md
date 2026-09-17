@@ -25,7 +25,7 @@ Use `fumadocs-core`, `fumadocs-ui` and `fumadocs-mdx`, with required types such 
 1. Adapt `apps/docs` in place, retaining its workspace identity and Bun scripts. Use Fumadocs MDX as the content source. Remove obsolete Mintlify commands and configuration.
 2. Integrate its MDX loader, layouts and documentation navigation. Reuse branding and design tokens without pulling authenticated app providers into the public docs bundle.
 3. Configure `output: 'export'`, pre-render documentation routes, and use Fumadocs' static search-index/client configuration. Default server search cannot simply be left behind on a static host. [Static deployment](https://www.fumadocs.dev/docs/deploying/static).
-4. Run docs through the shared type checks, build and applicable Ultracite/Biome checks. Check MDX rendering and links during the docs build; Biome's source-code checks alone do not validate rendered content.
+4. Run docs through the shared type checks, build and applicable Ultracite/Oxlint/Oxfmt checks. Check MDX rendering and links during the docs build; source-code checks alone do not validate rendered content.
 5. Deploy the exported `apps/docs/out` directory as a Render static site. Preview the built output and verify deep links, French search, navigation and mobile layout.
 
 Use the pinned version's built-in local search. A separate hosted search provider or CMS is not needed for the initial documentation. New independent integrations follow the [dependency policy](../dependency-policy.md).

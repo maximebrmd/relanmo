@@ -2,7 +2,8 @@
   "$schema": "https://turborepo.com/schema.json",
   "globalDependencies": [
     "**/.env.*local",
-    "biome.jsonc",
+    "oxlint.config.ts",
+    "oxfmt.config.ts",
     "package.json",
     "packages/typescript-config/*.json"
   ],

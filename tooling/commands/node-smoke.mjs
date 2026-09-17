@@ -1,9 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 
-const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
-const workerRoot = join(repositoryRoot, "apps", "worker");
+const repositoryRoot = path.join(import.meta.dirname, "../..");
+const workerRoot = path.join(repositoryRoot, "apps", "worker");
 const bunExecutable =
   process.env.RELANMO_BUN_BIN ?? process.env.npm_execpath ?? "bun";
 const nodeExecutable = process.env.RELANMO_NODE_BIN ?? "node";

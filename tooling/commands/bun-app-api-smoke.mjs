@@ -1,20 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:net";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
-const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const repositoryRoot = path.join(import.meta.dirname, "../..");
 const bunExecutable =
   process.env.RELANMO_BUN_BIN ?? process.env.npm_execpath ?? "bun";
-const nodeExecutable = process.env.RELANMO_NODE_BIN ?? "node";
 const nextApps = [
-  { directory: join(repositoryRoot, "apps", "app"), name: "app", path: "/" },
-  {
-    directory: join(repositoryRoot, "apps", "api"),
-    name: "api",
-    path: "/health",
-  },
+  { name: "app", path: "/" },
+  { name: "api", path: "/health" },
 ];
 
 const run = (command, args, cwd = repositoryRoot) => {
@@ -24,45 +19,39 @@ const run = (command, args, cwd = repositoryRoot) => {
   });
 
   if (result.error) {
-    console.error(`Unable to run ${command}: ${result.error.message}`);
-    process.exit(1);
+    throw result.error;
   }
 
   if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+    throw new Error(`${command} exited with code ${result.status ?? 1}.`);
   }
 };
 
-const delay = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+const getFreePort = async () => {
+  const server = createServer();
+  const listening = once(server, "listening");
+  const failed = once(server, "error");
+  server.listen(0, "127.0.0.1");
 
-const getFreePort = () =>
-  new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
+  const event = await Promise.race([listening, failed]);
+  if (event.length > 0) {
+    throw event[0];
+  }
 
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("Could not determine a free localhost port."));
-        return;
-      }
+  const address = server.address();
+  if (!address || !address.port) {
+    server.close();
+    throw new Error("Could not determine a free localhost port.");
+  }
 
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(address.port);
-      });
-    });
-  });
+  server.close();
+  await once(server, "close");
+  return address.port;
+};
 
 const waitForReady = async (url, child, deadline) => {
   if (child.exitCode !== null) {
-    throw new Error(`Production process exited before serving ${url}.`);
+    throw new Error(`Bun production process exited before serving ${url}.`);
   }
 
   try {
@@ -99,31 +88,34 @@ for (const nextApp of nextApps) {
   run(bunExecutable, ["run", "--filter", nextApp.name, "build"]);
 }
 
-const smoke = async ({ directory, name, path }) => {
+const smoke = async ({ name, path: route }) => {
   const port = await getFreePort();
   const child = spawn(
-    nodeExecutable,
+    bunExecutable,
     [
-      "node_modules/next/dist/bin/next",
+      "run",
+      "--filter",
+      name,
       "start",
+      "--",
       "--hostname",
       "127.0.0.1",
       "--port",
       String(port),
     ],
     {
-      cwd: directory,
+      cwd: repositoryRoot,
       stdio: "inherit",
     }
   );
 
   try {
     await waitForReady(
-      `http://127.0.0.1:${port}${path}`,
+      `http://127.0.0.1:${port}${route}`,
       child,
       Date.now() + 30_000
     );
-    console.info(`Node production smoke passed: ${name}`);
+    console.info(`Bun app/API smoke passed: ${name}`);
   } finally {
     await stop(child);
   }

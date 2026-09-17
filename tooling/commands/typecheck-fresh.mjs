@@ -1,9 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { readdir, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 
-const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const repositoryRoot = path.join(import.meta.dirname, "../..");
 const bunExecutable =
   process.env.RELANMO_BUN_BIN ?? process.env.npm_execpath ?? "bun";
 const nextApps = ["app", "web", "api", "docs"];
@@ -28,7 +27,7 @@ const run = (command, args, cwd = repositoryRoot) => {
 
 const workspaceEntries = await Promise.all(
   workspaceGroups.map(async (workspaceGroup) => ({
-    entries: await readdir(join(repositoryRoot, workspaceGroup), {
+    entries: await readdir(path.join(repositoryRoot, workspaceGroup), {
       withFileTypes: true,
     }),
     workspaceGroup,
@@ -40,14 +39,19 @@ const generatedOutputPaths = workspaceEntries.flatMap(
       .filter((entry) => entry.isDirectory())
       .flatMap((entry) =>
         generatedDirectories.map((generatedDirectory) =>
-          join(repositoryRoot, workspaceGroup, entry.name, generatedDirectory)
+          path.join(
+            repositoryRoot,
+            workspaceGroup,
+            entry.name,
+            generatedDirectory
+          )
         )
       )
 );
 
 await Promise.all(
-  [join(repositoryRoot, ".turbo"), ...generatedOutputPaths].map((path) =>
-    rm(path, { force: true, recursive: true })
+  [path.join(repositoryRoot, ".turbo"), ...generatedOutputPaths].map(
+    (outputPath) => rm(outputPath, { force: true, recursive: true })
   )
 );
 console.info("Cleared workspace build and task-cache outputs.");
@@ -56,7 +60,7 @@ for (const nextApp of nextApps) {
   run(
     bunExecutable,
     ["x", "--no-install", "next", "typegen"],
-    join(repositoryRoot, "apps", nextApp)
+    path.join(repositoryRoot, "apps", nextApp)
   );
 }
 

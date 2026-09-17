@@ -59,7 +59,7 @@ Before adding anything, consult [next-forge's llms.txt](https://www.next-forge.c
 3. Replace `packages/auth` and its callers, including providers nested inside design-system setup. Remove obsolete Clerk keys and callbacks.
 4. Add the Temporal worker and workflow package. Its dependency graph must exclude React, Next.js request APIs and browser-only modules. Activities own network/database calls; workflow definitions remain deterministic.
 5. Configure Stripe in `packages/payments` and signed webhooks in `apps/api`. Add application billing tables and entitlement transitions.
-6. Configure Ultracite's Biome provider explicitly. Remove competing lint/format scripts left by the scaffold and make the chosen commands mandatory in CI.
+6. Configure Ultracite's Oxlint/Oxfmt providers and vendored anti-slop preset explicitly. Remove competing lint/format scripts left by the scaffold and make the chosen commands mandatory in CI.
 7. Keep package-local environment schemas. Validate required runtime configuration per deployed app; a missing auth, database, Stripe or worker key must produce a clear startup failure for the service that requires it.
 8. Add Fumadocs in `apps/docs` using the documented migration, then configure static export and browser search. Replace Mintlify scripts rather than requiring both documentation systems.
 9. Provision private R2 buckets through Wrangler and use the AWS S3 v3 SDK at runtime.

@@ -10,6 +10,7 @@ import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+
 import { getMDXComponents } from "@/components/mdx";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
 import { source } from "@/lib/source";
@@ -23,7 +24,7 @@ export default async function Page(
     notFound();
   }
 
-  const MDX = page.data.body;
+  const PageBody = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
 
   return (
@@ -40,7 +41,7 @@ export default async function Page(
         />
       </div>
       <DocsBody>
-        <MDX
+        <PageBody
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
             a: createRelativeLink(source, page),
@@ -51,7 +52,7 @@ export default async function Page(
   );
 }
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
   return source.generateParams();
 }
 

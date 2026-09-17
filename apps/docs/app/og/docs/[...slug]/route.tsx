@@ -1,5 +1,6 @@
 import { generateOGImage } from "fumadocs-ui/og";
 import { notFound } from "next/navigation";
+
 import { appName, getPageImageUrl } from "@/lib/shared";
 import { source } from "@/lib/source";
 

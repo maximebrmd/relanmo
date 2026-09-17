@@ -4,7 +4,7 @@
   "scripts": {
     "build": "bun --bun next build",
     "dev": "bun --bun next dev -p 3002",
-    "start": "node node_modules/next/dist/bin/next start",
+    "start": "bun --bun next start",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },

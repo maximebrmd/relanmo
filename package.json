@@ -2,17 +2,17 @@
   "name": "relanmo",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
+  "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "check": "bun run lint",
+    "check": "ultracite check",
     "clean": "git clean -xdf node_modules .turbo",
     "dev": "turbo run dev",
-    "fix": "bun run format",
+    "fix": "ultracite fix",
     "format": "ultracite fix",
     "lint": "ultracite check",
     "test": "turbo run test",
@@ -20,18 +20,19 @@
     "typecheck:fresh": "node tooling/commands/typecheck-fresh.mjs",
     "verify:install": "bun install --frozen-lockfile",
     "verify:node": "node tooling/commands/node-smoke.mjs",
-    "verify:production": "node tooling/commands/production-node-smoke.mjs"
+    "verify:bun": "node tooling/commands/bun-app-api-smoke.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
     "@relanmo/typescript-config": "workspace:*",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
     "turbo": "2.10.13",
     "typescript": "7.0.2",
     "ultracite": "7.12.0",
     "vitest": "5.0.1"
   },
-  "packageManager": "bun@1.4.2",
   "engines": {
     "node": ">=24.21.0 <25"
-  }
+  },
+  "packageManager": "bun@1.4.2"
 }

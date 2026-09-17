@@ -38,4 +38,4 @@ Compile-time checks catch mismatched interfaces; integration tests verify actual
 
 No separate language subscription is included. Compiler work consumes CI/build minutes already accounted for in the cost model.
 
-Official TypeScript-compatible vendor SDKs are required where available; see the [SDK policy and package matrix](../sdk-policy.md). Run strict `tsc --noEmit` checks separately from Ultracite/Biome formatting and linting.
+Official TypeScript-compatible vendor SDKs are required where available; see the [SDK policy and package matrix](../sdk-policy.md). Run strict `tsc --noEmit` checks separately from Ultracite/Oxlint/Oxfmt formatting and linting.
