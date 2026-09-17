@@ -1,7 +1,6 @@
 {
   "extends": "@relanmo/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
       "@relanmo/*": ["../../packages/*"]

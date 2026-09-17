@@ -7,9 +7,9 @@ export const docsContentRoute = "/llms.mdx/docs";
 
 // fill this with your actual GitHub info, for example:
 export const gitConfig = {
-  user: "maximebrmd",
-  repo: "relanmo",
   branch: "main",
+  repo: "relanmo",
+  user: "maximebrmd",
 };
 
 const getContentUrl = createGetUrl(docsContentRoute);

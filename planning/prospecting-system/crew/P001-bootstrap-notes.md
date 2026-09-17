@@ -58,3 +58,36 @@ At `2026-09-17T14:30:56Z`, the final verification commands all passed:
   allowed by `--passWithNoTests`.
 
 All are fixture/local checks; no live provider or customer data is involved.
+
+## Follow-up tooling correction
+
+On 2026-09-17, the live [Bun release page](https://bun.sh/) and the
+[Bun releases](https://github.com/oven-sh/bun/releases) identified Bun
+`1.4.2` as the current stable release. The root `packageManager` and the
+verification commands now use `bun@1.4.2`.
+
+The latest stable direct dependency set was resolved with
+`bun@1.4.2 update --latest --recursive` and a follow-up
+`bun@1.4.2 outdated --recursive --no-save --no-summary` reported no remaining
+outdated direct dependencies. This updates Next.js to `16.3.5`, React to
+`19.3.0`, TypeScript to `7.0.2`, Turbo to `2.10.13`, Ultracite to `7.12.0`,
+Biome to `2.5.14`, Vitest to `5.0.1`, Tailwind/PostCSS to `4.3.3`/`8.5.28`,
+the React design-system dependencies to their current stable versions, and
+keeps the current Fumadocs set because it was not reported as outdated.
+
+Compatibility adaptations required by those releases are limited to the
+existing scaffold: Ultracite's documented Biome preset paths are now
+`ultracite/biome/*`; TypeScript 7 no longer accepts `baseUrl`, so the local
+app and design-system configs rely on their existing `paths`; React Day
+Picker 10 uses `month_grid` instead of the removed `table` class key; and the
+theme menu uses a stable selection handler. No dependency was held back after
+the full checks passed, and no new provider or product dependency was added.
+
+The two applicable Greptile findings were fixed: Fumadocs static search now
+uses French language processing, and the design-system chart tooltip renders
+numeric zero values. At `2026-09-17T14:52:16Z`, latest-Bun frozen install,
+Ultracite check (95 files), Turbo typecheck (17 tasks), Turbo build (5 app and
+worker builds), Turbo test (2 pass-with-no-tests tasks), and the Node worker
+smoke test all passed. The initial PR remains open for independent review;
+there is still no provider provisioning, deployment, prospecting, or customer
+data migration.

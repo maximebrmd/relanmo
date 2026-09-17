@@ -20,10 +20,10 @@ type RelanmoDocsLoader = LoaderOutput<{
 const docs = defineDocs({
   dir: "content/docs",
   docs: {
-    schema: pageSchema,
     postprocess: {
       includeProcessedMarkdown: true,
     },
+    schema: pageSchema,
   },
   meta: {
     schema: metaSchema,
@@ -33,8 +33,8 @@ const docs = defineDocs({
 // See https://fumadocs.dev/docs/headless/source-api for more info
 export const source = loader({
   baseUrl: docsRoute,
-  source: docs.toFumadocsSource(),
   plugins: [],
+  source: docs.toFumadocsSource(),
 }) as unknown as RelanmoDocsLoader;
 
 export const docsLlms = llms(source, {

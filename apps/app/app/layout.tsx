@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Relanmo",
   description: "La prospection avance. Vous aussi.",
+  title: "Relanmo",
 };
 
 export default function RootLayout({

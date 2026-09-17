@@ -2,6 +2,7 @@
 
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { useTheme } from "next-themes";
+import { useCallback } from "react";
 import { Button } from "../components/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +19,17 @@ const themes = [
 
 export const ModeToggle = () => {
   const { setTheme } = useTheme();
+  const handleThemeChange = useCallback(
+    (event: Event) => {
+      if (event.currentTarget instanceof HTMLElement) {
+        const { theme } = event.currentTarget.dataset;
+        if (theme) {
+          setTheme(theme);
+        }
+      }
+    },
+    [setTheme]
+  );
 
   return (
     <DropdownMenu>
@@ -34,7 +46,11 @@ export const ModeToggle = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {themes.map(({ label, value }) => (
-          <DropdownMenuItem key={value} onClick={() => setTheme(value)}>
+          <DropdownMenuItem
+            data-theme={value}
+            key={value}
+            onSelect={handleThemeChange}
+          >
             {label}
           </DropdownMenuItem>
         ))}

@@ -5,11 +5,11 @@ import { Provider } from "@/components/provider";
 import "./global.css";
 
 export const metadata: Metadata = {
+  description: "Documentation du socle Relanmo.",
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_DOCS_URL ?? "http://localhost:3004"
   ),
   title: "Relanmo documentation",
-  description: "Documentation du socle Relanmo.",
 };
 
 export default function Layout({ children }: LayoutProps<"/">): ReactNode {
