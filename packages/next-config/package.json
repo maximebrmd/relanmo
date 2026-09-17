@@ -4,6 +4,13 @@
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },

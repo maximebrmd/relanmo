@@ -2,8 +2,51 @@
   "name": "@relanmo/domain",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./contracts": {
+      "types": "./src/contracts/index.ts",
+      "default": "./src/contracts/index.ts"
+    },
+    "./contracts/*": {
+      "types": "./src/contracts/*.ts",
+      "default": "./src/contracts/*.ts"
+    },
+    "./contracts/product": {
+      "types": "./src/contracts/product/index.ts",
+      "default": "./src/contracts/product/index.ts"
+    },
+    "./contracts/product/*": {
+      "types": "./src/contracts/product/*.ts",
+      "default": "./src/contracts/product/*.ts"
+    },
+    "./ports/providers": {
+      "types": "./src/ports/providers/index.ts",
+      "default": "./src/ports/providers/index.ts"
+    },
+    "./ports/providers/*": {
+      "types": "./src/ports/providers/*.ts",
+      "default": "./src/ports/providers/*.ts"
+    },
+    "./ports/persistence": {
+      "types": "./src/ports/persistence/index.ts",
+      "default": "./src/ports/persistence/index.ts"
+    },
+    "./ports/persistence/*": {
+      "types": "./src/ports/persistence/*.ts",
+      "default": "./src/ports/persistence/*.ts"
+    },
+    "./workflow-safe": {
+      "types": "./src/workflow-safe.ts",
+      "default": "./src/workflow-safe.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },

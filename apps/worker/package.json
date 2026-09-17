@@ -8,9 +8,28 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@relanmo/connectors": "workspace:*",
+    "@relanmo/database": "workspace:*",
+    "@relanmo/domain": "workspace:*",
+    "@relanmo/email": "workspace:*",
+    "@relanmo/observability": "workspace:*",
+    "@relanmo/prompts": "workspace:*",
+    "@relanmo/storage": "workspace:*",
+    "@relanmo/workflows": "workspace:*",
+    "@sentry/node": "10.75.0",
+    "@temporalio/activity": "1.24.0",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/common": "1.24.0",
+    "@temporalio/worker": "1.24.0",
+    "@temporalio/workflow": "1.24.0"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
     "@types/node": "24.13.5",
     "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24.21.0 <25"
   }
 }

@@ -2,13 +2,34 @@
   "name": "@relanmo/payments",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./stripe": {
+      "types": "./src/stripe/index.ts",
+      "default": "./src/stripe/index.ts"
+    },
+    "./stripe/*": {
+      "types": "./src/stripe/*.ts",
+      "default": "./src/stripe/*.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@relanmo/domain": "workspace:*",
+    "server-only": "0.0.1",
+    "stripe": "22.6.2"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
+    "@types/node": "24.13.5",
     "typescript": "7.0.2"
   }
 }

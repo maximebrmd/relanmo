@@ -2,13 +2,77 @@
   "name": "@relanmo/connectors",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./unipile/accounts": {
+      "types": "./src/unipile/accounts/index.ts",
+      "default": "./src/unipile/accounts/index.ts"
+    },
+    "./unipile/accounts/*": {
+      "types": "./src/unipile/accounts/*.ts",
+      "default": "./src/unipile/accounts/*.ts"
+    },
+    "./unipile/discovery": {
+      "types": "./src/unipile/discovery/index.ts",
+      "default": "./src/unipile/discovery/index.ts"
+    },
+    "./unipile/discovery/*": {
+      "types": "./src/unipile/discovery/*.ts",
+      "default": "./src/unipile/discovery/*.ts"
+    },
+    "./unipile/messages": {
+      "types": "./src/unipile/messages/index.ts",
+      "default": "./src/unipile/messages/index.ts"
+    },
+    "./unipile/messages/*": {
+      "types": "./src/unipile/messages/*.ts",
+      "default": "./src/unipile/messages/*.ts"
+    },
+    "./unipile/events": {
+      "types": "./src/unipile/events/index.ts",
+      "default": "./src/unipile/events/index.ts"
+    },
+    "./unipile/events/*": {
+      "types": "./src/unipile/events/*.ts",
+      "default": "./src/unipile/events/*.ts"
+    },
+    "./typesafe": {
+      "types": "./src/typesafe/index.ts",
+      "default": "./src/typesafe/index.ts"
+    },
+    "./typesafe/*": {
+      "types": "./src/typesafe/*.ts",
+      "default": "./src/typesafe/*.ts"
+    },
+    "./anthropic": {
+      "types": "./src/anthropic/index.ts",
+      "default": "./src/anthropic/index.ts"
+    },
+    "./anthropic/*": {
+      "types": "./src/anthropic/*.ts",
+      "default": "./src/anthropic/*.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.126.0",
+    "@relanmo/domain": "workspace:*",
+    "@typesafe-ai/sdk": "0.6.0",
+    "server-only": "0.0.1",
+    "unipile-node-sdk": "1.9.3",
+    "zod": "4.6.5"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
+    "@types/node": "24.13.5",
     "typescript": "7.0.2"
   }
 }

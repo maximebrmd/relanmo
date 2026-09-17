@@ -3,7 +3,17 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./*"],
-      "@relanmo/*": ["../../packages/*"]
+      "@relanmo/*": ["../../packages/*"],
+      "@relanmo/auth/*": ["../../packages/auth/src/*"],
+      "@relanmo/connectors/*": ["../../packages/connectors/src/*"],
+      "@relanmo/database/*": ["../../packages/database/src/*"],
+      "@relanmo/domain/*": ["../../packages/domain/src/*"],
+      "@relanmo/email/*": ["../../packages/email/src/*"],
+      "@relanmo/observability/*": ["../../packages/observability/src/*"],
+      "@relanmo/payments/*": ["../../packages/payments/src/*"],
+      "@relanmo/prompts/*": ["../../packages/prompts/src/*"],
+      "@relanmo/storage/*": ["../../packages/storage/src/*"],
+      "@relanmo/workflows/*": ["../../packages/workflows/src/*"]
     }
   },
   "include": [
