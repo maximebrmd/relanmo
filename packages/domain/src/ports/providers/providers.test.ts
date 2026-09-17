@@ -8,6 +8,7 @@ import {
   parseProspectId,
   parseTenantId,
 } from "../../contracts/ids";
+import { parseUtcTimestamp } from "../../contracts/values";
 import type { ProviderReadResult, ProviderWriteResult } from "./common";
 import { TYPESAFE_LIMITS } from "./decisions";
 import {
@@ -273,6 +274,78 @@ describe("provider port contracts", () => {
     );
     expect(presigned.tenantId).toBe(otherTenantId);
     expect(presigned.key).toEqual(otherKey);
+  });
+
+  it("preserves event identity and disambiguates provider-id-less events", async () => {
+    const ports = createFakeProviderPorts();
+    const providerEventId = "provider_event_other";
+    const authenticated = {
+      ...providerEventAuthenticationFixture,
+      authenticationReference: providerEventId,
+      providerEventId,
+    };
+    const unresolvedScope = {
+      ...normalizedIncomingProviderEventFixture.scope,
+      accountId: parseAccountId("account_other"),
+      conversationId: null,
+      prospectId: null,
+      tenantId: parseTenantId("tenant_other"),
+    };
+
+    const quarantined = readValue(
+      await ports.events.normalize({
+        authenticated,
+        context: providerOperationContextFixture,
+        rawBody: providerEventAuthenticationInputFixture.rawBody,
+        scope: unresolvedScope,
+      })
+    );
+    expect(quarantined.event.kind).toBe("UNRECOGNIZED");
+    expect(quarantined.event.providerEventId).toBe(providerEventId);
+    expect(quarantined.event.scope).toEqual(unresolvedScope);
+    expect(quarantined.evidence?.reference).toBe(providerEventId);
+
+    const normalized = readValue(
+      await ports.events.normalize({
+        authenticated,
+        context: providerOperationContextFixture,
+        rawBody: providerEventAuthenticationInputFixture.rawBody,
+        scope: normalizedIncomingProviderEventFixture.scope,
+      })
+    );
+    expect(normalized.event.providerEventId).toBe(providerEventId);
+    expect(normalized.evidence?.reference).toBe(providerEventId);
+
+    const firstEvent = {
+      ...normalizedIncomingProviderEventFixture,
+      occurredAt: parseUtcTimestamp("2026-09-17T10:00:00.000Z"),
+      providerEventId: null,
+    };
+    const secondEvent = {
+      ...firstEvent,
+      occurredAt: parseUtcTimestamp("2026-09-17T10:00:01.000Z"),
+    };
+    const firstDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: firstEvent,
+      })
+    );
+    const repeatedDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: firstEvent,
+      })
+    );
+    const secondDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: secondEvent,
+      })
+    );
+    expect(firstDedupe.source).toBe("CANONICAL_PAYLOAD");
+    expect(repeatedDedupe.dedupeKey).toBe(firstDedupe.dedupeKey);
+    expect(secondDedupe.dedupeKey).not.toBe(firstDedupe.dedupeKey);
   });
 
   it("separates ambiguous writes from retryable reads", async () => {

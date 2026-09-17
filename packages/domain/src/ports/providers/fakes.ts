@@ -27,6 +27,7 @@ import type {
   ProviderEventNormalizationInput,
   ProviderEventPort,
   ProviderEventAuthenticationInput,
+  NormalizedProviderEvent,
 } from "./events";
 import {
   billingHostedSessionFixture,
@@ -277,21 +278,88 @@ function scopedConversationPage(input: LinkedInConversationInput) {
   };
 }
 
+function canonicalEventPayload(event: NormalizedProviderEvent): string {
+  switch (event.kind) {
+    case "ACCOUNT_STATUS_CHANGED": {
+      return JSON.stringify({
+        accountId: event.accountId,
+        capabilities: event.capabilities,
+        health: event.health,
+        kind: event.kind,
+        observedAt: event.observedAt,
+      });
+    }
+    case "INCOMING_MESSAGE":
+    case "OUTGOING_MESSAGE": {
+      return JSON.stringify({
+        conversationId: event.scope.conversationId,
+        direction: event.message.direction,
+        kind: event.kind,
+        messageId: event.message.messageId,
+        occurredAt: event.occurredAt,
+        providerMessageId: event.message.providerMessageId,
+        prospectId: event.scope.prospectId,
+      });
+    }
+    case "INVITATION_ACCEPTED": {
+      return JSON.stringify({
+        accountId: event.accountId,
+        acceptedAt: event.acceptedAt,
+        kind: event.kind,
+        prospectId: event.prospectId,
+      });
+    }
+    case "UNRECOGNIZED": {
+      return JSON.stringify({
+        kind: event.kind,
+        observedAt: event.observedAt,
+      });
+    }
+    default: {
+      return JSON.stringify(event);
+    }
+  }
+}
+
 function scopedEventNormalization(input: ProviderEventNormalizationInput) {
+  const { authenticated, scope } = input;
+  const { providerEventId } = authenticated;
+  const evidence = providerEventNormalizationFixture.evidence
+    ? {
+        ...providerEventNormalizationFixture.evidence,
+        reference: providerEventId,
+      }
+    : null;
+  const { conversationId, prospectId } = scope;
+
+  if (conversationId === null || prospectId === null) {
+    return {
+      ...providerEventNormalizationFixture,
+      event: {
+        kind: "UNRECOGNIZED" as const,
+        observedAt: normalizedIncomingProviderEventFixture.occurredAt,
+        providerEventId,
+        scope,
+      },
+      evidence,
+    };
+  }
+
   const event = normalizedIncomingProviderEventFixture;
   return {
     ...providerEventNormalizationFixture,
+    evidence,
     event: {
       ...event,
+      providerEventId,
       message: {
         ...event.message,
-        accountId: input.scope.accountId,
-        conversationId:
-          input.scope.conversationId ?? event.message.conversationId,
-        prospectId: input.scope.prospectId ?? event.message.prospectId,
-        tenantId: input.scope.tenantId,
+        accountId: scope.accountId,
+        conversationId,
+        prospectId,
+        tenantId: scope.tenantId,
       },
-      scope: input.scope,
+      scope,
     },
   };
 }
@@ -302,7 +370,7 @@ function scopedDedupeIdentity(input: ProviderEventDedupeInput) {
   const source: ProviderEventDedupeIdentity["source"] = providerEventId
     ? "PROVIDER_EVENT_ID"
     : "CANONICAL_PAYLOAD";
-  const eventPart = providerEventId ?? event.kind;
+  const eventPart = providerEventId ?? canonicalEventPayload(event);
   return {
     ...providerEventDedupeIdentityFixture,
     dedupeKey: `${event.scope.tenantId}:${event.scope.accountId}:${eventPart}`,
