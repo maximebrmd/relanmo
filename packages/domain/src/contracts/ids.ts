@@ -18,7 +18,11 @@ export type ProspectId = Brand<string, "ProspectId">;
 export type ConversationId = Brand<string, "ConversationId">;
 export type CampaignId = Brand<string, "CampaignId">;
 export type VersionId = Brand<string, "VersionId">;
+export type ProfileVersionId = Brand<string, "ProfileVersionId">;
 export type CampaignVersionId = Brand<string, "CampaignVersionId">;
+export type ExplicitStyleVersionId = Brand<string, "ExplicitStyleVersionId">;
+export type InferredStyleVersionId = Brand<string, "InferredStyleVersionId">;
+export type PromptVersionId = Brand<string, "PromptVersionId">;
 export type ActionId = Brand<string, "ActionId">;
 export type SendAttemptId = Brand<string, "SendAttemptId">;
 export type MessageId = Brand<string, "MessageId">;
@@ -65,8 +69,28 @@ export function parseVersionId(value: unknown): VersionId {
   return parseId<VersionId>(value, "versionId");
 }
 
+export function parseProfileVersionId(value: unknown): ProfileVersionId {
+  return parseId<ProfileVersionId>(value, "profileVersionId");
+}
+
 export function parseCampaignVersionId(value: unknown): CampaignVersionId {
   return parseId<CampaignVersionId>(value, "campaignVersionId");
+}
+
+export function parseExplicitStyleVersionId(
+  value: unknown
+): ExplicitStyleVersionId {
+  return parseId<ExplicitStyleVersionId>(value, "explicitStyleVersionId");
+}
+
+export function parseInferredStyleVersionId(
+  value: unknown
+): InferredStyleVersionId {
+  return parseId<InferredStyleVersionId>(value, "inferredStyleVersionId");
+}
+
+export function parsePromptVersionId(value: unknown): PromptVersionId {
+  return parseId<PromptVersionId>(value, "promptVersionId");
 }
 
 export function parseActionId(value: unknown): ActionId {

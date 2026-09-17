@@ -1,12 +1,19 @@
+import type { DuePlan } from "./due-plan";
 import type {
   AccountId,
+  ActionId,
   CampaignId,
+  EvidenceId,
   ProspectId,
   TenantId,
-  VersionId,
 } from "./ids";
 import type { Ownership, SuppressionEntry } from "./ownership";
-import type { UtcTimestamp, SequenceStep } from "./values";
+import type {
+  BusinessWindowEvaluation,
+  SequenceStep,
+  UtcTimestamp,
+} from "./values";
+import type { CurrentVersionSet, DraftSourceVersions } from "./versions";
 
 export const ELIGIBILITY_REASON_CODES = [
   "INCOMING_MESSAGE",
@@ -31,6 +38,45 @@ export type EligibilityReasonCode = (typeof ELIGIBILITY_REASON_CODES)[number];
 export const ELIGIBILITY_OUTCOMES = ["ALLOWED", "HOLD", "DENY"] as const;
 export type EligibilityOutcome = (typeof ELIGIBILITY_OUTCOMES)[number];
 
+export const ELIGIBILITY_FACT_STATUSES = [
+  "VALID",
+  "INVALID",
+  "MISSING",
+  "UNKNOWN",
+] as const;
+export type EligibilityFactStatus = (typeof ELIGIBILITY_FACT_STATUSES)[number];
+
+export const DRAFT_STATUSES = [
+  "VALID",
+  "MISSING",
+  "STALE",
+  "INVALID",
+  "UNKNOWN",
+] as const;
+export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+
+export type AcceptanceFact = Readonly<{
+  accepted: boolean | null;
+  observedAt: UtcTimestamp | null;
+}>;
+
+export type EligibilityDraftSnapshot = Readonly<{
+  actionId: ActionId | null;
+  status: DraftStatus;
+}>;
+
+export type EligibilityEvidenceSnapshot = Readonly<{
+  evidenceIds: readonly EvidenceId[];
+  status: EligibilityFactStatus;
+}>;
+
+export type EligibilityVersionSnapshot = Readonly<{
+  candidate: DraftSourceVersions | null;
+  current: CurrentVersionSet;
+}>;
+
+export type CompletedSequenceSteps = readonly SequenceStep[];
+
 export type EligibilityReason = Readonly<{
   code: EligibilityReasonCode;
   detail: string | null;
@@ -38,14 +84,22 @@ export type EligibilityReason = Readonly<{
 }>;
 
 export type EligibilitySnapshot = Readonly<{
+  acceptance: AcceptanceFact;
   accountHealthy: boolean | null;
+  businessWindow: BusinessWindowEvaluation | null;
   campaignActive: boolean | null;
-  currentCampaignVersionId: VersionId | null;
+  completedSteps: CompletedSequenceSteps;
+  draft: EligibilityDraftSnapshot;
+  duePlan: DuePlan | null;
   entitlementActive: boolean | null;
+  evaluatedAt: UtcTimestamp;
+  evidence: EligibilityEvidenceSnapshot;
   incomingMessageAt: UtcTimestamp | null;
   ownership: Ownership;
   quotaAvailable: boolean | null;
   suppression: SuppressionEntry | null;
+  unresolvedUnknownActionIds: readonly ActionId[];
+  versions: EligibilityVersionSnapshot;
 }>;
 
 export type EligibilityCheck = Readonly<{

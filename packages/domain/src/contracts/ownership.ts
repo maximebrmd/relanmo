@@ -15,18 +15,33 @@ export const OWNERSHIP_KINDS = ["BOT_ELIGIBLE", "HUMAN_OWNED"] as const;
 export type OwnershipKind = (typeof OWNERSHIP_KINDS)[number];
 
 export type OwnershipReason = (typeof OWNERSHIP_REASONS)[number];
+export const BOT_OWNERSHIP_REASONS = [
+  "INITIAL_ACTIVATION",
+  "ACCOUNT_RECONCILIATION",
+] as const;
+export type BotOwnershipReason = (typeof BOT_OWNERSHIP_REASONS)[number];
+
+export const HUMAN_OWNERSHIP_REASONS = [
+  "INCOMING_MESSAGE",
+  "MANUAL_REPLY",
+  "MANUAL_TAKEOVER",
+  "IMPORTED_MANUAL_CONVERSATION",
+  "UNMATCHED_OUTGOING_MESSAGE",
+  "ACCOUNT_RECONCILIATION",
+] as const;
+export type HumanOwnershipReason = (typeof HUMAN_OWNERSHIP_REASONS)[number];
 
 export type Ownership = Readonly<
   | {
       kind: "BOT_ELIGIBLE";
       ownerUserId: null;
-      reason: OwnershipReason;
+      reason: BotOwnershipReason;
       recordedAt: UtcTimestamp;
     }
   | {
       kind: "HUMAN_OWNED";
       ownerUserId: UserId | null;
-      reason: OwnershipReason;
+      reason: HumanOwnershipReason;
       recordedAt: UtcTimestamp;
     }
 >;

@@ -5,6 +5,7 @@ import {
   attachmentOnlyInboundMessageFixture,
   campaignChangeOwnershipContinuityFixture,
   defaultSequencePlanFixture,
+  eligibilityCheckFixture,
   invitationWithoutNoteActionFixture,
   outgoingBotEchoMessageFixture,
   uncertainSendActionFixture,
@@ -21,17 +22,23 @@ import {
   parseActionLifecycleEvent,
   parseActivityInput,
   parseActivityResult,
+  parseBusinessWindowConfiguration,
   parseDuePlan,
+  parseEligibilityCheck,
   parseEligibilityResult,
   parseEvidence,
   parseIncomingMessageEvent,
   parseMessage,
+  parseOwnership,
   parseWorkflowIdentity,
   parseWorkflowSignal,
   safeParseAction,
   safeParseMessage,
 } from "./parsers";
-import { DEFAULT_SEQUENCE_CLOSURE } from "./values";
+import {
+  DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+  DEFAULT_SEQUENCE_CLOSURE,
+} from "./values";
 import { WORKFLOW_ACTIVITY_NAMES, workflowIdFor } from "./workflow";
 
 const timestamp = "2026-09-17T10:00:00.000Z";
@@ -115,6 +122,7 @@ describe("domain contract fixtures", () => {
     expect(() =>
       parseDuePlan({
         businessTimeZone: "Europe/Paris",
+        businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
         closureAt: null,
         earliestAt: "2026-09-17T10:00:00+02:00",
         intendedAt: timestamp,
@@ -187,6 +195,175 @@ describe("domain contract fixtures", () => {
         retryAt: timestamp,
         step: "DM1",
         tenantId: "tenant_demo",
+      })
+    ).toThrow();
+  });
+
+  it("preserves every authoritative eligibility blocker and unknown fact", () => {
+    const blocked = parseEligibilityCheck({
+      ...eligibilityCheckFixture,
+      snapshot: {
+        ...eligibilityCheckFixture.snapshot,
+        acceptance: {
+          accepted: null,
+          observedAt: null,
+        },
+        businessWindow: {
+          nextOpenAt: null,
+          status: "UNKNOWN",
+        },
+        completedSteps: ["DM1"],
+        draft: {
+          actionId: "action_dm1_ready",
+          status: "STALE",
+        },
+        evidence: {
+          evidenceIds: [],
+          status: "MISSING",
+        },
+        incomingMessageAt: timestamp,
+        ownership: {
+          kind: "HUMAN_OWNED",
+          ownerUserId: "user_demo",
+          reason: "INCOMING_MESSAGE",
+          recordedAt: timestamp,
+        },
+        unresolvedUnknownActionIds: ["action_dm1_unknown"],
+        versions: {
+          ...eligibilityCheckFixture.snapshot.versions,
+          current: {
+            ...eligibilityCheckFixture.snapshot.versions.current,
+            campaign: {
+              ...eligibilityCheckFixture.snapshot.versions.current.campaign,
+              id: "campaign_version_beta_1",
+            },
+          },
+        },
+      },
+    });
+
+    expect(blocked.snapshot.acceptance.accepted).toBeNull();
+    expect(blocked.snapshot.businessWindow?.status).toBe("UNKNOWN");
+    expect(blocked.snapshot.completedSteps).toEqual(["DM1"]);
+    expect(blocked.snapshot.draft.status).toBe("STALE");
+    expect(blocked.snapshot.evidence.status).toBe("MISSING");
+    expect(blocked.snapshot.incomingMessageAt).toBe(timestamp);
+    expect(blocked.snapshot.ownership.kind).toBe("HUMAN_OWNED");
+    expect(blocked.snapshot.unresolvedUnknownActionIds).toHaveLength(1);
+    expect(blocked.snapshot.versions.current.campaign?.id).toBe(
+      "campaign_version_beta_1"
+    );
+    expect(blocked.snapshot.versions.candidate?.campaign.id).toBe(
+      "campaign_version_alpha_1"
+    );
+
+    for (const code of [
+      "INCOMING_MESSAGE",
+      "HUMAN_OWNED",
+      "MISSING_ACCEPTANCE",
+      "STALE_VERSION",
+      "NO_ELIGIBLE_STEP",
+      "UNKNOWN_SEND",
+    ] as const) {
+      expect(() =>
+        parseEligibilityResult({
+          accountId: "account_demo",
+          campaignId: "campaign_alpha",
+          evaluatedAt: timestamp,
+          outcome: "ALLOWED",
+          prospectId: "prospect_demo",
+          reasons: [{ code, detail: null, observedAt: timestamp }],
+          retryAt: null,
+          step: "DM1",
+          tenantId: "tenant_demo",
+        })
+      ).toThrow();
+    }
+
+    expect(() =>
+      parseEligibilityCheck({
+        ...eligibilityCheckFixture,
+        snapshot: {
+          ...eligibilityCheckFixture.snapshot,
+          completedSteps: ["DM1", "DM1"],
+        },
+      })
+    ).toThrow();
+    expect(() =>
+      parseEligibilityCheck({
+        ...eligibilityCheckFixture,
+        snapshot: {
+          ...eligibilityCheckFixture.snapshot,
+          draft: { actionId: null, status: "VALID" },
+        },
+      })
+    ).toThrow();
+  });
+
+  it("validates Europe/Paris business windows and due-plan closure order", () => {
+    const dstFacingConfiguration = parseBusinessWindowConfiguration({
+      businessTimeZone: "Europe/Paris",
+      windows: [
+        {
+          closesAt: "03:30",
+          opensAt: "02:30",
+          weekday: "SUNDAY",
+        },
+      ],
+    });
+    expect(dstFacingConfiguration.businessTimeZone).toBe("Europe/Paris");
+
+    expect(() =>
+      parseBusinessWindowConfiguration({
+        businessTimeZone: "Europe/Paris",
+        windows: [{ closesAt: "18:00", opensAt: "09:00", weekday: "FUNDAY" }],
+      })
+    ).toThrow();
+    expect(() =>
+      parseBusinessWindowConfiguration({
+        businessTimeZone: "Europe/Paris",
+        windows: [{ closesAt: "18:00", opensAt: "9:00", weekday: "MONDAY" }],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDuePlan({
+        businessTimeZone: "Europe/Paris",
+        businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+        closureAt: "2026-09-16T10:00:00.000Z",
+        earliestAt: timestamp,
+        intendedAt: timestamp,
+        step: "DM1",
+      })
+    ).toThrow();
+  });
+
+  it("rejects contradictory ownership reasons and campaign version snapshots", () => {
+    expect(() =>
+      parseOwnership({
+        kind: "BOT_ELIGIBLE",
+        ownerUserId: null,
+        reason: "INCOMING_MESSAGE",
+        recordedAt: timestamp,
+      })
+    ).toThrow();
+    expect(() =>
+      parseOwnership({
+        kind: "HUMAN_OWNED",
+        ownerUserId: "user_demo",
+        reason: "INITIAL_ACTIVATION",
+        recordedAt: timestamp,
+      })
+    ).toThrow();
+    expect(() =>
+      parseAction({
+        ...invitationWithoutNoteActionFixture,
+        sourceVersions: {
+          ...invitationWithoutNoteActionFixture.sourceVersions,
+          campaign: {
+            ...invitationWithoutNoteActionFixture.sourceVersions.campaign,
+            id: "campaign_version_other",
+          },
+        },
       })
     ).toThrow();
   });
@@ -271,6 +448,130 @@ describe("workflow contracts", () => {
         deliveredAt: timestamp,
         nextAttemptAt: null,
         outcome: "RETRY",
+      })
+    ).toThrow();
+  });
+
+  it("requires evidence for qualification and reasons for non-qualification", () => {
+    const qualified = parseActivityResult(
+      WORKFLOW_ACTIVITY_NAMES.discoveryQualifyBatch,
+      {
+        decisions: [
+          {
+            evidenceIds: ["evidence_offer_1"],
+            outcome: "QUALIFIED",
+            prospectId: "prospect_demo",
+            reason: null,
+          },
+        ],
+        observedAt: timestamp,
+      }
+    );
+    expect(qualified.decisions[0]?.outcome).toBe("QUALIFIED");
+
+    expect(() =>
+      parseActivityResult(WORKFLOW_ACTIVITY_NAMES.discoveryQualifyBatch, {
+        decisions: [
+          {
+            evidenceIds: [],
+            outcome: "QUALIFIED",
+            prospectId: "prospect_demo",
+            reason: null,
+          },
+        ],
+        observedAt: timestamp,
+      })
+    ).toThrow();
+    expect(() =>
+      parseActivityResult(WORKFLOW_ACTIVITY_NAMES.discoveryQualifyBatch, {
+        decisions: [
+          {
+            evidenceIds: [],
+            outcome: "HOLD",
+            prospectId: "prospect_demo",
+            reason: null,
+          },
+        ],
+        observedAt: timestamp,
+      })
+    ).toThrow();
+    expect(() =>
+      parseActivityResult(WORKFLOW_ACTIVITY_NAMES.discoveryQualifyBatch, {
+        decisions: [
+          {
+            evidenceIds: ["evidence_offer_1"],
+            outcome: "QUALIFIED",
+            prospectId: "prospect_demo",
+            reason: "MISSING_EVIDENCE",
+          },
+        ],
+        observedAt: timestamp,
+      })
+    ).toThrow();
+  });
+
+  it("freezes sequence drafting and authorized-dispatch Activity seams", () => {
+    const draftInput = parseActivityInput(
+      WORKFLOW_ACTIVITY_NAMES.sequenceDraftAction,
+      {
+        accountId: "account_demo",
+        campaignId: "campaign_alpha",
+        campaignVersionId: "campaign_version_alpha_1",
+        evidenceIds: ["evidence_offer_1"],
+        prospectId: "prospect_demo",
+        step: "DM1",
+        tenantId: "tenant_demo",
+      }
+    );
+    expect(draftInput.step).toBe("DM1");
+
+    const dispatchInput = parseActivityInput(
+      WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction,
+      {
+        accountId: "account_demo",
+        actionId: "action_dm1_ready",
+        attemptId: "attempt_dm1_1",
+        campaignVersionId: "campaign_version_alpha_1",
+        fence: 2,
+        prospectId: "prospect_demo",
+        tenantId: "tenant_demo",
+      }
+    );
+    expect(dispatchInput.fence).toBe(2);
+
+    const drafted = parseActivityResult(
+      WORKFLOW_ACTIVITY_NAMES.sequenceDraftAction,
+      {
+        actionId: "action_dm1_ready",
+        observedAt: timestamp,
+        outcome: "DRAFTED",
+        reason: null,
+        sourceVersions: invitationWithoutNoteActionFixture.sourceVersions,
+      }
+    );
+    expect(drafted.outcome).toBe("DRAFTED");
+    expect(drafted.reason).toBeNull();
+
+    const unknown = parseActivityResult(
+      WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction,
+      {
+        actionId: "action_dm1_ready",
+        attemptId: "attempt_dm1_1",
+        completedAt: timestamp,
+        outcome: "UNKNOWN",
+        providerMessageId: null,
+        reason: "TIMEOUT",
+      }
+    );
+    expect(unknown.outcome).toBe("UNKNOWN");
+    expect(() =>
+      parseActivityResult(WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction, {
+        actionId: "action_dm1_ready",
+        attemptId: "attempt_dm1_1",
+        completedAt: timestamp,
+        outcome: "CONFIRMED",
+        providerMessageId: null,
+        reason: "TIMEOUT",
       })
     ).toThrow();
   });

@@ -1,4 +1,4 @@
-import type { ActionUnknownReason } from "./action";
+import type { ActionFailureReason, ActionUnknownReason } from "./action";
 import type { EligibilityReasonCode } from "./eligibility";
 import type {
   AccountId,
@@ -10,6 +10,7 @@ import type {
   MessageId,
   OutboxEventId,
   ProspectId,
+  SendAttemptId,
   TenantId,
   WorkflowId,
 } from "./ids";
@@ -17,6 +18,7 @@ import { parseWorkflowId } from "./ids";
 import type { Ownership, OwnershipReason } from "./ownership";
 import { ContractValidationError } from "./runtime";
 import type { DirectMessageStep, SequenceStep, UtcTimestamp } from "./values";
+import type { DraftSourceVersions } from "./versions";
 
 export const WORKFLOW_ID_PREFIX = "rlm1" as const;
 
@@ -143,6 +145,8 @@ export const WORKFLOW_ACTIVITY_NAMES = {
   discoveryQualifyBatch: "discovery.qualify_batch",
   outboxDeliver: "outbox.deliver",
   sequenceCheckAcceptance: "sequence.check_acceptance",
+  sequenceDispatchAction: "sequence.dispatch_action",
+  sequenceDraftAction: "sequence.draft_action",
   sequenceReadState: "sequence.read_state",
   sequenceReconcileAction: "sequence.reconcile_action",
 } as const;
@@ -173,12 +177,25 @@ export type DiscoveryQualifyBatchInput = Readonly<{
   tenantId: TenantId;
 }>;
 
-export type DiscoveryQualification = Readonly<{
-  evidenceIds: readonly EvidenceId[];
-  outcome: "HOLD" | "QUALIFIED" | "SKIP";
-  prospectId: ProspectId;
-  reason: EligibilityReasonCode | null;
-}>;
+export type DiscoveryQualification =
+  | Readonly<{
+      evidenceIds: readonly [EvidenceId, ...EvidenceId[]];
+      outcome: "QUALIFIED";
+      prospectId: ProspectId;
+      reason: null;
+    }>
+  | Readonly<{
+      evidenceIds: readonly EvidenceId[];
+      outcome: "HOLD";
+      prospectId: ProspectId;
+      reason: EligibilityReasonCode;
+    }>
+  | Readonly<{
+      evidenceIds: readonly EvidenceId[];
+      outcome: "SKIP";
+      prospectId: ProspectId;
+      reason: EligibilityReasonCode;
+    }>;
 
 /** Qualification is a bounded recommendation, never send authorization. */
 export type DiscoveryQualifyBatchResult = Readonly<{
@@ -227,6 +244,69 @@ export type SequenceReconcileActionResult = Readonly<{
   reconciledAt: UtcTimestamp;
   unknownReason: ActionUnknownReason | null;
 }>;
+
+export type SequenceDraftActionInput = Readonly<{
+  accountId: AccountId;
+  campaignId: CampaignId;
+  campaignVersionId: CampaignVersionId;
+  evidenceIds: readonly EvidenceId[];
+  prospectId: ProspectId;
+  step: SequenceStep;
+  tenantId: TenantId;
+}>;
+
+/** Model output is advisory; this result contains no send authorization. */
+export type SequenceDraftActionResult =
+  | Readonly<{
+      actionId: ActionId;
+      observedAt: UtcTimestamp;
+      outcome: "DRAFTED";
+      reason: null;
+      sourceVersions: DraftSourceVersions;
+    }>
+  | Readonly<{
+      actionId: null;
+      observedAt: UtcTimestamp;
+      outcome: "HOLD";
+      reason: EligibilityReasonCode;
+      sourceVersions: null;
+    }>;
+
+export type SequenceDispatchActionInput = Readonly<{
+  accountId: AccountId;
+  actionId: ActionId;
+  attemptId: SendAttemptId;
+  campaignVersionId: CampaignVersionId;
+  fence: number;
+  prospectId: ProspectId;
+  tenantId: TenantId;
+}>;
+
+export type SequenceDispatchActionResult =
+  | Readonly<{
+      actionId: ActionId;
+      attemptId: SendAttemptId;
+      completedAt: UtcTimestamp;
+      outcome: "CONFIRMED";
+      providerMessageId: string;
+      reason: null;
+    }>
+  | Readonly<{
+      actionId: ActionId;
+      attemptId: SendAttemptId;
+      completedAt: UtcTimestamp;
+      outcome: "FAILED";
+      providerMessageId: null;
+      reason: ActionFailureReason;
+    }>
+  | Readonly<{
+      actionId: ActionId;
+      attemptId: SendAttemptId;
+      completedAt: UtcTimestamp;
+      outcome: "UNKNOWN";
+      providerMessageId: null;
+      reason: ActionUnknownReason;
+    }>;
 
 export type AccountReconcileInput = Readonly<{
   accountId: AccountId;
@@ -299,6 +379,14 @@ export interface WorkflowActivityContracts {
   [WORKFLOW_ACTIVITY_NAMES.sequenceCheckAcceptance]: {
     input: SequenceCheckAcceptanceInput;
     result: SequenceCheckAcceptanceResult;
+  };
+  [WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction]: {
+    input: SequenceDispatchActionInput;
+    result: SequenceDispatchActionResult;
+  };
+  [WORKFLOW_ACTIVITY_NAMES.sequenceDraftAction]: {
+    input: SequenceDraftActionInput;
+    result: SequenceDraftActionResult;
   };
   [WORKFLOW_ACTIVITY_NAMES.sequenceReconcileAction]: {
     input: SequenceReconcileActionInput;

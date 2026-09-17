@@ -16,13 +16,22 @@ import type {
   ActionUnknownReason,
 } from "./action";
 import type { DuePlan } from "./due-plan";
-import { ELIGIBILITY_OUTCOMES, ELIGIBILITY_REASON_CODES } from "./eligibility";
+import {
+  DRAFT_STATUSES,
+  ELIGIBILITY_FACT_STATUSES,
+  ELIGIBILITY_OUTCOMES,
+  ELIGIBILITY_REASON_CODES,
+} from "./eligibility";
 import type {
+  AcceptanceFact,
+  EligibilityDraftSnapshot,
+  EligibilityEvidenceSnapshot,
   EligibilityCheck,
   EligibilityReason,
   EligibilityReasonCode,
   EligibilityResult,
   EligibilitySnapshot,
+  EligibilityVersionSnapshot,
 } from "./eligibility";
 import { EVIDENCE_PROVENANCE } from "./evidence";
 import type { Evidence, EvidenceProvenance } from "./evidence";
@@ -34,14 +43,17 @@ import {
   parseCampaignVersionId,
   parseConversationId,
   parseEvidenceId,
+  parseExplicitStyleVersionId,
+  parseInferredStyleVersionId,
   parseMessageId,
   parseModelVersion as parseModelVersionId,
   parseOutboxEventId,
+  parseProfileVersionId,
   parseProspectId,
+  parsePromptVersionId,
   parseSendAttemptId,
   parseTenantId,
   parseUserId,
-  parseVersionId,
   parseWorkflowId,
 } from "./ids";
 import {
@@ -56,12 +68,16 @@ import type {
   MessageBase,
 } from "./message";
 import {
+  BOT_OWNERSHIP_REASONS,
+  HUMAN_OWNERSHIP_REASONS,
   OWNERSHIP_KINDS,
   OWNERSHIP_REASONS,
   SUPPRESSION_REASONS,
 } from "./ownership";
 import type {
   AccountProspectOwnership,
+  BotOwnershipReason,
+  HumanOwnershipReason,
   Ownership,
   OwnershipReason,
   SuppressionEntry,
@@ -84,13 +100,26 @@ import {
 } from "./runtime";
 import type { SafeParseResult } from "./runtime";
 import {
+  BUSINESS_WINDOW_STATUSES,
   parseBusinessTimeZone,
+  parseBusinessWeekday,
   parseDirectMessageStep,
+  parseLocalBusinessTime,
   parseSequenceStep,
   parseUtcTimestamp,
 } from "./values";
+import type {
+  BusinessWindow,
+  BusinessWindowConfiguration,
+  BusinessWindowEvaluation,
+} from "./values";
 import { VERSION_KINDS } from "./versions";
-import type { DraftSourceVersions, VersionKind, VersionRef } from "./versions";
+import type {
+  CurrentVersionSet,
+  DraftSourceVersions,
+  VersionKind,
+  VersionRef,
+} from "./versions";
 import {
   OUTBOX_EVENT_KINDS,
   WORKFLOW_ACTIVITY_NAMES,
@@ -101,6 +130,8 @@ import {
 } from "./workflow";
 import type {
   DiscoveryQualification,
+  SequenceDispatchActionResult,
+  SequenceDraftActionResult,
   WorkflowActivityInput,
   WorkflowActivityName,
   WorkflowActivityResult,
@@ -137,28 +168,73 @@ function cursor(value: unknown, path: string): string | null {
 
 function parseVersionRef(value: unknown, path: string): VersionRef {
   const record = expectRecord(value, path);
-  return Object.freeze({
+  const kind = member(
+    readRequired(record, "kind"),
+    VERSION_KINDS,
+    `${path}.kind`
+  );
+  const common = {
     createdAt: parseUtcTimestamp(readRequired(record, "createdAt")),
-    id: parseVersionId(readRequired(record, "id")),
-    kind: member(readRequired(record, "kind"), VERSION_KINDS, `${path}.kind`),
     revision: expectInteger(
       readRequired(record, "revision"),
       `${path}.revision`,
       1
     ),
-  });
+  };
+
+  switch (kind) {
+    case "PROFILE": {
+      return Object.freeze({
+        ...common,
+        id: parseProfileVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
+    case "CAMPAIGN": {
+      return Object.freeze({
+        ...common,
+        id: parseCampaignVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
+    case "STYLE_EXPLICIT": {
+      return Object.freeze({
+        ...common,
+        id: parseExplicitStyleVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
+    case "STYLE_INFERRED": {
+      return Object.freeze({
+        ...common,
+        id: parseInferredStyleVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
+    case "PROMPT_DEFAULT": {
+      return Object.freeze({
+        ...common,
+        id: parsePromptVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
+    default: {
+      throw new ContractValidationError(`${path}.kind is unsupported`);
+    }
+  }
 }
 
-function versionOfKind(
+function versionOfKind<Kind extends VersionKind>(
   value: unknown,
   path: string,
-  kind: VersionKind
-): VersionRef {
+  kind: Kind
+): Extract<VersionRef, { kind: Kind }> {
   const parsed = parseVersionRef(value, path);
   if (parsed.kind !== kind) {
     throw new ContractValidationError(`${path}.kind must be ${kind}`);
   }
-  return parsed;
+  // SAFETY: The discriminant check above narrows this reference to the requested kind.
+  return parsed as Extract<VersionRef, { kind: Kind }>;
 }
 
 export function parseDraftSourceVersions(value: unknown): DraftSourceVersions {
@@ -193,8 +269,50 @@ export function parseDraftSourceVersions(value: unknown): DraftSourceVersions {
   });
 }
 
+export function parseCurrentVersionSet(value: unknown): CurrentVersionSet {
+  const record = expectRecord(value, "currentVersions");
+  return Object.freeze({
+    acceptedInferredStyle: nullable(
+      readRequired(record, "acceptedInferredStyle"),
+      (input) =>
+        versionOfKind(
+          input,
+          "currentVersions.acceptedInferredStyle",
+          "STYLE_INFERRED"
+        )
+    ),
+    campaign: nullable(readRequired(record, "campaign"), (input) =>
+      versionOfKind(input, "currentVersions.campaign", "CAMPAIGN")
+    ),
+    defaultPrompt: nullable(readRequired(record, "defaultPrompt"), (input) =>
+      versionOfKind(input, "currentVersions.defaultPrompt", "PROMPT_DEFAULT")
+    ),
+    explicitStyle: nullable(readRequired(record, "explicitStyle"), (input) =>
+      versionOfKind(input, "currentVersions.explicitStyle", "STYLE_EXPLICIT")
+    ),
+    model: nullable(readRequired(record, "model"), parseModelVersionId),
+    profile: nullable(readRequired(record, "profile"), (input) =>
+      versionOfKind(input, "currentVersions.profile", "PROFILE")
+    ),
+  });
+}
+
 function parseOwnershipReason(value: unknown, path: string): OwnershipReason {
   return member(value, OWNERSHIP_REASONS, path);
+}
+
+function parseBotOwnershipReason(
+  value: unknown,
+  path: string
+): BotOwnershipReason {
+  return member(value, BOT_OWNERSHIP_REASONS, path);
+}
+
+function parseHumanOwnershipReason(
+  value: unknown,
+  path: string
+): HumanOwnershipReason {
+  return member(value, HUMAN_OWNERSHIP_REASONS, path);
 }
 
 export function parseOwnership(value: unknown): Ownership {
@@ -208,13 +326,7 @@ export function parseOwnership(value: unknown): Ownership {
     readRequired(record, "ownerUserId"),
     parseUserId
   );
-  const common = {
-    reason: parseOwnershipReason(
-      readRequired(record, "reason"),
-      "ownership.reason"
-    ),
-    recordedAt: parseUtcTimestamp(readRequired(record, "recordedAt")),
-  };
+  const recordedAt = parseUtcTimestamp(readRequired(record, "recordedAt"));
 
   if (kind === "BOT_ELIGIBLE") {
     if (ownerUserId !== null) {
@@ -223,16 +335,24 @@ export function parseOwnership(value: unknown): Ownership {
       );
     }
     return Object.freeze({
-      ...common,
       kind,
       ownerUserId: null,
+      reason: parseBotOwnershipReason(
+        readRequired(record, "reason"),
+        "ownership.reason"
+      ),
+      recordedAt,
     });
   }
 
   return Object.freeze({
-    ...common,
     kind,
     ownerUserId,
+    reason: parseHumanOwnershipReason(
+      readRequired(record, "reason"),
+      "ownership.reason"
+    ),
+    recordedAt,
   });
 }
 
@@ -663,13 +783,22 @@ export function parseAction(value: unknown): Action {
       "action.step must match action.payload.step"
     );
   }
+  const campaignVersionId = parseCampaignVersionId(
+    readRequired(record, "campaignVersionId")
+  );
+  const sourceVersions = parseDraftSourceVersions(
+    readRequired(record, "sourceVersions")
+  );
+  if (sourceVersions.campaign.id !== campaignVersionId) {
+    throw new ContractValidationError(
+      "action.campaignVersionId must match sourceVersions.campaign.id"
+    );
+  }
   const base: ActionIdentity = Object.freeze({
     accountId: parseAccountId(readRequired(record, "accountId")),
     actionId: parseActionId(readRequired(record, "actionId")),
     campaignId: parseCampaignId(readRequired(record, "campaignId")),
-    campaignVersionId: parseCampaignVersionId(
-      readRequired(record, "campaignVersionId")
-    ),
+    campaignVersionId,
     createdAt: parseUtcTimestamp(readRequired(record, "createdAt")),
     evidenceIds: expectArrayOf(
       readRequired(record, "evidenceIds"),
@@ -679,9 +808,7 @@ export function parseAction(value: unknown): Action {
     ),
     payload,
     prospectId: parseProspectId(readRequired(record, "prospectId")),
-    sourceVersions: parseDraftSourceVersions(
-      readRequired(record, "sourceVersions")
-    ),
+    sourceVersions,
     step,
     tenantId: parseTenantId(readRequired(record, "tenantId")),
   });
@@ -787,22 +914,272 @@ function parseEligibilityReason(
   });
 }
 
+function parseAcceptanceFact(value: unknown): AcceptanceFact {
+  const record = expectRecord(value, "eligibility.snapshot.acceptance");
+  const accepted = nullable(readRequired(record, "accepted"), (input) =>
+    expectBoolean(input, "eligibility.snapshot.acceptance.accepted")
+  );
+  const observedAt = nullable(
+    readRequired(record, "observedAt"),
+    parseUtcTimestamp
+  );
+  if (accepted !== null && observedAt === null) {
+    throw new ContractValidationError(
+      "known acceptance facts require an observed time"
+    );
+  }
+  return Object.freeze({ accepted, observedAt });
+}
+
+function parseEligibilityDraftSnapshot(
+  value: unknown
+): EligibilityDraftSnapshot {
+  const record = expectRecord(value, "eligibility.snapshot.draft");
+  const actionId = nullable(readRequired(record, "actionId"), parseActionId);
+  const status = member(
+    readRequired(record, "status"),
+    DRAFT_STATUSES,
+    "eligibility.snapshot.draft.status"
+  );
+  if (status === "VALID" && actionId === null) {
+    throw new ContractValidationError(
+      "VALID drafts require their stable action ID"
+    );
+  }
+  if (status === "MISSING" && actionId !== null) {
+    throw new ContractValidationError(
+      "MISSING drafts cannot carry an action ID"
+    );
+  }
+  return Object.freeze({ actionId, status });
+}
+
+function parseEligibilityEvidenceSnapshot(
+  value: unknown
+): EligibilityEvidenceSnapshot {
+  const record = expectRecord(value, "eligibility.snapshot.evidence");
+  const evidenceIds = expectArrayOf(
+    readRequired(record, "evidenceIds"),
+    (input) => parseEvidenceId(input),
+    "eligibility.snapshot.evidence.evidenceIds",
+    20
+  );
+  const status = member(
+    readRequired(record, "status"),
+    ELIGIBILITY_FACT_STATUSES,
+    "eligibility.snapshot.evidence.status"
+  );
+  if (status === "VALID" && !isNonEmpty(evidenceIds)) {
+    throw new ContractValidationError(
+      "VALID evidence snapshots require at least one evidence ID"
+    );
+  }
+  if (status === "MISSING" && evidenceIds.length !== 0) {
+    throw new ContractValidationError(
+      "MISSING evidence snapshots cannot carry evidence IDs"
+    );
+  }
+  return Object.freeze({ evidenceIds, status });
+}
+
+function parseCompletedSequenceSteps(
+  value: unknown
+): EligibilitySnapshot["completedSteps"] {
+  const steps = expectArrayOf(
+    value,
+    (input) => parseSequenceStep(input),
+    "eligibility.snapshot.completedSteps",
+    6
+  );
+  const seen = new Set<string>();
+  for (const step of steps) {
+    if (seen.has(step)) {
+      throw new ContractValidationError(
+        "eligibility.snapshot.completedSteps cannot repeat a step"
+      );
+    }
+    seen.add(step);
+  }
+  return steps;
+}
+
+function parseEligibilityVersionSnapshot(
+  value: unknown
+): EligibilityVersionSnapshot {
+  const record = expectRecord(value, "eligibility.snapshot.versions");
+  return Object.freeze({
+    candidate: nullable(
+      readRequired(record, "candidate"),
+      parseDraftSourceVersions
+    ),
+    current: parseCurrentVersionSet(readRequired(record, "current")),
+  });
+}
+
+function parseBusinessWindow(value: unknown, path: string): BusinessWindow {
+  const record = expectRecord(value, path);
+  const closesAt = parseLocalBusinessTime(
+    readRequired(record, "closesAt"),
+    `${path}.closesAt`
+  );
+  const opensAt = parseLocalBusinessTime(
+    readRequired(record, "opensAt"),
+    `${path}.opensAt`
+  );
+  if (opensAt >= closesAt) {
+    throw new ContractValidationError(
+      `${path} must open before it closes on the same local day`
+    );
+  }
+  return Object.freeze({
+    closesAt,
+    opensAt,
+    weekday: parseBusinessWeekday(
+      readRequired(record, "weekday"),
+      `${path}.weekday`
+    ),
+  });
+}
+
+export function parseBusinessWindowConfiguration(
+  value: unknown
+): BusinessWindowConfiguration {
+  const record = expectRecord(value, "businessWindow");
+  const windows = expectArrayOf(
+    readRequired(record, "windows"),
+    parseBusinessWindow,
+    "businessWindow.windows",
+    35
+  );
+  if (!isNonEmpty(windows)) {
+    throw new ContractValidationError(
+      "businessWindow.windows must contain at least one window"
+    );
+  }
+
+  for (const [index, window] of windows.entries()) {
+    for (const otherWindow of windows.slice(index + 1)) {
+      if (
+        window.weekday === otherWindow.weekday &&
+        window.opensAt < otherWindow.closesAt &&
+        otherWindow.opensAt < window.closesAt
+      ) {
+        throw new ContractValidationError(
+          "businessWindow.windows cannot overlap on the same weekday"
+        );
+      }
+    }
+  }
+
+  return Object.freeze({
+    businessTimeZone: parseBusinessTimeZone(
+      readRequired(record, "businessTimeZone")
+    ),
+    windows,
+  });
+}
+
+function parseBusinessWindowEvaluation(
+  value: unknown
+): BusinessWindowEvaluation {
+  const record = expectRecord(value, "eligibility.snapshot.businessWindow");
+  const status = member(
+    readRequired(record, "status"),
+    BUSINESS_WINDOW_STATUSES,
+    "eligibility.snapshot.businessWindow.status"
+  );
+  const nextOpenAt = nullable(
+    readRequired(record, "nextOpenAt"),
+    parseUtcTimestamp
+  );
+  if (status === "CLOSED") {
+    if (nextOpenAt === null) {
+      throw new ContractValidationError(
+        "CLOSED business windows require the next opening time"
+      );
+    }
+    return Object.freeze({ nextOpenAt, status });
+  }
+  if (nextOpenAt !== null) {
+    throw new ContractValidationError(
+      `${status} business windows cannot carry a next opening time`
+    );
+  }
+  if (status === "OPEN") {
+    return Object.freeze({ nextOpenAt: null, status });
+  }
+  return Object.freeze({ nextOpenAt: null, status });
+}
+
+export function parseDuePlan(value: unknown): DuePlan {
+  const record = expectRecord(value, "duePlan");
+  const businessTimeZone = parseBusinessTimeZone(
+    readRequired(record, "businessTimeZone")
+  );
+  const businessWindow = parseBusinessWindowConfiguration(
+    readRequired(record, "businessWindow")
+  );
+  if (businessWindow.businessTimeZone !== businessTimeZone) {
+    throw new ContractValidationError(
+      "duePlan business timezone must match its window configuration"
+    );
+  }
+  const closureAt = nullable(
+    readRequired(record, "closureAt"),
+    parseUtcTimestamp
+  );
+  const earliestAt = parseUtcTimestamp(readRequired(record, "earliestAt"));
+  if (closureAt !== null && closureAt < earliestAt) {
+    throw new ContractValidationError(
+      "duePlan closure cannot precede the earliest send opportunity"
+    );
+  }
+  return Object.freeze({
+    businessTimeZone,
+    businessWindow,
+    closureAt,
+    earliestAt,
+    intendedAt: parseUtcTimestamp(readRequired(record, "intendedAt")),
+    step: parseSequenceStep(readRequired(record, "step")),
+  });
+}
+
 function parseEligibilitySnapshot(value: unknown): EligibilitySnapshot {
   const record = expectRecord(value, "eligibility.snapshot");
+  const draft = parseEligibilityDraftSnapshot(readRequired(record, "draft"));
+  const duePlan = nullable(readRequired(record, "duePlan"), parseDuePlan);
+  const versions = parseEligibilityVersionSnapshot(
+    readRequired(record, "versions")
+  );
+  if (draft.status === "VALID" && versions.candidate === null) {
+    throw new ContractValidationError(
+      "VALID eligibility drafts require candidate source versions"
+    );
+  }
   return Object.freeze({
+    acceptance: parseAcceptanceFact(readRequired(record, "acceptance")),
     accountHealthy: nullable(readRequired(record, "accountHealthy"), (input) =>
       expectBoolean(input, "eligibility.snapshot.accountHealthy")
+    ),
+    businessWindow: nullable(
+      readRequired(record, "businessWindow"),
+      parseBusinessWindowEvaluation
     ),
     campaignActive: nullable(readRequired(record, "campaignActive"), (input) =>
       expectBoolean(input, "eligibility.snapshot.campaignActive")
     ),
-    currentCampaignVersionId: nullable(
-      readRequired(record, "currentCampaignVersionId"),
-      parseVersionId
+    completedSteps: parseCompletedSequenceSteps(
+      readRequired(record, "completedSteps")
     ),
+    draft,
+    duePlan,
     entitlementActive: nullable(
       readRequired(record, "entitlementActive"),
       (input) => expectBoolean(input, "eligibility.snapshot.entitlementActive")
+    ),
+    evaluatedAt: parseUtcTimestamp(readRequired(record, "evaluatedAt")),
+    evidence: parseEligibilityEvidenceSnapshot(
+      readRequired(record, "evidence")
     ),
     incomingMessageAt: nullable(
       readRequired(record, "incomingMessageAt"),
@@ -816,17 +1193,31 @@ function parseEligibilitySnapshot(value: unknown): EligibilitySnapshot {
       readRequired(record, "suppression"),
       parseSuppressionEntry
     ),
+    unresolvedUnknownActionIds: expectArrayOf(
+      readRequired(record, "unresolvedUnknownActionIds"),
+      (input) => parseActionId(input),
+      "eligibility.snapshot.unresolvedUnknownActionIds",
+      100
+    ),
+    versions,
   });
 }
 
 export function parseEligibilityCheck(value: unknown): EligibilityCheck {
   const record = expectRecord(value, "eligibilityCheck");
+  const snapshot = parseEligibilitySnapshot(readRequired(record, "snapshot"));
+  const step = parseSequenceStep(readRequired(record, "step"));
+  if (snapshot.duePlan !== null && snapshot.duePlan.step !== step) {
+    throw new ContractValidationError(
+      "eligibility step must match the due-plan step"
+    );
+  }
   return Object.freeze({
     accountId: parseAccountId(readRequired(record, "accountId")),
     campaignId: parseCampaignId(readRequired(record, "campaignId")),
     prospectId: parseProspectId(readRequired(record, "prospectId")),
-    snapshot: parseEligibilitySnapshot(readRequired(record, "snapshot")),
-    step: parseSequenceStep(readRequired(record, "step")),
+    snapshot,
+    step,
     tenantId: parseTenantId(readRequired(record, "tenantId")),
   });
 }
@@ -883,19 +1274,6 @@ export function parseEligibilityResult(value: unknown): EligibilityResult {
     );
   }
   return Object.freeze({ ...common, outcome, reasons, retryAt: null });
-}
-
-export function parseDuePlan(value: unknown): DuePlan {
-  const record = expectRecord(value, "duePlan");
-  return Object.freeze({
-    businessTimeZone: parseBusinessTimeZone(
-      readRequired(record, "businessTimeZone")
-    ),
-    closureAt: nullable(readRequired(record, "closureAt"), parseUtcTimestamp),
-    earliestAt: parseUtcTimestamp(readRequired(record, "earliestAt")),
-    intendedAt: parseUtcTimestamp(readRequired(record, "intendedAt")),
-    step: parseSequenceStep(readRequired(record, "step")),
-  });
 }
 
 function parseWorkflowSegment(value: string, path: string): string {
@@ -1026,6 +1404,41 @@ function parseActivityInputFor(
         tenantId: parseTenantId(readRequired(record, "tenantId")),
       });
     }
+    case WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction: {
+      return Object.freeze({
+        accountId: parseAccountId(readRequired(record, "accountId")),
+        actionId: parseActionId(readRequired(record, "actionId")),
+        attemptId: parseSendAttemptId(readRequired(record, "attemptId")),
+        campaignVersionId: parseCampaignVersionId(
+          readRequired(record, "campaignVersionId")
+        ),
+        fence: expectInteger(
+          readRequired(record, "fence"),
+          "activity.sequence.dispatch_action.fence",
+          1
+        ),
+        prospectId: parseProspectId(readRequired(record, "prospectId")),
+        tenantId: parseTenantId(readRequired(record, "tenantId")),
+      });
+    }
+    case WORKFLOW_ACTIVITY_NAMES.sequenceDraftAction: {
+      return Object.freeze({
+        accountId: parseAccountId(readRequired(record, "accountId")),
+        campaignId: parseCampaignId(readRequired(record, "campaignId")),
+        campaignVersionId: parseCampaignVersionId(
+          readRequired(record, "campaignVersionId")
+        ),
+        evidenceIds: expectArrayOf(
+          readRequired(record, "evidenceIds"),
+          (input) => parseEvidenceId(input),
+          "activity.sequence.draft_action.evidenceIds",
+          20
+        ),
+        prospectId: parseProspectId(readRequired(record, "prospectId")),
+        step: parseSequenceStep(readRequired(record, "step")),
+        tenantId: parseTenantId(readRequired(record, "tenantId")),
+      });
+    }
     case WORKFLOW_ACTIVITY_NAMES.sequenceReconcileAction: {
       return Object.freeze({
         accountId: parseAccountId(readRequired(record, "accountId")),
@@ -1106,22 +1519,43 @@ function parseDiscoveryQualification(
   path: string
 ): DiscoveryQualification {
   const record = expectRecord(value, path);
+  const evidenceIds = expectArrayOf(
+    readRequired(record, "evidenceIds"),
+    (input) => parseEvidenceId(input),
+    `${path}.evidenceIds`,
+    20
+  );
+  const outcome = member(
+    readRequired(record, "outcome"),
+    ["HOLD", "QUALIFIED", "SKIP"],
+    `${path}.outcome`
+  );
+  const prospectId = parseProspectId(readRequired(record, "prospectId"));
+  const reason = nullable(readRequired(record, "reason"), (input) =>
+    parseEligibilityReasonCode(input, `${path}.reason`)
+  );
+
+  if (outcome === "QUALIFIED") {
+    if (!isNonEmpty(evidenceIds) || reason !== null) {
+      throw new ContractValidationError(
+        "QUALIFIED discovery results require evidence and a null reason"
+      );
+    }
+    return Object.freeze({ evidenceIds, outcome, prospectId, reason: null });
+  }
+  if (reason === null) {
+    throw new ContractValidationError(
+      `${outcome} discovery results require a stable reason`
+    );
+  }
+  if (outcome === "HOLD") {
+    return Object.freeze({ evidenceIds, outcome, prospectId, reason });
+  }
   return Object.freeze({
-    evidenceIds: expectArrayOf(
-      readRequired(record, "evidenceIds"),
-      (input) => parseEvidenceId(input),
-      `${path}.evidenceIds`,
-      20
-    ),
-    outcome: member(
-      readRequired(record, "outcome"),
-      ["HOLD", "QUALIFIED", "SKIP"],
-      `${path}.outcome`
-    ),
-    prospectId: parseProspectId(readRequired(record, "prospectId")),
-    reason: nullable(readRequired(record, "reason"), (input) =>
-      parseEligibilityReasonCode(input, `${path}.reason`)
-    ),
+    evidenceIds,
+    outcome,
+    prospectId,
+    reason,
   });
 }
 
@@ -1151,6 +1585,119 @@ function validateReconciliationResult(
       "unknown reconciliation requires an explicit uncertainty reason"
     );
   }
+}
+
+function parseSequenceDispatchActionResult(
+  record: Record<string, unknown>
+): SequenceDispatchActionResult {
+  const outcome = member(
+    readRequired(record, "outcome"),
+    ["CONFIRMED", "FAILED", "UNKNOWN"],
+    "activity.sequence.dispatch_action.outcome"
+  );
+  const actionId = parseActionId(readRequired(record, "actionId"));
+  const attemptId = parseSendAttemptId(readRequired(record, "attemptId"));
+  const completedAt = parseUtcTimestamp(readRequired(record, "completedAt"));
+
+  if (outcome === "CONFIRMED") {
+    const reason = readRequired(record, "reason");
+    if (!isNull(reason)) {
+      throw new ContractValidationError(
+        "CONFIRMED dispatch results require a null reason"
+      );
+    }
+    return Object.freeze({
+      actionId,
+      attemptId,
+      completedAt,
+      outcome,
+      providerMessageId: expectNonEmptyString(
+        readRequired(record, "providerMessageId"),
+        "activity.sequence.dispatch_action.providerMessageId"
+      ),
+      reason: null,
+    });
+  }
+
+  const providerMessageId = nullableNonEmptyString(
+    readRequired(record, "providerMessageId"),
+    "activity.sequence.dispatch_action.providerMessageId"
+  );
+  if (providerMessageId !== null) {
+    throw new ContractValidationError(
+      `${outcome} dispatch results cannot carry a provider message ID`
+    );
+  }
+  if (outcome === "FAILED") {
+    return Object.freeze({
+      actionId,
+      attemptId,
+      completedAt,
+      outcome,
+      providerMessageId: null,
+      reason: parseActionFailureReason(
+        readRequired(record, "reason"),
+        "activity.sequence.dispatch_action.reason"
+      ),
+    });
+  }
+  return Object.freeze({
+    actionId,
+    attemptId,
+    completedAt,
+    outcome,
+    providerMessageId: null,
+    reason: parseActionUnknownReason(
+      readRequired(record, "reason"),
+      "activity.sequence.dispatch_action.reason"
+    ),
+  });
+}
+
+function parseSequenceDraftActionResult(
+  record: Record<string, unknown>
+): SequenceDraftActionResult {
+  const outcome = member(
+    readRequired(record, "outcome"),
+    ["DRAFTED", "HOLD"],
+    "activity.sequence.draft_action.outcome"
+  );
+  const actionId = nullable(readRequired(record, "actionId"), parseActionId);
+  const observedAt = parseUtcTimestamp(readRequired(record, "observedAt"));
+  const reason = nullable(readRequired(record, "reason"), (input) =>
+    parseEligibilityReasonCode(input, "activity.sequence.draft_action.reason")
+  );
+  const sourceVersions = nullable(
+    readRequired(record, "sourceVersions"),
+    parseDraftSourceVersions
+  );
+
+  if (outcome === "DRAFTED") {
+    if (actionId === null || sourceVersions === null || reason !== null) {
+      throw new ContractValidationError(
+        "DRAFTED results require an action, source versions and a null reason"
+      );
+    }
+    return Object.freeze({
+      actionId,
+      observedAt,
+      outcome,
+      reason: null,
+      sourceVersions,
+    });
+  }
+  if (actionId !== null || sourceVersions !== null || reason === null) {
+    throw new ContractValidationError(
+      "HOLD draft results require a reason and no action or source versions"
+    );
+  }
+  return Object.freeze({
+    actionId: null,
+    observedAt,
+    outcome,
+    reason,
+    sourceVersions: null,
+  });
 }
 
 function parseActivityResultFor(
@@ -1220,6 +1767,12 @@ function parseActivityResultFor(
           "activity.sequence.check_acceptance.source"
         ),
       });
+    }
+    case WORKFLOW_ACTIVITY_NAMES.sequenceDispatchAction: {
+      return parseSequenceDispatchActionResult(record);
+    }
+    case WORKFLOW_ACTIVITY_NAMES.sequenceDraftAction: {
+      return parseSequenceDraftActionResult(record);
     }
     case WORKFLOW_ACTIVITY_NAMES.sequenceReconcileAction: {
       const outcome = member(

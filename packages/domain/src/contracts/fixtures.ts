@@ -6,19 +6,23 @@ import type { AccountProspectOwnership, Ownership } from "./ownership";
 import {
   parseAccountProspectOwnership,
   parseAction,
+  parseEligibilityCheck,
   parseIncomingMessageEvent,
   parseMessage,
   parseOwnership,
 } from "./parsers";
 import type { DefaultSequencePlan } from "./values";
-import { DEFAULT_SEQUENCE_PLAN } from "./values";
+import {
+  DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+  DEFAULT_SEQUENCE_PLAN,
+} from "./values";
 
 const FIXTURE_TIME = "2026-09-17T10:00:00.000Z";
 const SOURCE_VERSIONS = {
   acceptedInferredStyle: null,
   campaign: {
     createdAt: FIXTURE_TIME,
-    id: "version_campaign_1",
+    id: "campaign_version_alpha_1",
     kind: "CAMPAIGN",
     revision: 1,
   },
@@ -162,6 +166,59 @@ export const campaignChangeOwnershipContinuityFixture: Readonly<{
   }),
   fromCampaignId: parseCampaignId("campaign_alpha"),
   toCampaignId: parseCampaignId("campaign_beta"),
+});
+
+export const eligibilityCheckFixture = parseEligibilityCheck({
+  accountId: "account_demo",
+  campaignId: "campaign_alpha",
+  prospectId: "prospect_demo",
+  snapshot: {
+    acceptance: {
+      accepted: true,
+      observedAt: FIXTURE_TIME,
+    },
+    accountHealthy: true,
+    businessWindow: {
+      nextOpenAt: null,
+      status: "OPEN",
+    },
+    campaignActive: true,
+    completedSteps: [],
+    draft: {
+      actionId: "action_dm1_ready",
+      status: "VALID",
+    },
+    duePlan: {
+      businessTimeZone: "Europe/Paris",
+      businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+      closureAt: "2026-10-08T10:00:00.000Z",
+      earliestAt: FIXTURE_TIME,
+      intendedAt: FIXTURE_TIME,
+      step: "DM1",
+    },
+    entitlementActive: true,
+    evaluatedAt: FIXTURE_TIME,
+    evidence: {
+      evidenceIds: ["evidence_offer_1"],
+      status: "VALID",
+    },
+    incomingMessageAt: null,
+    ownership: {
+      kind: "BOT_ELIGIBLE",
+      ownerUserId: null,
+      reason: "INITIAL_ACTIVATION",
+      recordedAt: FIXTURE_TIME,
+    },
+    quotaAvailable: true,
+    suppression: null,
+    unresolvedUnknownActionIds: [],
+    versions: {
+      candidate: SOURCE_VERSIONS,
+      current: SOURCE_VERSIONS,
+    },
+  },
+  step: "DM1",
+  tenantId: "tenant_demo",
 });
 
 export const defaultSequencePlanFixture: DefaultSequencePlan =
