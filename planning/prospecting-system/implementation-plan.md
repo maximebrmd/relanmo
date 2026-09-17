@@ -10,7 +10,7 @@ For coding delegation, use the [Firstmate execution plan](execution-plan.md) and
 2. Replace the default Prisma integration with Drizzle in `packages/database`. Replace Clerk with Better Auth in `packages/auth`, including UI providers, route guards, user controls, webhooks and environment keys.
 3. Create separate Neon environments and generate Better Auth's Drizzle schema from the configured auth features. Review and apply auth plus product migrations through one Drizzle release process.
 4. Add `apps/worker`, deterministic workflow definitions and official SDK adapters. Keep the existing `apps/app`, `apps/web` and `apps/api` roles, and add `apps/docs` with Fumadocs instead of Mintlify. Use Node.js to run compiled Temporal workers.
-5. Configure Ultracite with its Biome provider, root lint/format commands and strict TypeScript checks. Verify frozen Bun installation and native SDK startup in Linux images.
+5. Configure Ultracite with its Oxlint/Oxfmt providers and vendored anti-slop preset, root lint/format commands and strict TypeScript checks. Verify frozen Bun installation and native SDK startup in Linux images.
 6. Configure Stripe Checkout, Portal and verified subscription webhooks as a required integration. Add billing-to-tenant mappings and test-mode fixtures.
 7. Set up private EU R2 buckets through Wrangler, implement AWS SDK v3 object access, and configure Resend auth mail and Sentry. Validate only the environment keys each service needs, and ensure production services cannot silently start with missing required integration keys.
 
@@ -77,7 +77,7 @@ If rollback is needed, pause cloud sending first. Export the latest receipts and
 | Quality | French evaluation results, explicit-versus-inferred style precedence, customer overrides, stale draft invalidation and model/prompt versions |
 | Documentation | Static Fumadocs build, public-content boundary, valid links and browser search |
 | Dependencies | next-forge source and reason for each addition, with user agreement recorded for choices outside the catalog/agreed stack |
-| Required stack | Frozen Bun install, Node worker boot, Better Auth/Drizzle schema compatibility, Biome checks and Stripe test-mode event recovery |
+| Required stack | Frozen Bun install, Node worker boot, Better Auth/Drizzle schema compatibility, Oxlint/Oxfmt checks and Stripe test-mode event recovery |
 | Operations | Restore drill, account outage drill, deployment rollback and actionable alerts |
 | Cost | Seven days of measured tokens, Temporal actions/history, network use and database growth |
 

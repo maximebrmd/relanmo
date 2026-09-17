@@ -10,13 +10,14 @@ import {
   SearchDialogInput,
   SearchDialogList,
   SearchDialogOverlay,
-  type SharedProps,
 } from "fumadocs-ui/components/dialog/search";
+import type { SharedProps } from "fumadocs-ui/components/dialog/search";
 import { useI18n } from "fumadocs-ui/contexts/i18n";
 import type { ReactNode } from "react";
 
 export default function DefaultSearchDialog(props: SharedProps): ReactNode {
-  const { locale } = useI18n(); // (optional) for i18n
+  // The locale is optional in the Fumadocs search client configuration.
+  const { locale } = useI18n();
   const { search, setSearch, query } = useDocsSearch({
     client: staticClient({
       locale,

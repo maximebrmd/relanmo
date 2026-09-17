@@ -1,6 +1,6 @@
 # Bun — required package manager
 
-Use Bun to install dependencies and run repository scripts. Production application and Temporal processes use Node.js 24 LTS. The user requested Bun as package manager; this does not require switching every runtime or test runner.
+Use Bun to install dependencies and run repository scripts. The `apps/app` and `apps/api` Next.js processes use Bun; the Temporal worker uses Node.js 24 LTS. The user requested Bun as package manager and explicitly selected these runtime boundaries.
 
 ## Repository rules
 
@@ -14,7 +14,7 @@ Use Bun to install dependencies and run repository scripts. Production applicati
 
 ## Runtime boundary
 
-Launch compiled workers with `node`, and run Vitest/Temporal tests under the chosen Node version. Do not silently replace those tests with `bun test` or force CLIs onto Bun with `--bun`.
+Launch compiled Temporal workers with `node`. App/API starts intentionally use `bun --bun next start`; verify Vitest and Temporal tests against the runtime required by the relevant package rather than silently replacing them with `bun test`.
 
 Temporal's SDK relies on Node-specific worker facilities, and its current repository strongly discourages running workers under alternative runtimes. Use a pinned released SDK and verify its own compatibility matrix; a development-branch README alone is not release certification. [Temporal runtime requirements](https://github.com/temporalio/sdk-typescript#requirements).
 

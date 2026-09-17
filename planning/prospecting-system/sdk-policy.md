@@ -1,6 +1,6 @@
 # TypeScript SDK and integration policy
 
-**Required implementation rule, updated 17 September 2026.** Prefer each vendor's official TypeScript or TypeScript-compatible JavaScript SDK. “Tempora” is interpreted as **Temporal**, the workflow service already selected. All application code is TypeScript; Bun is the package manager and Node.js 24 LTS is the deployment runtime.
+**Required implementation rule, updated 17 September 2026.** Prefer each vendor's official TypeScript or TypeScript-compatible JavaScript SDK. “Tempora” is interpreted as **Temporal**, the workflow service already selected. All application code is TypeScript; Bun is the package manager and runs the app/API Next.js processes, while Node.js 24 LTS runs the Temporal worker.
 
 Consult the [dependency policy](dependency-policy.md) and next-forge documentation before adding a package. An official SDK preference does not bypass the user’s approval rule for a new unlisted dependency. Wrangler setup and the existing AWS SDK v3 R2 adapter are explicitly requested.
 
@@ -37,6 +37,6 @@ Consult the [dependency policy](dependency-policy.md) and next-forge documentati
 
 ## Version acceptance before building
 
-The guide identifies packages, not a prevalidated lockfile. The build must record exact next-forge, Bun, Node, Next.js, Better Auth, Drizzle, Temporal, TypeSafe, Ultracite and Biome versions after a clean-install compatibility run. In particular, choose a compatible released Better Auth adapter/Drizzle relation API; do not combine an old generated auth schema with a newer adapter by assumption.
+The guide identifies packages, not a prevalidated lockfile. The build must record exact next-forge, Bun, Node, Next.js, Better Auth, Drizzle, Temporal, TypeSafe, Ultracite, Oxlint and Oxfmt versions after a clean-install compatibility run. In particular, choose a compatible released Better Auth adapter/Drizzle relation API; do not combine an old generated auth schema with a newer adapter by assumption.
 
 Acceptance requires a frozen Bun install, an actual Node worker boot, migrated auth tables, a working sign-in, signed Stripe webhook verification, one evaluated TypeSafe decision and a provider integration report. Those checks have not been executed on an application in this documentation task.

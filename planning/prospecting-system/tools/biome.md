@@ -1,11 +1,13 @@
-# Biome — required formatter and linter
+# Biome — superseded provider note
 
-Install `@biomejs/biome` at the version supported by the pinned Ultracite release. Ultracite defines the policy; Biome performs the checks. This is one toolchain, not two parallel formatting passes. [Biome installation](https://biomejs.dev/guides/getting-started/).
+The original planning pack selected Biome, but the explicit P002 provider
+revision switches the active Ultracite toolchain to Oxlint and Oxfmt with the
+vendored anti-slop preset. Do not add a root `biome.jsonc` or install Biome for
+the current repository. The active setup is documented in
+[ultracite.md](ultracite.md) and the root `oxlint.config.ts` and
+`oxfmt.config.ts` files.
 
-Use the root `biome.jsonc` described in [Ultracite](ultracite.md), with explicit scope for source files and generated-output exclusions. Share editor settings so save-time formatting matches CI. Avoid blanket suppression of a rule across the whole monorepository to accommodate one generated file.
-
-CI runs the non-mutating check and strict TypeScript compilation. Existing next-forge ESLint/Prettier/Oxlint scripts, if present in the chosen scaffold revision, must be reconciled with this requested Biome configuration. Do not claim formatting catches authorization bugs or proves a Temporal workflow deterministic.
-
-Upgrade Biome and Ultracite together through a reviewed dependency update; inspect formatting and rule changes before merging. [Biome CI guidance](https://biomejs.dev/recipes/continuous-integration/).
-
-There is no cloud service bill. Validate checks across application, API, worker and shared TypeScript packages, and measure CI time within the existing allowance.
+The original Biome decision remains in the task-card history so the planning
+pack's initial record is preserved. Current checks still run non-mutating lint
+and strict TypeScript compilation separately; neither claims authorization
+correctness or Temporal workflow determinism.

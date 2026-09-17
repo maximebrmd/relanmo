@@ -27,7 +27,7 @@ The customer application, provider API and worker have independent replicas. Bet
 ## Setup
 
 1. Define each service and environment in version-controlled Render configuration, rooted in the same next-forge repository. Choose Frankfurt and attach the appropriate domains.
-2. Build dependencies with pinned Bun and the frozen lockfile. Deploy the customer app and API as separate Node web services, and the Temporal process as a Node background worker.
+2. Build dependencies with pinned Bun and the frozen lockfile. Deploy the customer app and API as separate Bun-backed web services, and the Temporal process as a Node.js 24 background worker.
 3. Export marketing and Fumadocs documentation statically for the MVP. Configure docs for static browser search and confirm all pages support export; if dynamic rendering is retained, add a paid service rather than pretending it is free static hosting.
 4. Configure production and staging secrets separately. The API receives provider webhooks over TLS, authenticates events and commits database/outbox records before acknowledgement.
 5. Configure health and graceful shutdown behaviour. Apply reviewed Drizzle migrations once per release, with the direct database URL and migration role. Runtime services use their restricted pooled connections.

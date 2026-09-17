@@ -2,7 +2,7 @@
 
 **Specification revised 17 September 2026 · tariff inputs checked 16 September 2026 · EUR · VAT excluded · developer labour €0.**
 
-Updated for Neon, Better Auth, Drizzle, next-forge, required Stripe, Ultracite/Biome, Bun, Fumadocs and Wrangler. Static docs and the selected next-forge addons add no fixed service fee; a small style-analysis allowance is included in AI usage. My recommendation is to allocate **about €500/month for a ten-customer pilot**, including a separate staging environment. For the stated workload, plan approximately **€1,700/month at 100 connected customers**, **€6,900 at 500**, and **€13,600 at 1,000**. These budgets include a 20% reserve and upward rounding. Payment processing is shown separately below.
+Updated for Neon, Better Auth, Drizzle, next-forge, required Stripe, Ultracite/Oxlint/Oxfmt, Bun, Fumadocs and Wrangler. Static docs and the selected next-forge addons add no fixed service fee; a small style-analysis allowance is included in AI usage. My recommendation is to allocate **about €500/month for a ten-customer pilot**, including a separate staging environment. For the stated workload, plan approximately **€1,700/month at 100 connected customers**, **€6,900 at 500**, and **€13,600 at 1,000**. These budgets include a 20% reserve and upward rounding. Payment processing is shown separately below.
 
 The initial cash budget for building and running a two-month, ten-customer pilot is approximately **€1,000–€1,300**, assuming free developers. Most of this is subscriptions and usage during the pilot, not a one-time software licence.
 
@@ -145,7 +145,7 @@ Restore history means average billed retained history, not simply database size 
 
 These are unbenchmarked starting envelopes. Scale from measured memory, CPU, query latency and queue age. Each extra average production CU running all month adds $77.38 on Launch. A staging database kept active all month instead of 160 hours adds about $15.11 at 0.25 CU. Choosing Scale for its additional service/network features changes the CU-hour rate to $0.222; at the same assumed workload that adds about €25.81/month at 10 customers, €46.98 at 100, and €174 at 1,000 before reserve. Storage and optional service charges still need review.
 
-Better Auth runs on our app instances and Neon database. It has no separate managed-auth fee in this plan. Drizzle, next-forge, Turborepo, Bun, Ultracite, Biome, Fumadocs, Wrangler, Next Safe Action and nuqs add no runtime subscription. Their build/bandwidth impact must still fit the usage allowance. The required Stripe fees remain revenue-dependent and are shown separately below.
+Better Auth runs on our app instances and Neon database. It has no separate managed-auth fee in this plan. Drizzle, next-forge, Turborepo, Bun, Ultracite, Oxlint, Oxfmt, Fumadocs, Wrangler, Next Safe Action and nuqs add no runtime subscription. Their build/bandwidth impact must still fit the usage allowance. The required Stripe fees remain revenue-dependent and are shown separately below.
 
 PITR is a recovery facility, not a live standby or end-to-end availability guarantee. Before automatic sending resumes after a restore, reconcile provider history and the send ledger.
 

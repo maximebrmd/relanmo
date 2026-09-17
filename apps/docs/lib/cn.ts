@@ -1,3 +1,3 @@
-export function cn(...inputs: Array<string | false | null | undefined>) {
+export function cn(...inputs: (string | false | null | undefined)[]) {
   return inputs.filter(Boolean).join(" ");
 }

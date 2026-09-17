@@ -1,6 +1,6 @@
 # Next.js — customer dashboard and HTTP API
 
-**Status: required web framework.** Deploy a Node.js application on Render. No separate Vercel hosting subscription is included. [Official deployment options](https://nextjs.org/docs/app/getting-started/deploying).
+**Status: required web framework.** Deploy the Bun-backed Next.js app/API processes on Render. No separate Vercel hosting subscription is included. [Official deployment options](https://nextjs.org/docs/app/getting-started/deploying).
 
 ## Screens and endpoints
 
@@ -28,6 +28,6 @@ Separate reads from commands in the domain layer so retries of a page request ne
 
 No per-customer framework fee is included. Web compute, staging and bandwidth appear under [Render](render.md). Build the standalone/container output where appropriate; do not run the development server in production.
 
-Marketing is a static export in the baseline. Verify the chosen pages support static export and remove dynamic-only template features from that app; otherwise budget another paid web service. Product and API services remain dynamic Node deployments.
+Marketing is a static export in the baseline. Verify the chosen pages support static export and remove dynamic-only template features from that app; otherwise budget another paid web service. Product and API services remain dynamic deployments started with Bun.
 
 Use the selected next-forge [Next Safe Action addon](next-safe-action.md) for repeated customer commands and [nuqs](nuqs.md) for pipeline URL filters. Runtime validation and authorization stay server-side.

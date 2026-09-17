@@ -10,7 +10,7 @@ See the [next-forge guide](next-forge.md) for the authoritative workspace layout
 ## Pipeline
 
 1. Install the pinned Bun and Node.js versions on a standard Linux runner. Run `bun install --frozen-lockfile` from the root.
-2. Run root Ultracite/Biome checks, strict TypeScript checks and focused Vitest suites under Node. A Bun package-manager choice does not change the test runtime.
+2. Run root Ultracite/Oxlint/Oxfmt checks, strict TypeScript checks and focused Vitest suites under the documented runtimes. Bun owns app/API Next processes; the worker smoke runs under Node 24.
 3. Start a disposable Postgres database and verify schema migrations, isolation and concurrency invariants.
 4. Run Temporal workflow tests and replay-compatible checks for orchestration changes.
 5. Build separate customer-app/API/worker artifacts and the static marketing and Fumadocs documentation outputs and run Playwright against the staging/test application.

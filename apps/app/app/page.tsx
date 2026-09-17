@@ -2,13 +2,13 @@ export default function AppPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-16">
       <div className="w-full max-w-2xl space-y-6">
-        <p className="font-mono text-muted-foreground text-sm uppercase tracking-[0.2em]">
+        <p className="text-muted-foreground font-mono text-sm tracking-[0.2em] uppercase">
           Relanmo
         </p>
-        <h1 className="font-semibold text-4xl tracking-tight sm:text-5xl">
+        <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
           La prospection avance. Vous aussi.
         </h1>
-        <p className="max-w-xl text-lg text-muted-foreground">
+        <p className="text-muted-foreground max-w-xl text-lg">
           Le socle produit est en préparation. Relanmo aidera les freelances à
           avancer dans leur prospection avec des séquences bornées et une
           reprise en main humaine dès la première réponse.

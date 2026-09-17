@@ -1,15 +1,15 @@
-# Node.js — server and worker runtime
+# Node.js — Temporal worker runtime
 
 **Status: required runtime.** Start with Node.js 24 LTS and pin a tested patch release. The official release table currently marks 24 as LTS. [Node.js release policy](https://nodejs.org/en/about/previous-releases).
 
 ## What runs here
 
-The Next.js server, Temporal workers, vendor adapters, database access and import/maintenance commands all run in Node.js. A single language/runtime keeps shared domain rules consistent across web and worker processes. Python services are not required for this design.
+The Temporal worker, its vendor adapters and its database activities run in Node.js. The `apps/app` and `apps/api` Next.js processes use Bun as an explicit application-runtime boundary; shared TypeScript packages remain runtime-neutral. Python services are not required for this design.
 
 ## Setup
 
 1. Pin the same runtime family in local development, CI and Docker images. Verify Temporal, TypeSafe and other SDK compatibility in the integration spike.
-2. Use next-forge with separate app, API and worker entry points. Bun manages dependencies and scripts; explicit `node` entry points run production code. Workers have no public customer HTTP surface except any platform-required health mechanism.
+2. Use next-forge with separate app, API and worker entry points. Bun manages dependencies and scripts and starts the app/API Next.js processes; the compiled worker runs from an explicit `node` entry point. Workers have no public customer HTTP surface except any platform-required health mechanism.
 3. Use explicit timeouts and bounded concurrency for network requests. Account-scoped outbound serialization belongs in persistent shared state, not just an in-memory JavaScript queue.
 4. Use small database pools per process; count the sum across replicas. Close pools and stop accepting new work on shutdown.
 5. Handle `SIGTERM` by draining supported worker activities within the deployment grace period. Persist uncertain sends for reconciliation if a process cannot finish cleanly.

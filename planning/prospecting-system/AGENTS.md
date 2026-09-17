@@ -12,7 +12,7 @@ This file is mirrored at the Relanmo application repository root. The repository
 
 ## Required stack and layout
 
-Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Biome, Bun as package manager, and official TypeScript-compatible SDKs where available. Retain Temporal, Unipile and TypeSafe from the agreed architecture. Node.js runs Temporal workers.
+Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Oxlint and Oxfmt plus its vendored anti-slop preset, Bun as package manager, and official TypeScript-compatible SDKs where available. Retain Temporal, Unipile and TypeSafe from the agreed architecture. Bun runs the Next.js app/API processes; Node.js 24 runs Temporal workers.
 
 Use `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Set up R2 buckets through Wrangler; application object operations use the AWS S3 v3 SDK. Do not restore Clerk, Prisma, Supabase or Mintlify defaults over these choices.
 

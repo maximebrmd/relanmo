@@ -4,8 +4,8 @@
 
 ## Implementation
 
-1. Use a pinned Node.js 24 base with the system libraries required by the evaluated SDKs. Prefer a tested Debian-based worker image initially; verify native Temporal dependencies before adopting a smaller alternative.
-2. Use pinned Bun in dependency/build stages with a frozen lockfile. Compile for Node and use Node.js 24 in runtime stages. Preserve required workspace exports and native Temporal artifacts built for the target Linux architecture. Verify any Turbo pruning step against the chosen Bun lockfile and SDK versions; a full frozen workspace build is an acceptable first implementation.
+1. Use a pinned Node.js 24 base for the Temporal worker, with the system libraries required by the evaluated SDKs. Prefer a tested Debian-based worker image initially; verify native Temporal dependencies before adopting a smaller alternative.
+2. Use pinned Bun in dependency/build stages with a frozen lockfile. Build the app/API images around their Bun `next start` entrypoints and compile the worker for its Node.js 24 runtime. Preserve required workspace exports and native Temporal artifacts built for the target Linux architecture. Verify any Turbo pruning step against the chosen Bun lockfile and SDK versions; a full frozen workspace build is an acceptable first implementation.
 3. Run as a non-root user. Pass secrets at runtime; never bake API keys, database passwords or customer sessions into image layers.
 4. Keep persistent state in Postgres/private object storage and Temporal, so replacing a container is routine.
 5. Implement graceful shutdown and deployment health behaviour in the application. Build and deploy immutable revisions so a worker release can be traced to its source.

@@ -2,7 +2,7 @@
 
 **Specification updated: 17 September 2026. Developer labour: €0, as requested.**
 
-Build a shared cloud application around Unipile for LinkedIn, TypeSafe for structured decisions, and Claude's API for French message writing. Temporal coordinates the work. Build with next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Biome, Bun as package manager, and Fumadocs for documentation. Render runs the Node.js application, API and background workers. Official TypeScript-compatible SDKs are required where available.
+Build a shared cloud application around Unipile for LinkedIn, TypeSafe for structured decisions, and Claude's API for French message writing. Temporal coordinates the work. Build with next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Oxlint and Oxfmt plus its vendored anti-slop preset, Bun as package manager, and Fumadocs for documentation. Bun runs the Next.js app and API processes; Node.js 24 runs the Temporal worker. Official TypeScript-compatible SDKs are required where available.
 
 Customers connect LinkedIn, configure their offer and target market, and activate a bounded campaign. Prospecting continues with their laptop switched off. The first incoming prospect message ends automation for that conversation; a human takes over. No Claude Desktop, Cowork, browser extension, or customer-owned worker is required by this design.
 
@@ -38,13 +38,12 @@ Each first-class technology has its own `.md` (30 tool guides, including Firstma
 | next-forge | Required monorepository foundation | [next-forge.md](tools/next-forge.md) |
 | Turborepo | Workspace build/test coordination | [turborepo.md](tools/turborepo.md) |
 | Bun | Required package manager and workspace installation | [bun.md](tools/bun.md) |
-| Ultracite | Required lint/format policy, using Biome | [ultracite.md](tools/ultracite.md) |
-| Biome | Required formatting and lint engine | [biome.md](tools/biome.md) |
+| Ultracite | Required lint/format policy using Oxlint, Oxfmt and vendored anti-slop | [ultracite.md](tools/ultracite.md) |
 | Fumadocs | Required product documentation in `apps/docs` | [fumadocs.md](tools/fumadocs.md) |
 | Next Safe Action | Validated customer commands, a documented next-forge addon | [next-safe-action.md](tools/next-safe-action.md) |
 | nuqs | Typed pipeline URL filters, a documented next-forge addon | [nuqs.md](tools/nuqs.md) |
 | Next.js | Customer app, marketing, docs and API | [nextjs.md](tools/nextjs.md) |
-| Node.js | Production app/API and Temporal worker runtime | [nodejs.md](tools/nodejs.md) |
+| Node.js | Temporal worker runtime | [nodejs.md](tools/nodejs.md) |
 | TypeScript | Application language and shared contracts | [typescript.md](tools/typescript.md) |
 | Neon | Required managed PostgreSQL host | [neon.md](tools/neon.md) |
 | PostgreSQL | Authoritative product and auth state | [postgresql.md](tools/postgresql.md) |
@@ -66,9 +65,9 @@ Each first-class technology has its own `.md` (30 tool guides, including Firstma
 | Playwright | Customer product browser tests | [playwright.md](tools/playwright.md) |
 | Firstmate | Parallel coding crewmates, independent review and task supervision | [firstmate.md](tools/firstmate.md) |
 
-Neon and PostgreSQL describe the same database deployment. Better Auth runs in our application and stores its data there; no additional managed-auth subscription is assumed. R2 replaces the previous bundled file store; Wrangler configures it and the AWS S3 v3 SDK handles object operations. Bun installs packages while Node.js runs production services, especially Temporal workers. Stripe is required, but its revenue-dependent fees are separated from infrastructure in the estimate.
+Neon and PostgreSQL describe the same database deployment. Better Auth runs in our application and stores its data there; no additional managed-auth subscription is assumed. R2 replaces the previous bundled file store; Wrangler configures it and the AWS S3 v3 SDK handles object operations. Bun installs packages and runs the Next.js app/API services while Node.js 24 runs the Temporal worker. Stripe is required, but its revenue-dependent fees are separated from infrastructure in the estimate.
 
-The monorepository uses `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Replace the template's default Clerk/Prisma integrations with Better Auth/Drizzle. Ultracite explicitly uses its Biome provider. See the [next-forge adaptation guide](tools/next-forge.md).
+The monorepository uses `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Replace the template's default Clerk/Prisma integrations with Better Auth/Drizzle. Ultracite explicitly uses its Oxlint/Oxfmt providers and vendored anti-slop preset. See the [next-forge adaptation guide](tools/next-forge.md).
 
 ## Scope of the estimate
 

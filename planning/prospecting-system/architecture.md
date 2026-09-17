@@ -31,7 +31,7 @@ flowchart TB
     APP --> STRIPE
 ```
 
-Bun installs the monorepository; Node.js 24 LTS runs the deployed services. Render runs application processes; Temporal persists orchestration history; Neon persists business and authentication state. Temporal Cloud does not host our workers. [Temporal SDK runtime requirements](https://github.com/temporalio/sdk-typescript#requirements), [Next.js deployment options](https://nextjs.org/docs/app/getting-started/deploying).
+Bun installs the monorepository and runs the `apps/app` and `apps/api` Next.js processes; Node.js 24 LTS runs the deployed Temporal worker. Render runs those application processes; Temporal persists orchestration history; Neon persists business and authentication state. Temporal Cloud does not host our workers. [Temporal SDK runtime requirements](https://github.com/temporalio/sdk-typescript#requirements), [Next.js deployment options](https://nextjs.org/docs/app/getting-started/deploying).
 
 Choose Frankfurt for Render and a nearby supported EU Neon region, with an EU Temporal namespace where available. Use TLS and bounded pools between providers; sharing a city name does not imply a shared private network. R2 uses an explicit EU jurisdiction for private files. Better Auth is self-hosted in the application and accesses Neon through Drizzle. [Neon connection guidance](https://neon.com/docs/connect/choose-connection), [Better Auth adapter](https://better-auth.com/docs/adapters/drizzle), [R2 location controls](https://developers.cloudflare.com/r2/reference/data-location/).
 
@@ -142,7 +142,7 @@ Monitor webhook lag, account disconnections, unknown sends, queue age, stale acc
 
 ## 8. Required engineering decisions
 
-Neon, Better Auth, Drizzle, next-forge, Stripe, Ultracite with Biome, Bun as package manager, and official TypeScript SDKs are fixed requirements. Supabase, Clerk and Prisma are replaced in the proposed build. No extra managed authentication service is needed. Production auth, payment and database configuration must be explicit, including package-specific environment validation.
+Neon, Better Auth, Drizzle, next-forge, Stripe, Ultracite with Oxlint and Oxfmt plus its vendored anti-slop preset, Bun as package manager, and official TypeScript SDKs are fixed requirements. Supabase, Clerk and Prisma are replaced in the proposed build. No extra managed authentication service is needed. Production auth, payment and database configuration must be explicit, including package-specific environment validation.
 
 Stripe entitlements determine whether new outreach may start. A payment problem pauses outgoing activity according to the product grace policy while reply ingestion and unknown-send reconciliation continue. Our `packages/payments` module is the sole owner of subscription state.
 

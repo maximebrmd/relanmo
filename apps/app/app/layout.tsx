@@ -2,6 +2,7 @@ import { DesignSystemProvider } from "@relanmo/design-system";
 import { fonts } from "@relanmo/design-system/lib/fonts";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
 import "./styles.css";
 
 export const metadata: Metadata = {
