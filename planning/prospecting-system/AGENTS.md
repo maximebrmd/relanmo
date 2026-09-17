@@ -34,4 +34,6 @@ Continue unrelated fixture-based tasks while a live credential or dependency dec
 
 ## Product identity
 
-The app is named **Relanmo**; repository and technical slug: `relanmo`. Use the identity guide and supplied logo assets at `planning/prospecting-system/brand/`. The French tagline is « La prospection avance. Vous aussi. ». Use the agreed forest/ivory/coral palette and existing next-forge typography; do not introduce a new font dependency just for branding. Keep customer copy truthful about bounded sending and human takeover on reply. The current logo masters are PNG; do not label raster wrappers as editable vectors.
+The app is named **Relanmo**; repository and technical slug: `relanmo`. Use the identity guide and supplied logo assets at `planning/prospecting-system/brand/`. The French tagline is « La prospection avance. Vous aussi. ». Use a simple black/white logo, neutral gray interface, light/dark themes and Vercel Geist design principles with existing next-forge typography; do not introduce a new font dependency just for branding. Keep customer copy truthful about bounded sending and human takeover on reply. The current logo masters are PNG; do not label raster wrappers as editable vectors.
+
+This repository is public. Use synthetic fixtures and keep credentials and customer data out of commits.

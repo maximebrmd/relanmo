@@ -1,9 +1,9 @@
 # Prompt to give Firstmate
 
-Use this after cloning/registering the private repository https://github.com/maximebrmd/relanmo with Firstmate. Its planning pack is already at `planning/prospecting-system/`. This prompt is for the future coding run; preparing the repository has not launched that run.
+Use this after cloning/registering the public repository https://github.com/maximebrmd/relanmo with Firstmate. Its planning pack is already at `planning/prospecting-system/`. This prompt is for the future coding run; preparing the repository has not launched that run.
 
 ```text
-Implement Relanmo, the French freelance prospecting SaaS, in the existing private repository https://github.com/maximebrmd/relanmo. The project name is relanmo. Read the specification in planning/prospecting-system; preserve the initial Git history, planning and brand assets. Do not create a second repository.
+Implement Relanmo, the French freelance prospecting SaaS, in the existing public repository https://github.com/maximebrmd/relanmo. The project name is relanmo. Read the specification in planning/prospecting-system; preserve the initial Git history, planning and brand assets. Do not create a second repository.
 
 Use GPT-5.6-Luna with max reasoning and Fast mode for implementation crewmates and independent reviewers. Use the Codex CLI harness with a supported Firstmate backend. Check the actual child model/effort and /fast status before scaling out. Do not silently substitute another model or reduce reasoning.
 

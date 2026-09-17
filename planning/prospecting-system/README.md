@@ -10,7 +10,7 @@ This revision supersedes the previous Supabase stack and owned LinkedIn connecto
 
 ## Brand and repository
 
-**Name: Relanmo.** Tagline: « La prospection avance. Vous aussi. » The private implementation repository is [maximebrmd/relanmo](https://github.com/maximebrmd/relanmo). Its initial commit contains this pack at `planning/prospecting-system/`, branding and coding instructions; the app implementation starts with P001.
+**Name: Relanmo.** Tagline: « La prospection avance. Vous aussi. » The public implementation repository is [maximebrmd/relanmo](https://github.com/maximebrmd/relanmo). Its initial commit contains this pack at `planning/prospecting-system/`, branding and coding instructions; the app implementation starts with P001.
 
 Read the [brand guide](brand/README.md) and [visual identity preview](brand/preview.html) before creating the product UI.
 

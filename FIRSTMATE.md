@@ -1,6 +1,6 @@
 # Firstmate intake — Relanmo
 
-Repository: **https://github.com/maximebrmd/relanmo** · Visibility: **private** · Default branch: **main** · Local registered project name: **relanmo**.
+Repository: **https://github.com/maximebrmd/relanmo** · Visibility: **public** · Default branch: **main** · Local registered project name: **relanmo**.
 
 The user authorized creation of this repository and will run Firstmate. The initial commit is planning/brand setup, not completion of P001. Preserve the existing Git history and `planning/prospecting-system/` when scaffolding next-forge.
 

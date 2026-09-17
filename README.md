@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="planning/prospecting-system/brand/relanmo-logo.png" alt="Relanmo" width="680" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="planning/prospecting-system/brand/relanmo-logo-dark.png" />
+    <img src="planning/prospecting-system/brand/relanmo-logo.png" alt="Relanmo — geometric R and wordmark" width="680" />
+  </picture>
 </p>
 
 # Relanmo
@@ -25,6 +28,10 @@ python3 planning/prospecting-system/crew/check-plan.py --ready
 ```
 
 The checker is read-only. The JSON manifest supplements Firstmate's native backlog/brief workflow; it is not a native Firstmate import file.
+
+## Visual identity
+
+Use a simple black-and-white logo, neutral interface grays, light/dark themes and the existing Geist typography. Follow the [brand guide](planning/prospecting-system/brand/README.md) and Vercel Geist design principles through next-forge’s shared components.
 
 ## Agreed stack
 
