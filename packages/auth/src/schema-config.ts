@@ -1,3 +1,1 @@
-import "server-only";
-
-export const authSchemaSurface = "DISABLED" as const;
+export const authSchemaSurface = "node-portable-server" as const;

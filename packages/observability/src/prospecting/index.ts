@@ -1,3 +1,1 @@
-import "server-only";
-
-export const prospectingObservabilitySurface = "DISABLED" as const;
+export const prospectingObservabilitySurface = "node-portable-server" as const;

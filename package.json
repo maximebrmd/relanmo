@@ -18,13 +18,13 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "typecheck:fresh": "node tooling/commands/typecheck-fresh.mjs",
+    "verify:boundaries": "node tooling/dependencies/client-boundary-smoke.mjs",
     "verify:exports": "node tooling/dependencies/verify-exports.mjs",
     "verify:install": "bun install --frozen-lockfile",
-    "verify:node": "node tooling/commands/node-smoke.mjs",
+    "verify:node": "node tooling/dependencies/node-runtime-smoke.mjs && node tooling/commands/node-smoke.mjs",
     "verify:bun": "node tooling/commands/bun-app-api-smoke.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260917.1",
     "@relanmo/typescript-config": "workspace:*",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",

@@ -1,3 +1,1 @@
-import "server-only";
-
-export const databaseSchemaSurface = "DISABLED" as const;
+export const databaseSchemaSurface = "node-portable-server" as const;

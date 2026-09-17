@@ -1,3 +1,1 @@
-import "server-only";
-
-export const r2Surface = "DISABLED" as const;
+export const r2Surface = "node-portable-server" as const;

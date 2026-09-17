@@ -1,3 +1,3 @@
 export { paymentsProvider } from "../index";
 
-export const paymentsSurface = "server-only" as const;
+export const paymentsSurface = "node-portable-server" as const;

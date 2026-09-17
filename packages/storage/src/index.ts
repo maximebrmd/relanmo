@@ -1,3 +1,3 @@
 export { storageProvider } from "../index";
 
-export const storageSurface = "server-only" as const;
+export const storageSurface = "node-portable-server" as const;

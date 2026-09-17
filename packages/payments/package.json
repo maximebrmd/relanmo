@@ -6,14 +6,17 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./stripe": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/stripe/index.ts",
       "default": "./src/stripe/index.ts"
     },
     "./stripe/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/stripe/*.ts",
       "default": "./src/stripe/*.ts"
     },

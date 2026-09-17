@@ -6,22 +6,27 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./delivery": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/delivery/index.ts",
       "default": "./src/delivery/index.ts"
     },
     "./delivery/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/delivery/*.ts",
       "default": "./src/delivery/*.ts"
     },
     "./templates": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/templates/index.ts",
       "default": "./src/templates/index.ts"
     },
     "./templates/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/templates/*.tsx",
       "default": "./src/templates/*.tsx"
     },

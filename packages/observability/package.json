@@ -14,10 +14,12 @@
       "default": "./error.ts"
     },
     "./prospecting": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/prospecting/index.ts",
       "default": "./src/prospecting/index.ts"
     },
     "./prospecting/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/prospecting/*.ts",
       "default": "./src/prospecting/*.ts"
     },

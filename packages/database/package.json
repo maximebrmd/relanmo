@@ -6,38 +6,47 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./client": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/client/index.ts",
       "default": "./src/client/index.ts"
     },
     "./client/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/client/*.ts",
       "default": "./src/client/*.ts"
     },
     "./transactions": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/transactions/index.ts",
       "default": "./src/transactions/index.ts"
     },
     "./transactions/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/transactions/*.ts",
       "default": "./src/transactions/*.ts"
     },
     "./schema": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/schema/index.ts",
       "default": "./src/schema/index.ts"
     },
     "./schema/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/schema/*.ts",
       "default": "./src/schema/*.ts"
     },
     "./repositories": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/repositories/index.ts",
       "default": "./src/repositories/index.ts"
     },
     "./repositories/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/repositories/*/index.ts",
       "default": "./src/repositories/*/index.ts"
     },

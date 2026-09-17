@@ -6,54 +6,67 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./unipile/accounts": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/accounts/index.ts",
       "default": "./src/unipile/accounts/index.ts"
     },
     "./unipile/accounts/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/accounts/*.ts",
       "default": "./src/unipile/accounts/*.ts"
     },
     "./unipile/discovery": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/discovery/index.ts",
       "default": "./src/unipile/discovery/index.ts"
     },
     "./unipile/discovery/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/discovery/*.ts",
       "default": "./src/unipile/discovery/*.ts"
     },
     "./unipile/messages": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/messages/index.ts",
       "default": "./src/unipile/messages/index.ts"
     },
     "./unipile/messages/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/messages/*.ts",
       "default": "./src/unipile/messages/*.ts"
     },
     "./unipile/events": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/events/index.ts",
       "default": "./src/unipile/events/index.ts"
     },
     "./unipile/events/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/unipile/events/*.ts",
       "default": "./src/unipile/events/*.ts"
     },
     "./typesafe": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/typesafe/index.ts",
       "default": "./src/typesafe/index.ts"
     },
     "./typesafe/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/typesafe/*.ts",
       "default": "./src/typesafe/*.ts"
     },
     "./anthropic": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/anthropic/index.ts",
       "default": "./src/anthropic/index.ts"
     },
     "./anthropic/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/anthropic/*.ts",
       "default": "./src/anthropic/*.ts"
     },

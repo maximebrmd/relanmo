@@ -10,10 +10,12 @@
       "default": "./src/index.ts"
     },
     "./server": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/server/index.ts",
       "default": "./src/server/index.ts"
     },
     "./server/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/server/*.ts",
       "default": "./src/server/*.ts"
     },
@@ -26,14 +28,17 @@
       "default": "./src/client/*.ts"
     },
     "./session": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/session/index.ts",
       "default": "./src/session/index.ts"
     },
     "./session/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/session/*.ts",
       "default": "./src/session/*.ts"
     },
     "./schema-config": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/schema-config.ts",
       "default": "./src/schema-config.ts"
     },

@@ -1,3 +1,3 @@
 export type { ConnectorName } from "../index";
 
-export const connectorSurface = "server-only" as const;
+export const connectorSurface = "node-portable-server" as const;

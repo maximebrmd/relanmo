@@ -54,6 +54,72 @@ const exportSpecifiers = [
   "@relanmo/design-system/lib/utils",
 ];
 
+const serverExportSpecifiers = [
+  "@relanmo/auth/server",
+  "@relanmo/auth/session",
+  "@relanmo/auth/schema-config",
+  "@relanmo/connectors",
+  "@relanmo/connectors/unipile/accounts",
+  "@relanmo/connectors/unipile/discovery",
+  "@relanmo/connectors/unipile/messages",
+  "@relanmo/connectors/unipile/events",
+  "@relanmo/connectors/typesafe",
+  "@relanmo/connectors/anthropic",
+  "@relanmo/database",
+  "@relanmo/database/client",
+  "@relanmo/database/transactions",
+  "@relanmo/database/schema",
+  "@relanmo/database/repositories",
+  "@relanmo/database/repositories/tenancy",
+  "@relanmo/email",
+  "@relanmo/email/delivery",
+  "@relanmo/email/templates",
+  "@relanmo/observability/prospecting",
+  "@relanmo/payments",
+  "@relanmo/payments/stripe",
+  "@relanmo/storage",
+  "@relanmo/storage/r2",
+  "@relanmo/workflows",
+  "@relanmo/workflows/client",
+  "@relanmo/workflows/discovery",
+  "@relanmo/workflows/account-sync",
+  "@relanmo/workflows/prospect-sequence",
+  "@relanmo/workflows/campaign-control",
+];
+
+const portableServerEntries = [
+  "packages/auth/src/server/index.ts",
+  "packages/auth/src/session/index.ts",
+  "packages/auth/src/schema-config.ts",
+  "packages/connectors/src/index.ts",
+  "packages/connectors/src/unipile/accounts/index.ts",
+  "packages/connectors/src/unipile/discovery/index.ts",
+  "packages/connectors/src/unipile/messages/index.ts",
+  "packages/connectors/src/unipile/events/index.ts",
+  "packages/connectors/src/typesafe/index.ts",
+  "packages/connectors/src/anthropic/index.ts",
+  "packages/database/src/index.ts",
+  "packages/database/src/client/index.ts",
+  "packages/database/src/transactions/index.ts",
+  "packages/database/src/schema/index.ts",
+  "packages/database/src/repositories/index.ts",
+  "packages/database/src/repositories/tenancy/index.ts",
+  "packages/email/src/index.ts",
+  "packages/email/src/delivery/index.ts",
+  "packages/email/src/templates/index.ts",
+  "packages/observability/src/prospecting/index.ts",
+  "packages/payments/src/index.ts",
+  "packages/payments/src/stripe/index.ts",
+  "packages/storage/src/index.ts",
+  "packages/storage/src/r2/index.ts",
+  "packages/workflows/src/index.ts",
+  "packages/workflows/src/client.ts",
+  "packages/workflows/src/discovery/index.ts",
+  "packages/workflows/src/account-sync/index.ts",
+  "packages/workflows/src/prospect-sequence/index.ts",
+  "packages/workflows/src/campaign-control/index.ts",
+];
+
 const forbiddenWorkflowImports = [
   /node:/u,
   /@temporalio\//u,
@@ -99,6 +165,20 @@ function assert(condition, message) {
   }
 }
 
+function resolveWorkspaceSpecifier(specifier, conditions) {
+  for (const requireFromWorkspace of resolutionRequires) {
+    try {
+      return conditions
+        ? requireFromWorkspace.resolve(specifier, {
+            conditions: new Set(conditions),
+          })
+        : requireFromWorkspace.resolve(specifier);
+    } catch {
+      // Each app has a deliberately small direct dependency set; try the next consumer.
+    }
+  }
+}
+
 function resolveLocalImport(filePath, specifier) {
   const basePath = path.resolve(path.dirname(filePath), specifier);
   const candidates = [
@@ -130,33 +210,60 @@ function scanWorkflowSafe(filePath, visited = new Set()) {
     /(?:from|import)\s*(?:type\s*)?["'](?<specifier>[^"']+)["']/gu;
   for (const { groups } of source.matchAll(importPattern)) {
     const { specifier } = groups ?? {};
-    if (!specifier?.startsWith(".")) {
+    if (!specifier) {
       continue;
     }
 
-    const childPath = resolveLocalImport(filePath, specifier);
+    let childPath;
+    if (specifier.startsWith(".")) {
+      childPath = resolveLocalImport(filePath, specifier);
+    } else if (specifier.startsWith("@relanmo/")) {
+      childPath = resolveWorkspaceSpecifier(specifier);
+    }
     assert(
       childPath,
-      `Cannot resolve ${specifier} from ${path.relative(repositoryRoot, filePath)}`
+      `Workflow-safe module imports unsupported or unresolved ${specifier} from ${path.relative(repositoryRoot, filePath)}`
     );
     scanWorkflowSafe(childPath, visited);
   }
 }
 
 for (const specifier of exportSpecifiers) {
-  let resolved;
-  for (const requireFromWorkspace of resolutionRequires) {
-    try {
-      resolved = requireFromWorkspace.resolve(specifier);
-      break;
-    } catch {
-      // Each app has a deliberately small direct dependency set; try the next consumer.
-    }
-  }
-
+  const resolved = resolveWorkspaceSpecifier(specifier);
   assert(
     resolved && path.isAbsolute(resolved),
     `${specifier} did not resolve from a workspace consumer`
+  );
+}
+
+for (const specifier of serverExportSpecifiers) {
+  const nodePath = resolveWorkspaceSpecifier(specifier);
+  const browserPath = resolveWorkspaceSpecifier(specifier, ["browser"]);
+  assert(
+    nodePath && path.isAbsolute(nodePath),
+    `${specifier} has no Node export`
+  );
+  assert(
+    !nodePath.endsWith("next-client-reject.ts"),
+    `${specifier} resolves to a Next-only wrapper for Node`
+  );
+  assert(
+    browserPath?.endsWith("next-client-reject.ts"),
+    `${specifier} has no Next client rejection export`
+  );
+}
+
+for (const relativePath of portableServerEntries) {
+  assert(
+    !read(relativePath).includes("server-only"),
+    `${relativePath} imports the Next-only server-only sentinel`
+  );
+}
+
+for (const app of ["app", "api", "docs", "web"]) {
+  assert(
+    !read(`apps/${app}/tsconfig.json`).includes('"@relanmo/*"'),
+    `apps/${app}/tsconfig.json bypasses package exports with a workspace alias`
   );
 }
 
@@ -230,14 +337,19 @@ for (const manifestPath of temporalManifests) {
 
 const authServer = read("packages/auth/src/server/index.ts");
 const authClient = read("packages/auth/src/client/index.ts");
+const nextClientReject = read("packages/database/src/next-client-reject.ts");
 const workerManifest = JSON.parse(read("apps/worker/package.json"));
 assert(
-  authServer.includes('import "server-only"'),
-  "auth server entrypoint is not server-only"
+  !authServer.includes("server-only"),
+  "auth server entrypoint imports the Next-only server-only sentinel"
 );
 assert(
   !authClient.includes("server-only"),
   "auth client entrypoint imports server-only"
+);
+assert(
+  nextClientReject.includes('import "server-only"'),
+  "Next client rejection wrapper is not server-only"
 );
 assert(
   workerManifest.engines?.node === ">=24.21.0 <25",

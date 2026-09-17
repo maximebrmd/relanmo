@@ -1,3 +1,1 @@
-import "server-only";
-
-export const workflowClientSurface = "DISABLED" as const;
+export const workflowClientSurface = "node-portable-server" as const;

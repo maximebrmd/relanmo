@@ -1,3 +1,1 @@
-import "server-only";
-
-export const stripeSurface = "DISABLED" as const;
+export const stripeSurface = "node-portable-server" as const;

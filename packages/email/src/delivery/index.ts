@@ -1,3 +1,1 @@
-import "server-only";
-
-export const emailDeliverySurface = "DISABLED" as const;
+export const emailDeliverySurface = "node-portable-server" as const;

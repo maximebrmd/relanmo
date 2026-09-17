@@ -6,10 +6,12 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./client": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/client.ts",
       "default": "./src/client.ts"
     },
@@ -18,34 +20,42 @@
       "default": "./src/workflow-safe.ts"
     },
     "./discovery": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/discovery/index.ts",
       "default": "./src/discovery/index.ts"
     },
     "./discovery/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/discovery/*.ts",
       "default": "./src/discovery/*.ts"
     },
     "./account-sync": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/account-sync/index.ts",
       "default": "./src/account-sync/index.ts"
     },
     "./account-sync/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/account-sync/*.ts",
       "default": "./src/account-sync/*.ts"
     },
     "./prospect-sequence": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/prospect-sequence/index.ts",
       "default": "./src/prospect-sequence/index.ts"
     },
     "./prospect-sequence/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/prospect-sequence/*.ts",
       "default": "./src/prospect-sequence/*.ts"
     },
     "./campaign-control": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/campaign-control/index.ts",
       "default": "./src/campaign-control/index.ts"
     },
     "./campaign-control/*": {
+      "browser": "./src/next-client-reject.ts",
       "types": "./src/campaign-control/*.ts",
       "default": "./src/campaign-control/*.ts"
     },
