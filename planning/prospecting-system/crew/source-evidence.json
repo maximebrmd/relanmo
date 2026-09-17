@@ -1,0 +1,61 @@
+{
+  "checked_at": "2026-09-17",
+  "firstmate": {
+    "repository": "https://github.com/kunchenguid/firstmate",
+    "revision": "fa93097162d16f70a070044b8ccece037a38e3e6",
+    "inspection": "Read-only inspection of public source; no repository scripts executed."
+  },
+  "codex_cli_version": "0.154.0",
+  "local_catalog_excerpt": {
+    "slug": "gpt-5.6-luna",
+    "display_name": "GPT-5.6-Luna",
+    "supported_reasoning_levels": [
+      {
+        "effort": "low",
+        "description": "Fast responses with lighter reasoning"
+      },
+      {
+        "effort": "medium",
+        "description": "Balances speed and reasoning depth for everyday tasks"
+      },
+      {
+        "effort": "high",
+        "description": "Greater reasoning depth for complex problems"
+      },
+      {
+        "effort": "xhigh",
+        "description": "Extra high reasoning depth for complex problems"
+      },
+      {
+        "effort": "max",
+        "description": "Maximum reasoning depth for the hardest problems"
+      }
+    ],
+    "service_tiers": [
+      {
+        "id": "priority",
+        "name": "Fast",
+        "description": "1.5x speed, increased usage"
+      }
+    ]
+  },
+  "verification_scope": "Advertised model/effort/tier only. No Firstmate crewmate was launched; actual child settings and account access must be checked at setup.",
+  "plan_checks": {
+    "task_count": 95,
+    "cycle_check": "passed",
+    "unordered_write_overlap_check": "passed",
+    "ready_after_first_seven_merged": 34,
+    "checker_negative_cases": [
+      "dependency cycle",
+      "unordered ownership collision",
+      "invalid merged SHA"
+    ],
+    "markdown_link_check": "passed",
+    "handbook_diagrams": 9,
+    "handbook_documents": 39,
+    "board_filter_and_deep_link_checks": "passed",
+    "mobile_overflow": false,
+    "board_javascript_errors": []
+  },
+  "application_checks": "Not run: application implementation, live providers, deployment and pilot are future tasks."
+}

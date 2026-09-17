@@ -1,0 +1,138 @@
+{
+  "as_of": "2026-09-16",
+  "stack_revision": "next-forge-neon-fumadocs-wrangler-personalization",
+  "specification_updated": "2026-09-17",
+  "per_customer_usd": {
+    "typesafe": 0.33264,
+    "sonnet5": 4.3344,
+    "haiku45": 2.1672,
+    "temporal": 1.4794175
+  },
+  "scenarios": [
+    {
+      "customers": 10,
+      "line_items_eur": {
+        "Unipile": 49,
+        "Render: app, API, workers, staging, workspace": 139.0,
+        "Neon: compute, database storage and restore history": 25.925,
+        "R2 private storage allowance": 5.0,
+        "TypeSafe AI": 3.3264,
+        "Claude Sonnet 5": 43.343999999999994,
+        "Temporal, including support and history": 14.794175000000001,
+        "Resend": 20.0,
+        "Sentry allowance": 30.0,
+        "Bandwidth and CI allowance": 10.0,
+        "Domain/DNS allowance": 2
+      },
+      "base_eur": 342.3896,
+      "with_contingency_eur": 410.8675,
+      "rounded_budget_eur": 500,
+      "budget_per_customer_eur": 41.09,
+      "haiku_base_eur": 320.7176,
+      "heavy_ai_base_eur": 435.7304,
+      "neon_scale_extra_eur": 25.81,
+      "stripe_example_eur": 24.28,
+      "base_plus_stripe_example_eur": 366.6696
+    },
+    {
+      "customers": 50,
+      "line_items_eur": {
+        "Unipile": 250,
+        "Render: app, API, workers, staging, workspace": 139.0,
+        "Neon: compute, database storage and restore history": 27.875000000000004,
+        "R2 private storage allowance": 5.0,
+        "TypeSafe AI": 16.631999999999998,
+        "Claude Sonnet 5": 216.71999999999997,
+        "Temporal, including support and history": 73.970875,
+        "Resend": 20.0,
+        "Sentry allowance": 30.0,
+        "Bandwidth and CI allowance": 15.0,
+        "Domain/DNS allowance": 2
+      },
+      "base_eur": 796.1979,
+      "with_contingency_eur": 955.4374,
+      "rounded_budget_eur": 1000,
+      "budget_per_customer_eur": 19.11,
+      "haiku_base_eur": 687.8379,
+      "heavy_ai_base_eur": 1262.9019,
+      "neon_scale_extra_eur": 25.81,
+      "stripe_example_eur": 121.4,
+      "base_plus_stripe_example_eur": 917.5979
+    },
+    {
+      "customers": 100,
+      "line_items_eur": {
+        "Unipile": 400,
+        "Render: app, API, workers, staging, workspace": 214.0,
+        "Neon: compute, database storage and restore history": 51.32,
+        "R2 private storage allowance": 5.0,
+        "TypeSafe AI": 33.263999999999996,
+        "Claude Sonnet 5": 433.43999999999994,
+        "Temporal, including support and history": 147.94175,
+        "Resend": 20.0,
+        "Sentry allowance": 30.0,
+        "Bandwidth and CI allowance": 25.0,
+        "Domain/DNS allowance": 2
+      },
+      "base_eur": 1361.9657,
+      "with_contingency_eur": 1634.3589,
+      "rounded_budget_eur": 1700,
+      "budget_per_customer_eur": 16.34,
+      "haiku_base_eur": 1145.2457,
+      "heavy_ai_base_eur": 2295.3737,
+      "neon_scale_extra_eur": 46.98,
+      "stripe_example_eur": 242.8,
+      "base_plus_stripe_example_eur": 1604.7657
+    },
+    {
+      "customers": 500,
+      "line_items_eur": {
+        "Unipile": 2000,
+        "Render: app, API, workers, staging, workspace": 334.0,
+        "Neon: compute, database storage and restore history": 111.26,
+        "R2 private storage allowance": 10.0,
+        "TypeSafe AI": 166.32,
+        "Claude Sonnet 5": 2167.2,
+        "Temporal, including support and history": 739.70875,
+        "Resend": 20.0,
+        "Sentry allowance": 60.0,
+        "Bandwidth and CI allowance": 75.0,
+        "Domain/DNS allowance": 2
+      },
+      "base_eur": 5685.4887,
+      "with_contingency_eur": 6822.5865,
+      "rounded_budget_eur": 6900,
+      "budget_per_customer_eur": 13.65,
+      "haiku_base_eur": 4601.8888,
+      "heavy_ai_base_eur": 10352.5287,
+      "neon_scale_extra_eur": 89.32,
+      "stripe_example_eur": 1214.0,
+      "base_plus_stripe_example_eur": 6899.4887
+    },
+    {
+      "customers": 1000,
+      "line_items_eur": {
+        "Unipile": 4000,
+        "Render: app, API, workers, staging, workspace": 624.0,
+        "Neon: compute, database storage and restore history": 217.89,
+        "R2 private storage allowance": 20.0,
+        "TypeSafe AI": 332.64,
+        "Claude Sonnet 5": 4334.4,
+        "Temporal, including support and history": 1479.4175,
+        "Resend": 20.0,
+        "Sentry allowance": 100.0,
+        "Bandwidth and CI allowance": 150.0,
+        "Domain/DNS allowance": 2
+      },
+      "base_eur": 11280.3475,
+      "with_contingency_eur": 13536.417,
+      "rounded_budget_eur": 13600,
+      "budget_per_customer_eur": 13.54,
+      "haiku_base_eur": 9113.1475,
+      "heavy_ai_base_eur": 20614.4275,
+      "neon_scale_extra_eur": 174.0,
+      "stripe_example_eur": 2428.0,
+      "base_plus_stripe_example_eur": 13708.3475
+    }
+  ]
+}

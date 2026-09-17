@@ -1,0 +1,8 @@
+# Merge into the application repository .codex/config.toml; do not overwrite existing configuration.
+# Fast is separate from Firstmate dispatch profile selection. Verify /fast status in the child.
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
+service_tier = "fast"
+
+[features]
+fast_mode = true

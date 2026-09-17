@@ -1,0 +1,3670 @@
+{
+  "schema_version": 1,
+  "description": "Project planning manifest; not a native Firstmate import format. See README.md.",
+  "created_at": "2026-09-17",
+  "firstmate_revision": "fa93097162d16f70a070044b8ccece037a38e3e6",
+  "profile": {
+    "harness": "codex",
+    "model": "gpt-5.6-luna",
+    "effort": "max",
+    "codex_service_tier": "fast"
+  },
+  "external_gates": {
+    "controlled-provider-access": "Named test accounts, credentials, controlled recipients and explicit provider-action scope supplied; a TypeSafe key/access exists.",
+    "model-evaluation-access": "Test API credentials and an agreed bounded evaluation spend are available.",
+    "staging-pilot-authorized": "Staging deployment/cohort, provider sends and spending scope explicitly authorized; old senders disabled for cutover accounts."
+  },
+  "tasks": [
+    {
+      "key": "bootstrap",
+      "title": "Create the next-forge workspace and remove conflicting defaults",
+      "group": "Foundation",
+      "write_paths": [
+        "apps/",
+        "packages/",
+        "package.json",
+        "bun.lock",
+        "turbo.json",
+        ".gitignore",
+        "AGENTS.md",
+        "planning/",
+        ".codex/config.toml"
+      ],
+      "outcome": "A clean, pinned next-forge baseline in the existing Relanmo repository exposes the five agreed apps and shared package boundaries.",
+      "build": [
+        "Preserve the existing Relanmo Git history, README identity, FIRSTMATE.md, .codex/config.toml, root AGENTS.md and planning/prospecting-system including brand assets. Scaffold via a temporary directory if next-forge needs an empty destination, and record its upstream revision.",
+        "Keep apps/app, web, api, docs and worker; remove Clerk, Prisma and Mintlify integration code before creating neutral shells.",
+        "Preserve requested stack; inspect scaffold dependencies against next-forge and the agreed inventory. No product routes may claim authentication or send messages yet."
+      ],
+      "checks": [
+        "Fresh Bun install succeeds and the skeleton apps build without Clerk/Prisma/Mintlify secrets.",
+        "Diff contains scaffold/adaptation only; list generated files separately for review."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [
+        "tools/next-forge.md"
+      ],
+      "exclusive_resources": [
+        "root-config"
+      ],
+      "id": "P001",
+      "firstmate_id": "pros-001",
+      "depends_on": [],
+      "brief": "tasks/P001-bootstrap.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "toolchain",
+      "title": "Pin Bun, Node, Ultracite and Biome commands",
+      "group": "Foundation",
+      "write_paths": [
+        "package.json",
+        "bun.lock",
+        "biome.json",
+        "biome.jsonc",
+        "turbo.json",
+        ".node-version",
+        ".bun-version",
+        "packages/typescript-config/",
+        "tooling/commands/"
+      ],
+      "outcome": "Every worktree uses the same install, lint, typecheck and targeted verification commands.",
+      "build": [
+        "Pin compatible Bun and Node.js 24 releases; use Bun for package management and Node for production.",
+        "Configure Ultracite with Biome and strict TypeScript, retaining approved next-forge tooling.",
+        "Publish actual commands and workspace names in tooling/commands/README.md; distinguish generated files from source."
+      ],
+      "checks": [
+        "Frozen Bun install and lint/typecheck pass on the skeleton.",
+        "Node executes a compiled TypeScript smoke entry; no assumption that Bun can run the Temporal native worker."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/bun.md",
+        "tools/ultracite.md",
+        "tools/biome.md"
+      ],
+      "exclusive_resources": [
+        "root-config"
+      ],
+      "id": "P002",
+      "firstmate_id": "pros-002",
+      "depends_on": [
+        "P001"
+      ],
+      "brief": "tasks/P002-toolchain.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "domain-contracts",
+      "title": "Freeze domain identifiers and state contracts",
+      "group": "Foundation",
+      "write_paths": [
+        "packages/domain/src/contracts/"
+      ],
+      "outcome": "All lanes share tenant, prospect, campaign, action and ownership types.",
+      "build": [
+        "Implement the domain contract section of crew/contracts.md with discriminated unions and runtime parsing using existing approved validation tools.",
+        "Define versioned messages, timestamps, branded IDs, eligibility reasons, action states and C5 Workflow IDs/signals/Activity DTOs.",
+        "Publish fixtures for incoming attachment-only messages, provider echoes and unknown sends; no business implementation yet."
+      ],
+      "checks": [
+        "Invalid state/event shapes fail validation; representative valid fixtures compile and parse.",
+        "Contract exports import without database, vendor SDKs or Node-only dependencies."
+      ],
+      "contract": "C1 C5",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P003",
+      "firstmate_id": "pros-003",
+      "depends_on": [
+        "P002"
+      ],
+      "brief": "tasks/P003-domain-contracts.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "provider-contracts",
+      "title": "Freeze provider ports and error semantics",
+      "group": "Foundation",
+      "write_paths": [
+        "packages/domain/src/ports/providers/"
+      ],
+      "outcome": "Provider adapters can be implemented independently of workflows and the database.",
+      "build": [
+        "Define LinkedIn account/read/send/history, TypeSafe decisions, writer, billing, email and object-storage interfaces.",
+        "Separate definitive refusal, retryable read failure and ambiguous write outcome; never encode fictional Unipile idempotency.",
+        "Publish deterministic fake ports and fixtures inside this directory for consumers."
+      ],
+      "checks": [
+        "Fake implementations conform to ports and can inject ambiguous sends and attachment-only replies.",
+        "No SDK object leaks into a port or Workflow-safe export."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P004",
+      "firstmate_id": "pros-004",
+      "depends_on": [
+        "P003"
+      ],
+      "brief": "tasks/P004-provider-contracts.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "store-contracts",
+      "title": "Freeze repository and transaction interfaces",
+      "group": "Foundation",
+      "write_paths": [
+        "packages/domain/src/ports/persistence/"
+      ],
+      "outcome": "Stateful services agree on transaction boundaries before repositories are built.",
+      "build": [
+        "Define repositories, tenant transaction context, lock order, send authorization, ledger, lease/quota, inbox/outbox and reply-stop interfaces from C3.",
+        "Expose atomic authorize and stop operations, rather than composing unrelated writes in callers.",
+        "Provide small fake repositories only for consumer tests; mark them unsuitable as concurrency evidence."
+      ],
+      "checks": [
+        "Contract scenarios specify unique action identity, one active owner per account/prospect, version checks and outbox atomicity.",
+        "No consumer can claim a database transaction with unrelated pooled connections."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P005",
+      "firstmate_id": "pros-005",
+      "depends_on": [
+        "P003"
+      ],
+      "brief": "tasks/P005-store-contracts.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "ui-contracts",
+      "title": "Freeze customer command and view DTOs",
+      "group": "Foundation",
+      "write_paths": [
+        "packages/domain/src/contracts/product/"
+      ],
+      "outcome": "UI and backend crewmates can work against stable, tenant-safe shapes.",
+      "build": [
+        "Define profile, LinkedIn status, campaign, style, pipeline, timeline, billing and metrics DTOs and command validation.",
+        "Derive authenticated tenant server-side; browser tenant/account IDs are selectors to authorize, never authority.",
+        "Specify pagination, error codes, optimistic versions and all empty/loading/paused states; include mock fixtures."
+      ],
+      "checks": [
+        "Fixture DTOs render without private provider credentials or raw SDK responses.",
+        "Invalid inputs and stale command versions have explicit error responses."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P006",
+      "firstmate_id": "pros-006",
+      "depends_on": [
+        "P003"
+      ],
+      "brief": "tasks/P006-ui-contracts.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "dependency-integration",
+      "title": "Land the approved dependency and export baseline",
+      "group": "Foundation",
+      "write_paths": [
+        "package.json",
+        "bun.lock",
+        "packages/*/package.json",
+        "apps/*/package.json",
+        "packages/*/tsconfig.json",
+        "apps/*/tsconfig.json",
+        "packages/*/src/index.ts",
+        "packages/domain/src/workflow-safe.ts",
+        "apps/app/features/*/bindings.ts",
+        "tooling/dependencies/"
+      ],
+      "outcome": "Feature crewmates can import agreed subpaths without competing over manifests or lockfiles.",
+      "build": [
+        "Consult live next-forge docs and sdk-policy.md; install only packages required by approved tasks and pin compatible releases.",
+        "Publish package/subpath export map for all planned directories; use module entrypoints that do not import unfinished code. Separate server-only and Workflow-safe surfaces; establish disabled feature-binding stubs per C4.",
+        "Record version/source/reason and required peers; route any unlisted dependency proposal to the captain before changing manifests."
+      ],
+      "checks": [
+        "Frozen install, workspace resolution and all contract typechecks pass.",
+        "Temporal packages use one version; manifests contain no unintended auth/database/vendor substitutions."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [
+        "dependency-policy.md",
+        "sdk-policy.md"
+      ],
+      "exclusive_resources": [
+        "root-config",
+        "shared-exports"
+      ],
+      "id": "P007",
+      "firstmate_id": "pros-007",
+      "depends_on": [
+        "P004",
+        "P005",
+        "P006"
+      ],
+      "brief": "tasks/P007-dependency-integration.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "ci",
+      "title": "Add the pull-request verification workflow",
+      "group": "Foundation",
+      "write_paths": [
+        ".github/workflows/ci.yml",
+        ".github/pull_request_template.md",
+        "tooling/ci/"
+      ],
+      "outcome": "Every small PR reports scoped checks and dependency provenance consistently.",
+      "build": [
+        "Use pinned Bun/Node and frozen installation; run actual commands from tooling/commands.",
+        "Run affected lint/typecheck/build and task-specific tests; report when integration tests need isolated databases rather than skipping silently.",
+        "Add PR fields for behavior, ownership, acceptance evidence, dependencies and blocked external checks; do not grant auto-merge."
+      ],
+      "checks": [
+        "A fixture PR with a type error fails; the baseline passes.",
+        "No production secrets reach untrusted PR jobs; schema and dependency changes are visible to reviewers."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [
+        "tools/github-actions.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P008",
+      "firstmate_id": "pros-008",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P008-ci.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "eligibility",
+      "title": "Implement the pure outbound eligibility rules",
+      "group": "Domain",
+      "write_paths": [
+        "packages/domain/src/eligibility/"
+      ],
+      "outcome": "Code decides whether an invite or follow-up is eligible, with a reason for every refusal.",
+      "build": [
+        "Check human ownership, suppression, account health, campaign activation, billing entitlement, acceptance and step bounds.",
+        "Require current versions and a valid draft where applicable; return explicit hold/deny reasons.",
+        "Keep external I/O outside this module; atomic state loading is a later task."
+      ],
+      "checks": [
+        "Reply/manual takeover or opt-out always denies, including a second campaign for the same account/prospect.",
+        "Blocked accounts, stale drafts and inactive billing deny; models cannot override the result."
+      ],
+      "contract": "C1",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P009",
+      "firstmate_id": "pros-009",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P009-eligibility.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "cadence",
+      "title": "Implement the French business-window cadence",
+      "group": "Domain",
+      "write_paths": [
+        "packages/domain/src/cadence/"
+      ],
+      "outcome": "A deterministic planner schedules DM1–DM5 without catch-up bursts.",
+      "build": [
+        "Use Europe/Paris and configurable business windows; DM1 follows confirmed acceptance.",
+        "Compute +2/+5/+9/+14-day targets from DM1 and preserve the minimum gap from the prior actual send; use existing approved date tools or Intl.",
+        "Close no-response at max(DM1+21 days, actual DM5+7 days); recheck current pause/eligibility at dispatch."
+      ],
+      "checks": [
+        "Table-driven cases cover both DST transitions, weekends, late DM4 and a paused campaign.",
+        "Delayed work never emits several immediate follow-ups; all five steps have explicit due/expiry outcomes."
+      ],
+      "contract": "C1",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P010",
+      "firstmate_id": "pros-010",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P010-cadence.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "identity",
+      "title": "Implement prospect identity and suppression matching",
+      "group": "Domain",
+      "write_paths": [
+        "packages/domain/src/identity/"
+      ],
+      "outcome": "Discovery and imports use the same stable prospect identity and exclusion checks.",
+      "build": [
+        "Canonicalize supported LinkedIn identifiers/URLs; preserve provider IDs and legacy IDs separately.",
+        "Deduplicate within tenant/account and flag ambiguous aliases; do not infer identity from a name alone.",
+        "Define scoped suppression matching and migration-friendly collision results."
+      ],
+      "checks": [
+        "URL variants match without joining two different people; cross-tenant records stay separate.",
+        "Suppressed and historically human-owned prospects cannot re-enter a new campaign."
+      ],
+      "contract": "C1",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P011",
+      "firstmate_id": "pros-011",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P011-identity.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "content-guard",
+      "title": "Implement deterministic message checks",
+      "group": "Domain",
+      "write_paths": [
+        "packages/domain/src/content-guard/"
+      ],
+      "outcome": "Only grounded, bounded French drafts can become send candidates.",
+      "build": [
+        "Validate length, unresolved variables, allowed factual claims/evidence IDs and campaign-specific constraints.",
+        "Distinguish retryable generation defects from hold/skip decisions; no unbounded regeneration loop.",
+        "User prompts and prospect content remain data and cannot override system controls."
+      ],
+      "checks": [
+        "Unsupported claims, prompt-injection fixtures and leaked placeholders fail.",
+        "A neutral grounded draft passes without requiring a prospect hiring signal where the existing ICP rules do not require one."
+      ],
+      "contract": "C1",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P012",
+      "firstmate_id": "pros-012",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P012-content-guard.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "database-pool",
+      "title": "Implement the Postgres connection and transaction layer",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/client/",
+        "packages/database/src/transactions/",
+        "packages/database/tests/support/"
+      ],
+      "outcome": "Services use bounded pg pools and one connection per transaction.",
+      "build": [
+        "Implement Drizzle with node-postgres, pooled runtime URLs and a separate direct migration URL.",
+        "Set tenant context transaction-locally after server validation; avoid leaking session state when pooled connections are reused.",
+        "Provide isolated local test database setup with unique names per worktree/run."
+      ],
+      "checks": [
+        "Concurrent test transactions cannot see each other's tenant context after connection reuse.",
+        "A failed transaction rolls back and releases its connection; missing runtime settings fail clearly."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/neon.md",
+        "tools/drizzle.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P013",
+      "firstmate_id": "pros-013",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P013-database-pool.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "auth-schema",
+      "title": "Generate and review the Better Auth schema",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/auth.ts",
+        "packages/auth/src/schema-config.ts"
+      ],
+      "outcome": "The selected Better Auth features have a version-compatible Drizzle schema.",
+      "build": [
+        "Use the pinned Better Auth schema generator/config; name the login account table distinctly from provider_accounts.",
+        "Review IDs, relations and indexes and keep auth schema/config aligned.",
+        "Emit schema fragments only; the migration owner creates SQL/journal entries later."
+      ],
+      "checks": [
+        "A fresh schema generation produces a stable reviewed result with no Prisma output.",
+        "Adapter compatibility is recorded; credentials and sessions are not exposed in product DTOs."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/better-auth.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P014",
+      "firstmate_id": "pros-014",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P014-auth-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "tenant-schema",
+      "title": "Define tenants, memberships and freelancer profiles",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/tenancy.ts"
+      ],
+      "outcome": "Tenant membership and freelancer offer data have a constrained schema.",
+      "build": [
+        "Define tenants, memberships and freelancer_profiles with explicit ownership and revision fields.",
+        "Represent offers, target market and accepted work locations using the agreed contract.",
+        "Add local unique/check constraints and specify external foreign-key intent for P020; do not import an unmerged sibling schema."
+      ],
+      "checks": [
+        "Local constraints prevent duplicate membership; all external ownership references are listed for P020 to enforce.",
+        "No provider account credentials enter freelancer profile fields."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P015",
+      "firstmate_id": "pros-015",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P015-tenant-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "campaign-schema",
+      "title": "Define campaigns and editable prompt versions",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/campaigns.ts",
+        "packages/database/src/schema/styles.ts"
+      ],
+      "outcome": "Campaign and customer writing changes preserve version history.",
+      "build": [
+        "Define campaigns/campaign_versions and style profiles, prompt overrides and immutable version tables.",
+        "Store tenant-owned editable fields separately from code defaults; include accepted inferred style provenance.",
+        "Support draft-version comparison and active campaign history without rewriting sent content."
+      ],
+      "checks": [
+        "Version references can reconstruct the inputs to an existing draft.",
+        "Schema contains no cross-tenant shared writable style row."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P016",
+      "firstmate_id": "pros-016",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P016-campaign-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "lead-schema",
+      "title": "Define accounts, prospects, evidence and conversations",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/leads.ts"
+      ],
+      "outcome": "The account/prospect pair owns reply-stop state independently of any one campaign.",
+      "build": [
+        "Define provider_accounts, prospects, evidence, conversations, messages and suppression entries.",
+        "Persist human ownership on account/prospect and conversation; maintain inbound event and provider message timestamps separately.",
+        "Add scoped unique provider IDs, legacy IDs and indexes; list external foreign keys for P020 without importing unmerged schema files."
+      ],
+      "checks": [
+        "The schema supports attachment-only messages and a prospect appearing in a later campaign.",
+        "Unique constraints prevent one provider account being silently rebound across tenants."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P017",
+      "firstmate_id": "pros-017",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P017-lead-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "ledger-schema",
+      "title": "Define actions, attempts, leases and event queues",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/delivery.ts"
+      ],
+      "outcome": "The database can retain every send outcome and retryable product event.",
+      "build": [
+        "Define actions/send_attempts, account leases with fencing, quota reservations, webhook_events and outbox_events.",
+        "Constrain immutable action identity, exact outbound body/version, provider receipts and UNKNOWN outcomes.",
+        "Include dedupe keys, due times, attempts, leases and dead-letter visibility without logging sensitive bodies."
+      ],
+      "checks": [
+        "Unique step keys and webhook dedupe keys have explicit tenant/provider scope.",
+        "Schema supports crash recovery without replacing an action ID or losing uncertain attempts."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P018",
+      "firstmate_id": "pros-018",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P018-ledger-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "billing-schema",
+      "title": "Define billing, usage and audit records",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/src/schema/billing.ts",
+        "packages/database/src/schema/audit.ts"
+      ],
+      "outcome": "Subscriptions, entitlement decisions and measured usage have durable records.",
+      "build": [
+        "Define billing customer/subscription/event mappings and usage_events/audit_events.",
+        "Keep currency, quantities, provider event IDs and effective times explicit.",
+        "Record operational decisions without full message text, tokens or payment secrets."
+      ],
+      "checks": [
+        "Customer/provider IDs are uniquely mapped and all tenant-owned records carry tenant keys.",
+        "Usage units distinguish input/output tokens, TypeSafe work and workflow operations."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P019",
+      "firstmate_id": "pros-019",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P019-billing-schema.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "migrations",
+      "title": "Integrate the initial Drizzle migrations",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/drizzle/",
+        "packages/database/drizzle.config.ts",
+        "packages/database/src/schema/",
+        "tooling/database/migrate.ts"
+      ],
+      "outcome": "One reviewed migration lineage creates the agreed schema.",
+      "build": [
+        "As the sole migration owner, add the listed cross-fragment foreign keys/relations to the now-merged schemas, then generate SQL and journal once from that baseline.",
+        "Validate direct migration role versus pooled runtime role and document migration commands.",
+        "Review cross-tenant foreign keys and indexes; do not let each feature generate competing migration histories."
+      ],
+      "checks": [
+        "Apply to a fresh isolated Postgres database and re-run successfully without duplicate effects.",
+        "Compare generated SQL with schema; authenticate with the generated Better Auth tables in the later auth task."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/drizzle.md"
+      ],
+      "exclusive_resources": [
+        "migration-lineage",
+        "shared-schema-exports"
+      ],
+      "id": "P020",
+      "firstmate_id": "pros-020",
+      "depends_on": [
+        "P013",
+        "P014",
+        "P015",
+        "P016",
+        "P017",
+        "P018",
+        "P019"
+      ],
+      "brief": "tasks/P020-migrations.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "rls",
+      "title": "Enforce tenant isolation and runtime database roles",
+      "group": "Data",
+      "write_paths": [
+        "packages/database/drizzle/",
+        "packages/database/src/security/",
+        "packages/database/tests/isolation/"
+      ],
+      "outcome": "Runtime roles cannot read or mutate another tenant's state.",
+      "build": [
+        "Add reviewed RLS/role migration using the single migration lane; runtime users are not table owners and have no BYPASSRLS.",
+        "Use validated transaction-local tenant context; define narrow auth pre-session access separately.",
+        "Restrict worker access away from authentication secrets and prove server/worker role grants."
+      ],
+      "checks": [
+        "Cross-tenant reads/writes fail using real nonowner connections; untrusted browser context never reaches a trusted SQL transaction.",
+        "Auth can establish a session before a tenant is selected; migration/admin roles do not mask test failures."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [
+        "migration-lineage"
+      ],
+      "id": "P021",
+      "firstmate_id": "pros-021",
+      "depends_on": [
+        "P020"
+      ],
+      "brief": "tasks/P021-rls.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "tenant-store",
+      "title": "Implement membership and freelancer profile repositories",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/tenancy/"
+      ],
+      "outcome": "Authenticated services can resolve memberships and update the current tenant profile.",
+      "build": [
+        "Implement C3 tenancy/profile repository methods with optimistic revision checks.",
+        "Resolve tenant selection from validated user membership on the server.",
+        "Use the shared transaction helper; never accept browser-supplied tenant context directly."
+      ],
+      "checks": [
+        "Two tenants with overlapping profile names cannot access each other.",
+        "Stale edits return a conflict instead of silently overwriting current data."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P022",
+      "firstmate_id": "pros-022",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P022-tenant-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "campaign-store",
+      "title": "Implement versioned campaign persistence",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/campaigns/"
+      ],
+      "outcome": "Campaign edits, activation and pause preserve one current revision.",
+      "build": [
+        "Persist immutable campaign versions and activation history.",
+        "Write pause/start product events to the outbox in the same transaction.",
+        "Preserve eligible progress on edits; do not reset completed steps or human ownership."
+      ],
+      "checks": [
+        "Conflicting revisions are rejected and a rolled-back command emits no event.",
+        "Pause immediately affects database eligibility even if the outbox consumer is down."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P023",
+      "firstmate_id": "pros-023",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P023-campaign-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "style-store",
+      "title": "Implement customer style and prompt version persistence",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/styles/"
+      ],
+      "outcome": "Customer style edits invalidate only stale unsent drafts.",
+      "build": [
+        "Version explicit settings, accepted inference and campaign overrides with provenance.",
+        "On changes mark READY drafts stale while preserving action IDs/cadence; retain IN_FLIGHT/UNKNOWN and sent snapshots.",
+        "Support reset to code defaults and optimistic updates."
+      ],
+      "checks": [
+        "A style change racing with send authorization is resolved by the common version guard.",
+        "UNKNOWN/CONFIRMED attempts are not regenerated or changed."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P024",
+      "firstmate_id": "pros-024",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P024-style-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "prospect-store",
+      "title": "Implement candidate, evidence and suppression persistence",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/prospects/"
+      ],
+      "outcome": "Repeated discovery upserts candidates without losing evidence or exclusions.",
+      "build": [
+        "Use canonical identity and stable provider/legacy mappings with tenant/account scope.",
+        "Persist source, capture time, qualification evidence and suppression provenance.",
+        "Add paginated candidate access for discovery; human-owned pairs stay suppressed from automation."
+      ],
+      "checks": [
+        "Duplicate discovery does not create duplicate eligible sequences.",
+        "Ambiguous identity collisions return an explicit unresolved result."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P025",
+      "firstmate_id": "pros-025",
+      "depends_on": [
+        "P021",
+        "P011"
+      ],
+      "brief": "tasks/P025-prospect-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "timeline-store",
+      "title": "Implement conversation history persistence and reads",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/conversations/"
+      ],
+      "outcome": "The app can display an authorized, ordered conversation timeline.",
+      "build": [
+        "Persist provider message IDs, direction, attachments and received/provider timestamps.",
+        "Provide paginated timeline queries through C4 DTOs; redact private provider fields.",
+        "Keep ownership mutations in the atomic reply-stop repository, not in this read/history helper."
+      ],
+      "checks": [
+        "Out-of-order and duplicate message history imports are stable.",
+        "Another tenant cannot load a conversation by guessing its ID."
+      ],
+      "contract": "C3 C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P026",
+      "firstmate_id": "pros-026",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P026-timeline-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "ledger-store",
+      "title": "Implement immutable actions and send attempts",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/actions/"
+      ],
+      "outcome": "The ledger preserves one logical action and all delivery evidence.",
+      "build": [
+        "Create or find actions by the unique step key; prevent campaign revisions from replaying already-completed steps; enforce permitted state transitions.",
+        "Record dispatch attempts, request IDs, exact body, version snapshots and provider receipts.",
+        "Make stale IN_FLIGHT recovery produce UNKNOWN; never automatically convert UNKNOWN to READY."
+      ],
+      "checks": [
+        "Concurrent creation yields one action; repeated receipt recording is idempotent.",
+        "Timeout/crash evidence remains inspectable and cannot be overwritten by a late contradictory result."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P027",
+      "firstmate_id": "pros-027",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P027-ledger-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "lease-quota",
+      "title": "Implement account leases and quota reservations",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/account-control/"
+      ],
+      "outcome": "Multiple worker replicas serialize an account and reserve its sending budget.",
+      "build": [
+        "Acquire bounded persistent leases with monotonic fencing and explicit release/renewal.",
+        "Reserve quotas in the same authorization transaction; release only known unconsumed reservations and retain uncertain ones.",
+        "Observe the common lock order and limits from C3."
+      ],
+      "checks": [
+        "Two contenders cannot both acquire an effective lease; stale fences cannot authorize another dispatch.",
+        "Concurrent quota claims never exceed the configured limit and UNKNOWN outcomes are not counted as safely unsent."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P028",
+      "firstmate_id": "pros-028",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P028-lease-quota.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "event-store",
+      "title": "Implement the inbox and transactional outbox",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/events/"
+      ],
+      "outcome": "Provider events are durable and product events can be delivered at least once.",
+      "build": [
+        "Persist deduplicated webhook events and outbox messages with bounded leases and retry metadata.",
+        "Support transaction participation for reply, billing and campaign operations.",
+        "Add dead-letter/query support without discarding unprocessed events on duplicate webhook delivery."
+      ],
+      "checks": [
+        "Crash after delivery before acknowledgement causes a safe retry with the same identity.",
+        "Two consumers do not hold the same active lease; processing failure remains retryable/visible."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P029",
+      "firstmate_id": "pros-029",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P029-event-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "reply-stop",
+      "title": "Implement the atomic reply and manual-takeover transaction",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/reply-stop/"
+      ],
+      "outcome": "Any recorded incoming message makes the account/prospect pair human-owned immediately.",
+      "build": [
+        "Lock using C3 order, store/dedupe message and event, mark pair/conversation HUMAN_OWNED, cancel future READY work and enqueue stop/alert events atomically.",
+        "Attachment-only inbound counts without model classification; unmatched manual outbound also stops automation.",
+        "Match outgoing bot echoes against durable receipts/attempt evidence; ambiguous echoes hold for reconciliation."
+      ],
+      "checks": [
+        "A rolled-back transaction leaves neither a partial stop nor a lost inbox event.",
+        "After commit no new IN_FLIGHT authorization can succeed; an already authorized send is explicitly outside that guarantee."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P030",
+      "firstmate_id": "pros-030",
+      "depends_on": [
+        "P021",
+        "P027",
+        "P029"
+      ],
+      "brief": "tasks/P030-reply-stop.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "billing-store",
+      "title": "Implement subscription state and entitlement persistence",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/billing/"
+      ],
+      "outcome": "Verified Stripe events change outbound entitlement without disabling reply intake.",
+      "build": [
+        "Map provider customer/subscription IDs to tenant records and deduplicate events.",
+        "Apply fresh authoritative subscription state rather than trusting arrival order.",
+        "Write entitlement change events atomically and preserve existing billing mappings for migration."
+      ],
+      "checks": [
+        "Old/cross-tenant events cannot restore an obsolete entitlement.",
+        "An inactive subscription pauses outbound while inbox/reconciliation remain operable."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P031",
+      "firstmate_id": "pros-031",
+      "depends_on": [
+        "P021",
+        "P029"
+      ],
+      "brief": "tasks/P031-billing-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "usage-store",
+      "title": "Implement usage and audit persistence",
+      "group": "Repositories",
+      "write_paths": [
+        "packages/database/src/repositories/usage/"
+      ],
+      "outcome": "Measured provider work and important state changes are traceable without leaking content.",
+      "build": [
+        "Implement append-only idempotent usage/audit records with tenant, action, model and version references.",
+        "Distinguish estimated and actual usage and preserve units/currency.",
+        "Provide bounded aggregate reads for later metrics and cost calibration."
+      ],
+      "checks": [
+        "Retrying the same usage receipt does not double-count costs.",
+        "Logs/records omit API keys, auth tokens and unnecessary private message bodies."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P032",
+      "firstmate_id": "pros-032",
+      "depends_on": [
+        "P021"
+      ],
+      "brief": "tasks/P032-usage-store.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "unipile-accounts",
+      "title": "Implement Unipile connection and account status",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/unipile/accounts/"
+      ],
+      "outcome": "The product can issue hosted connection links and normalize account health.",
+      "build": [
+        "Use the official SDK and the C2 port; bind returned accounts to server-authorized tenants.",
+        "Support reconnect and normalize challenge/restriction/disconnect states without suppressing the need for owner action.",
+        "Redact credentials; use bounded read retries and typed failures."
+      ],
+      "checks": [
+        "Fixtures cover successful connection, reconnect, expired flow and restricted account.",
+        "An account cannot be rebound by supplying another tenant ID; live behavior stays unverified until the provider-proof task."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/unipile.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P033",
+      "firstmate_id": "pros-033",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P033-unipile-accounts.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "unipile-reads",
+      "title": "Implement Unipile people search and profile reads",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/unipile/discovery/"
+      ],
+      "outcome": "Discovery receives normalized candidate pages with explicit provenance.",
+      "build": [
+        "Use official SDK methods verified against the pinned release; bound page size and continuation cursors.",
+        "Map normal LinkedIn features separately from paid account capabilities.",
+        "Normalize unsupported/rate-limited responses and capture source/time without inventing missing fields."
+      ],
+      "checks": [
+        "Fixtures cover empty pages, pagination, missing fields and rate limits.",
+        "A normal account does not silently depend on Sales Navigator or another paid capability."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/unipile.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P034",
+      "firstmate_id": "pros-034",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P034-unipile-reads.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "unipile-messages",
+      "title": "Implement Unipile invitations, sends and history",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/unipile/messages/"
+      ],
+      "outcome": "Outbound side effects return evidence or an explicit uncertain outcome.",
+      "build": [
+        "Implement invite-without-note, acceptance read, message send and bounded conversation history through C2.",
+        "Inspect/disable automatic retries for side effects; distinguish definitive rejection from uncertain network failure.",
+        "Return provider IDs and request evidence; SDK gaps require a narrow documented typed HTTP fallback."
+      ],
+      "checks": [
+        "A mocked timeout after dispatch results in UNKNOWN-compatible evidence and no second HTTP send.",
+        "History retains manual outgoing and attachment-only messages; no unverified exactly-once claim."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/unipile.md",
+        "sdk-policy.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P035",
+      "firstmate_id": "pros-035",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P035-unipile-messages.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "unipile-events",
+      "title": "Validate and normalize Unipile webhook payloads",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/unipile/events/"
+      ],
+      "outcome": "Provider payloads become normalized events before product processing.",
+      "build": [
+        "Implement runtime validation, stable dedupe identity and direction/account mapping.",
+        "Use the authentication mechanism actually supported by the provider; do not invent signature headers.",
+        "Preserve attachment-only, deleted/unknown and account-status cases; route unknown event versions to visible quarantine."
+      ],
+      "checks": [
+        "Invalid authentication and malformed bodies fail without a business mutation.",
+        "Fixtures preserve provider occurrence time separately from receipt time; unknown shapes are not silently acknowledged as processed."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/unipile.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P036",
+      "firstmate_id": "pros-036",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P036-unipile-events.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "typesafe",
+      "title": "Implement the TypeSafe decision adapter",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/typesafe/"
+      ],
+      "outcome": "TypeSafe returns validated, bounded decisions with evidence references.",
+      "build": [
+        "Use the official TypeScript SDK for independent qualification/evidence questions and dependent offer/angle decisions.",
+        "Bound choices, inputs, timeouts and retries; retain model/version and billable usage.",
+        "Treat uncertainty/access failure as hold/skip, not permission to invent a positive result."
+      ],
+      "checks": [
+        "Fixtures reject invalid enum answers and preserve evidence IDs.",
+        "SDK smoke is separate from French accuracy evaluation; mocked success is not production-access proof."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/typesafe-ai.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P037",
+      "firstmate_id": "pros-037",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P037-typesafe.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "anthropic",
+      "title": "Implement the Claude writing adapter",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/connectors/src/anthropic/"
+      ],
+      "outcome": "A versioned writing request yields text, usage and explicit errors.",
+      "build": [
+        "Use the official SDK with server credentials, pinned model selection and bounded request budget.",
+        "Receive composed prompts and evidence through C2; no provider-owned scheduling or send permission.",
+        "Report truncation, timeout and model refusal; do not silently switch models."
+      ],
+      "checks": [
+        "Fixtures capture input/output usage, partial/truncated output and bounded retries.",
+        "Sensitive prompts are absent from routine logs."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/anthropic.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P038",
+      "firstmate_id": "pros-038",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P038-anthropic.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "stripe-adapter",
+      "title": "Implement Stripe Checkout, Portal and subscription reads",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/payments/src/stripe/"
+      ],
+      "outcome": "Billing services can create idempotent sessions and fetch current subscription state.",
+      "build": [
+        "Use official server SDK and validated server-side price IDs, return URLs and customer mappings.",
+        "Use Stripe-supported idempotency on creation and avoid duplicate customers/subscriptions.",
+        "Implement raw-body signature verification as an adapter entry point for the webhook route."
+      ],
+      "checks": [
+        "Test-mode fixtures cover duplicate creation, invalid signatures and an existing customer.",
+        "Client input cannot choose another tenant's Stripe customer or arbitrary prices."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/stripe.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P039",
+      "firstmate_id": "pros-039",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P039-stripe-adapter.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "storage",
+      "title": "Implement the private R2 object adapter",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/storage/src/r2/"
+      ],
+      "outcome": "Authorized services can store and retrieve private tenant objects.",
+      "build": [
+        "Use AWS SDK v3 and short-lived presigned URLs against the EU jurisdiction endpoint.",
+        "Enforce server-derived tenant key prefixes, file size/type limits and bounded expiration.",
+        "Keep management credentials out of runtime; return metadata without public bucket URLs."
+      ],
+      "checks": [
+        "A caller cannot sign an arbitrary other-tenant object key.",
+        "Fixtures test expiry, size limits and failed uploads; live credentials are not needed for unit checks."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/cloudflare-r2.md",
+        "tools/wrangler.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P040",
+      "firstmate_id": "pros-040",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P040-storage.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "email",
+      "title": "Implement transactional authentication and handover email",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/email/src/delivery/",
+        "packages/email/src/templates/"
+      ],
+      "outcome": "The product can deliver French auth, reconnect and handover notifications.",
+      "build": [
+        "Use Resend and existing React Email integration; receive semantic events with stable delivery keys.",
+        "Provide accessible plain-text/HTML variants and application links; omit private conversation bodies from alerts.",
+        "Bound retries and honor available provider idempotency; no cold-outreach email feature."
+      ],
+      "checks": [
+        "Templates render with escaping and correct action URLs.",
+        "Duplicate product events use the same delivery identity and failures remain visible."
+      ],
+      "contract": "C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/resend.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P041",
+      "firstmate_id": "pros-041",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P041-email.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "observability",
+      "title": "Implement structured logging and Sentry adapters",
+      "group": "Adapters",
+      "write_paths": [
+        "packages/observability/src/prospecting/"
+      ],
+      "outcome": "App/API/workers share correlation fields and content-safe error reporting.",
+      "build": [
+        "Provide request, event, workflow, action and tenant correlation with consistent error taxonomy.",
+        "Configure redaction of credentials and private bodies; separate logs, usage and audit concerns.",
+        "Expose counters for lag, UNKNOWN sends, reply-stop delay and paused accounts."
+      ],
+      "checks": [
+        "Redaction fixtures remove tokens and message bodies while retaining useful IDs.",
+        "Server-only Sentry dependencies cannot enter browser or deterministic Workflow bundles."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/sentry.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P042",
+      "firstmate_id": "pros-042",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P042-observability.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "prompt-defaults",
+      "title": "Port French defaults and message evaluation fixtures",
+      "group": "Writing",
+      "write_paths": [
+        "packages/prompts/src/defaults/",
+        "packages/prompts/fixtures/"
+      ],
+      "outcome": "Versioned defaults preserve the useful French product behavior from the current skills.",
+      "build": [
+        "Read the current lead-agent setup/hunt/dm assets and record their source revision; port approved ICP and DM1–DM5 writing rules.",
+        "Separate reusable message templates from browser instructions and Excel operations.",
+        "Include decision-maker, recruiter/ESN, no-signal and historical-reply fixtures with documented expected outcomes."
+      ],
+      "checks": [
+        "Defaults cover the full sequence without requiring a hiring signal for every ICP match.",
+        "Fixtures contain synthetic/redacted data and trace each migrated rule to its source."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P043",
+      "firstmate_id": "pros-043",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P043-prompt-defaults.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "prompt-composer",
+      "title": "Compose grounded prompts with editable style precedence",
+      "group": "Writing",
+      "write_paths": [
+        "packages/prompts/src/composition/"
+      ],
+      "outcome": "Every draft can be reconstructed from defaults, customer choices and evidence.",
+      "build": [
+        "Apply campaign override, explicit customer setting, accepted inferred style, then code defaults.",
+        "Include freelancer offer/profile facts automatically, without pretending those facts prove a writing voice.",
+        "Attach prompt/style/campaign/model versions and allowed evidence; user/prospect text cannot change send rules."
+      ],
+      "checks": [
+        "Explicit edits win over inference and reset restores the intended baseline.",
+        "Unsupported variables and missing evidence fail or produce a neutral allowed prompt."
+      ],
+      "contract": "C1 C2",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P044",
+      "firstmate_id": "pros-044",
+      "depends_on": [
+        "P043",
+        "P012"
+      ],
+      "brief": "tasks/P044-prompt-composer.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "style-inference",
+      "title": "Infer an optional writing style from customer examples",
+      "group": "Writing",
+      "write_paths": [
+        "apps/worker/src/activities/style-inference/"
+      ],
+      "outcome": "Optional examples create a versioned style suggestion the customer can accept or edit.",
+      "build": [
+        "Bound example count/size and model spend; distinguish inferred preferences from explicit settings.",
+        "Persist provenance and a suggestion rather than silently replacing customer choices.",
+        "Invalidate relevant unsent drafts only on an accepted style version using the style repository."
+      ],
+      "checks": [
+        "A customer edit is never overwritten by a later analysis job.",
+        "No samples produces useful defaults; profile-only facts are not labeled as learned voice."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P045",
+      "firstmate_id": "pros-045",
+      "depends_on": [
+        "P044",
+        "P038",
+        "P024"
+      ],
+      "brief": "tasks/P045-style-inference.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "auth-core",
+      "title": "Implement Better Auth with Drizzle and auth mail",
+      "group": "Authentication",
+      "write_paths": [
+        "packages/auth/src/server/",
+        "packages/auth/src/client/",
+        "packages/auth/src/session/"
+      ],
+      "outcome": "The customer app can sign in with application-hosted Better Auth.",
+      "build": [
+        "Use the generated schema and approved adapter; configure required verification/recovery/session flows.",
+        "Keep server/client entry points separate and use the shared email port.",
+        "Respect pre-session auth permissions and secure same-origin cookies; no managed Neon Auth substitution."
+      ],
+      "checks": [
+        "An isolated database supports signup, verification, sign-in, sign-out and session revocation.",
+        "The auth adapter uses the generated schema correctly and does not expose server keys to the browser."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/better-auth.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P046",
+      "firstmate_id": "pros-046",
+      "depends_on": [
+        "P021",
+        "P041"
+      ],
+      "brief": "tasks/P046-auth-core.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "auth-ui",
+      "title": "Wire auth routes and the customer application shell",
+      "group": "Authentication",
+      "write_paths": [
+        "apps/app/app/api/auth/",
+        "apps/app/app/(auth)/",
+        "apps/app/app/layout.tsx",
+        "apps/app/app/(app)/layout.tsx",
+        "apps/app/components/navigation/",
+        "apps/app/proxy.ts",
+        "apps/app/middleware.ts"
+      ],
+      "outcome": "Customers enter an authenticated app with explicit tenant selection.",
+      "build": [
+        "Mount Better Auth routes/providers and adapt next-forge navigation to agreed feature routes.",
+        "Resolve membership on the server before rendering tenant data; retain correct empty/loading/error states.",
+        "Use the central design system; links to unfinished features stay hidden until the final wiring task."
+      ],
+      "checks": [
+        "Unauthenticated access redirects safely and revoked sessions cannot reach tenant pages.",
+        "Two tenants cannot switch context by editing a URL alone."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P047",
+      "firstmate_id": "pros-047",
+      "depends_on": [
+        "P046",
+        "P022"
+      ],
+      "brief": "tasks/P047-auth-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "command-auth",
+      "title": "Build authenticated Next Safe Action middleware",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/lib/commands/",
+        "apps/app/lib/queries/"
+      ],
+      "outcome": "Every customer command/query receives validated identity and tenant context.",
+      "build": [
+        "Use next-safe-action with server-side membership, permissions, schema validation and consistent errors.",
+        "Provide C4 query helpers and optimistic version handling, with no browser-selected authority.",
+        "Keep command modules free of direct provider sends; use repositories and durable commands."
+      ],
+      "checks": [
+        "Forged tenant/account selectors fail before side effects.",
+        "Unauthenticated, malformed and stale requests return safe typed errors."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/next-safe-action.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P048",
+      "firstmate_id": "pros-048",
+      "depends_on": [
+        "P046",
+        "P022",
+        "P007"
+      ],
+      "brief": "tasks/P048-command-auth.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "profile-commands",
+      "title": "Implement onboarding and freelancer profile commands",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/profile/server/"
+      ],
+      "outcome": "Users can save an offer, target market and work preferences.",
+      "build": [
+        "Validate and persist the C4 profile fields with revision checks.",
+        "Initialize a tenant for a new verified member using the agreed transaction, without accepting a claimed tenant ID.",
+        "Expose preview context for automatic profile adaptation; do not infer style from profile facts."
+      ],
+      "checks": [
+        "The same onboarding submission does not create duplicate tenants.",
+        "Invalid/stale/cross-tenant edits fail with useful errors."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P049",
+      "firstmate_id": "pros-049",
+      "depends_on": [
+        "P048",
+        "P022"
+      ],
+      "brief": "tasks/P049-profile-commands.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "profile-ui",
+      "title": "Build the French onboarding and profile screens",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/onboarding/",
+        "apps/app/app/(app)/settings/profile/",
+        "apps/app/features/profile/ui/"
+      ],
+      "outcome": "A freelancer can understand and edit the information used in prospecting.",
+      "build": [
+        "Build against C4 fixture props with injected command/query bindings until final wiring.",
+        "Use the shared form/UI system with French labels and accessible validation.",
+        "Explain profile adaptation and optional style examples without a model-settings burden."
+      ],
+      "checks": [
+        "Render empty, invalid, saving and saved states; keyboard flow works.",
+        "Component acceptance uses fixtures and does not claim a working backend until wired."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P050",
+      "firstmate_id": "pros-050",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P050-profile-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "account-commands",
+      "title": "Implement LinkedIn connect, reconnect and pause commands",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/accounts/server/",
+        "packages/database/src/repositories/provider-accounts/"
+      ],
+      "outcome": "A tenant can connect and recover its own LinkedIn account.",
+      "build": [
+        "Bind provider connection results to an authenticated flow with server state and expiry.",
+        "Persist health/mapping changes and outbox pause/reconcile requests atomically.",
+        "Do not treat a successful callback alone as permission to start sending."
+      ],
+      "checks": [
+        "Forged/replayed callbacks and cross-tenant account claims fail.",
+        "Reconnect retains histories and requires reconciliation before outbound eligibility returns."
+      ],
+      "contract": "C3 C4",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P051",
+      "firstmate_id": "pros-051",
+      "depends_on": [
+        "P048",
+        "P033",
+        "P023"
+      ],
+      "brief": "tasks/P051-account-commands.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "account-ui",
+      "title": "Build account status and reconnection screens",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/settings/linkedin/",
+        "apps/app/features/accounts/ui/"
+      ],
+      "outcome": "Customers can see connection state and take the required recovery action.",
+      "build": [
+        "Build C4 fixture-driven states for connected, waiting, restricted, challenge and disconnected.",
+        "Show owner intervention and paused sending clearly without exposing credentials.",
+        "Inject server bindings during final wiring; do not create a browser automation worker."
+      ],
+      "checks": [
+        "Each account state has an understandable French action or explanation.",
+        "Retry/error and keyboard navigation are verified."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P052",
+      "firstmate_id": "pros-052",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P052-account-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "campaign-commands",
+      "title": "Implement campaign editing, activation and pause",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/campaigns/server/"
+      ],
+      "outcome": "A customer authorizes a bounded sequence once and can pause it immediately.",
+      "build": [
+        "Validate offer, ICP, exclusions, business hours, quota and DM sequence version.",
+        "Activation persists the scope/version and requests durable scheduling; pause changes database eligibility immediately.",
+        "Reject invalid account/billing state; do not require approval of every individual message."
+      ],
+      "checks": [
+        "Duplicate activation cannot start duplicate sequence ownership.",
+        "Pause wins over a stale timer and editing cannot restart a replied-to prospect."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P053",
+      "firstmate_id": "pros-053",
+      "depends_on": [
+        "P048",
+        "P023",
+        "P010",
+        "P009"
+      ],
+      "brief": "tasks/P053-campaign-commands.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "campaign-ui",
+      "title": "Build campaign setup and activation screens",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/campaigns/",
+        "apps/app/features/campaigns/ui/"
+      ],
+      "outcome": "Users understand the target audience, cadence and sending limits before activating.",
+      "build": [
+        "Use C4 fixtures and injected bindings for list/detail/edit/activate/pause states.",
+        "Show Europe/Paris hours, DM1–DM5 bounds and stop-on-reply behavior in French.",
+        "Use existing design system; keep runtime/vendor implementation details out of the flow."
+      ],
+      "checks": [
+        "Activation shows the actual authorized scope and a clear pause control.",
+        "Invalid schedules/quotas and read-only/paused states are covered."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P054",
+      "firstmate_id": "pros-054",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P054-campaign-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "style-commands",
+      "title": "Implement editable style, templates, preview and reset",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/style/server/"
+      ],
+      "outcome": "Customers can edit their voice and inspect a bounded preview without sending it.",
+      "build": [
+        "Persist tone/instructions/step overrides and optional examples under current tenant/version.",
+        "Generate previews through the writing adapter and content checks with a per-request budget.",
+        "Accept/reset inferred styles explicitly; preserve READY invalidation semantics and never send previews."
+      ],
+      "checks": [
+        "Preview requests cannot create outbound actions or bypass quotas.",
+        "Stale concurrent edits fail and explicit overrides survive inference/reset operations as designed."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P055",
+      "firstmate_id": "pros-055",
+      "depends_on": [
+        "P048",
+        "P024",
+        "P044",
+        "P038",
+        "P012"
+      ],
+      "brief": "tasks/P055-style-commands.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "style-ui",
+      "title": "Build the writing-style and message-template editor",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/settings/writing/",
+        "apps/app/features/style/ui/"
+      ],
+      "outcome": "Users can start with defaults, modify the voice and preview each step.",
+      "build": [
+        "Build C4 fixture-driven tone, examples, DM step templates, reset and preview views.",
+        "Distinguish default, explicit and suggested style; show which unsent drafts will update.",
+        "Provide accessible validation and clear French copy."
+      ],
+      "checks": [
+        "Users can reset a single override without confusing it with deleting their profile.",
+        "Preview loading/error and stale-save conflict states are usable."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P056",
+      "firstmate_id": "pros-056",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P056-style-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "pipeline-query",
+      "title": "Implement authorized pipeline filters and pagination",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/pipeline/server/"
+      ],
+      "outcome": "The pipeline returns bounded tenant-scoped rows with reasons and state.",
+      "build": [
+        "Map C4 filters/cursors onto indexed queries for campaign, status, ownership and evidence.",
+        "Validate sort/filter inputs and return only product DTOs.",
+        "Keep provider IDs that are needed server-side out of unnecessary browser fields."
+      ],
+      "checks": [
+        "Cross-tenant guessed IDs return no data and pagination is stable.",
+        "Filtering by human-owned/UNKNOWN/paused yields correct results."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P057",
+      "firstmate_id": "pros-057",
+      "depends_on": [
+        "P048",
+        "P025"
+      ],
+      "brief": "tasks/P057-pipeline-query.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "pipeline-ui",
+      "title": "Build the lead pipeline with nuqs filters",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/pipeline/",
+        "apps/app/features/pipeline/ui/"
+      ],
+      "outcome": "Customers can find leads and understand why automation is active or stopped.",
+      "build": [
+        "Use nuqs for typed URL filters and C4 fixture-driven table/detail summaries.",
+        "Show evidence, stage, next due step and hold reasons without suggesting UNKNOWN means failed.",
+        "Provide empty/error/loading/pagination and keyboard states."
+      ],
+      "checks": [
+        "Filters survive refresh and invalid query parameters fall back safely.",
+        "Rows link to the correct conversation and do not expose another tenant through URL state."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/nuqs.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P058",
+      "firstmate_id": "pros-058",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P058-pipeline-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "timeline-ui",
+      "title": "Build the conversation timeline and handover view",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/conversations/",
+        "apps/app/features/conversations/ui/",
+        "apps/app/features/conversations/server/"
+      ],
+      "outcome": "A human sees the history and knows to reply directly in LinkedIn.",
+      "build": [
+        "Build C4 fixture-driven timeline UI and a binding factory for the authorized timeline repository.",
+        "Display incoming attachments, bot sends, owner sends, unknown outcomes and handover status distinctly.",
+        "Provide a valid LinkedIn conversation/profile link when known; no automatic-reply composer in MVP."
+      ],
+      "checks": [
+        "Attachment-only replies visibly stop automation.",
+        "Sensitive/raw provider payloads stay out of rendered HTML."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P059",
+      "firstmate_id": "pros-059",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P059-timeline-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "billing-commands",
+      "title": "Implement tenant billing Checkout and Portal commands",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/billing/server/"
+      ],
+      "outcome": "An authorized customer can subscribe or manage the existing subscription.",
+      "build": [
+        "Use server-owned customer mappings, allowed price IDs and return URLs.",
+        "Preserve existing subscriptions and supported Stripe idempotency; rely on verified webhooks for entitlement.",
+        "Return session URLs through typed C4 results without trusting client-supplied billing identity."
+      ],
+      "checks": [
+        "Repeated clicks do not create duplicate billing records.",
+        "Checkout success redirect alone does not grant sending access."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P060",
+      "firstmate_id": "pros-060",
+      "depends_on": [
+        "P048",
+        "P039",
+        "P031"
+      ],
+      "brief": "tasks/P060-billing-commands.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "billing-ui",
+      "title": "Build subscription and billing-status screens",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/settings/billing/",
+        "apps/app/features/billing/ui/"
+      ],
+      "outcome": "Customers can understand their subscription and restore paused outbound access.",
+      "build": [
+        "Build C4 fixture-driven active/pending/past-due/canceled billing states and injected actions.",
+        "Show the consequence for outreach while keeping conversation access available.",
+        "Use agreed product prices only when configured; no invented commercial price."
+      ],
+      "checks": [
+        "Pending webhook state is distinct from paid access.",
+        "Error states do not encourage repeated subscription creation."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P061",
+      "firstmate_id": "pros-061",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P061-billing-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "metrics-query",
+      "title": "Implement basic prospecting metrics queries",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/features/metrics/server/"
+      ],
+      "outcome": "The dashboard reports counts and costs from authoritative state.",
+      "build": [
+        "Define invitations, acceptances, sent steps, replies/handoffs, UNKNOWN actions and spend measures.",
+        "Avoid double-counting provider echoes or repeated events; use explicit date windows and denominators.",
+        "Query tenant-scoped aggregate records with bounded ranges."
+      ],
+      "checks": [
+        "Fixtures reconcile metrics with ledger/event counts and late events.",
+        "No ambiguous send is reported as a confirmed delivery."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P062",
+      "firstmate_id": "pros-062",
+      "depends_on": [
+        "P048",
+        "P032"
+      ],
+      "brief": "tasks/P062-metrics-query.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "metrics-ui",
+      "title": "Build the customer metrics dashboard",
+      "group": "Customer product",
+      "write_paths": [
+        "apps/app/app/(app)/dashboard/",
+        "apps/app/features/metrics/ui/"
+      ],
+      "outcome": "Users can read campaign activity and handovers at a glance.",
+      "build": [
+        "Render C4 fixture-driven metrics with plain French labels and date ranges.",
+        "Distinguish confirmed sends, uncertain delivery and replies; expose freshness.",
+        "Use existing chart components only where they clarify the numbers."
+      ],
+      "checks": [
+        "Empty/new accounts and missing denominators do not display misleading rates.",
+        "Dashboard remains usable on mobile and via keyboard."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P063",
+      "firstmate_id": "pros-063",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P063-metrics-ui.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "unipile-webhook",
+      "title": "Wire durable Unipile webhook ingestion",
+      "group": "Automation",
+      "write_paths": [
+        "apps/api/app/webhooks/unipile/",
+        "apps/api/src/ingestion/unipile/"
+      ],
+      "outcome": "Incoming messages reach the atomic stop transaction before any AI work.",
+      "build": [
+        "Authenticate and map the provider account to a tenant using server-owned records.",
+        "Persist and apply inbound/manual-takeover events using the atomic reply-stop boundary; queue other normalized events durably.",
+        "Return success only after the durable result; preserve/retry deduplicated pending work if downstream processing fails."
+      ],
+      "checks": [
+        "Attachment-only replies stop automation while TypeSafe and Temporal are down.",
+        "Duplicate/out-of-order events, invalid authentication and transient database failures have explicit retry behavior."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P064",
+      "firstmate_id": "pros-064",
+      "depends_on": [
+        "P036",
+        "P029",
+        "P030",
+        "P051"
+      ],
+      "brief": "tasks/P064-unipile-webhook.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "stripe-webhook",
+      "title": "Wire verified Stripe webhooks and entitlement updates",
+      "group": "Automation",
+      "write_paths": [
+        "apps/api/app/webhooks/stripe/",
+        "apps/api/src/ingestion/stripe/"
+      ],
+      "outcome": "Billing changes safely update outbound eligibility.",
+      "build": [
+        "Verify the untouched raw body, resolve billing-to-tenant mappings and persist deduplicated events.",
+        "Fetch current subscription state for ordering/reconciliation and apply it through the billing repository.",
+        "Keep reply ingestion and account reconciliation alive when subscription access is removed."
+      ],
+      "checks": [
+        "Bad signatures, duplicate events, out-of-order cancellation/payment and missing mapping are covered.",
+        "A retry after partial processing converges to the current Stripe state."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P065",
+      "firstmate_id": "pros-065",
+      "depends_on": [
+        "P039",
+        "P031"
+      ],
+      "brief": "tasks/P065-stripe-webhook.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "authorization",
+      "title": "Implement atomic send authorization",
+      "group": "Automation",
+      "write_paths": [
+        "packages/database/src/repositories/send-authorization/"
+      ],
+      "outcome": "A single transaction authorizes one current eligible action into IN_FLIGHT.",
+      "build": [
+        "Use the common account/pair lock order and current human ownership, campaign, entitlement, draft versions, account health and due window.",
+        "Reserve quota, verify fencing and commit the exact send attempt atomically.",
+        "Reject stale READY work; preserve UNKNOWN/IN_FLIGHT decisions and immutable payloads."
+      ],
+      "checks": [
+        "Two real database transactions racing authorization and reply-stop respect the commit guarantee.",
+        "Concurrent workers cannot authorize the same step twice or exceed account quota."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P066",
+      "firstmate_id": "pros-066",
+      "depends_on": [
+        "P009",
+        "P010",
+        "P023",
+        "P024",
+        "P028",
+        "P027",
+        "P030",
+        "P031"
+      ],
+      "brief": "tasks/P066-authorization.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "dispatch",
+      "title": "Implement the outbound dispatch Activity",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/activities/dispatch/"
+      ],
+      "outcome": "One authorized attempt invokes the provider once and records its actual outcome.",
+      "build": [
+        "Refresh relevant conversation/account state before authorization and ingest newly discovered activity through the same stop path.",
+        "Authorize, call the C2 provider once, then persist CONFIRMED/FAILED/UNKNOWN with request evidence.",
+        "On lost lease, timeout or crash recovery use uncertainty handling; a workflow retry must not repeat the side effect blindly."
+      ],
+      "checks": [
+        "Timeout after an actual send does not create a second request.",
+        "A reply committed before authorization denies sending; the already-authorized external race is recorded honestly."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P067",
+      "firstmate_id": "pros-067",
+      "depends_on": [
+        "P066",
+        "P035",
+        "P042"
+      ],
+      "brief": "tasks/P067-dispatch.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "reconcile",
+      "title": "Reconcile uncertain sends and expired in-flight attempts",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/activities/reconciliation/"
+      ],
+      "outcome": "Uncertain outcomes are resolved from evidence or held without a resend.",
+      "build": [
+        "Inspect bounded provider history, receipts, action identity and time/body evidence; never use body equality alone as certainty.",
+        "Reconcile provider echoes and unmatched owner messages through the common ownership path.",
+        "If evidence is inconclusive retain UNKNOWN and surface an actionable hold; account lease expiry cannot authorize a competing send."
+      ],
+      "checks": [
+        "A confirmed provider message after local timeout resolves once.",
+        "Duplicate text, incomplete history and late manual sends remain safe and do not authorize blind retry."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P068",
+      "firstmate_id": "pros-068",
+      "depends_on": [
+        "P027",
+        "P028",
+        "P035",
+        "P030"
+      ],
+      "brief": "tasks/P068-reconcile.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "outbox-delivery",
+      "title": "Deliver product events to Temporal and notifications",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/outbox/"
+      ],
+      "outcome": "Committed starts, pauses, handovers and alerts eventually reach their consumers.",
+      "build": [
+        "Consume leased events with stable workflow and notification IDs; handle already-started/completed workflow outcomes explicitly.",
+        "Apply bounded retries, acknowledgement and dead-letter visibility without losing the event.",
+        "Use C5 signals and official Temporal client; keep inbox and outbound workers independently operable."
+      ],
+      "checks": [
+        "Crashing between delivery and acknowledgement does not create duplicate sequence ownership.",
+        "Temporal outage leaves database reply-stop effective and queued events recover later."
+      ],
+      "contract": "C3 C5",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P069",
+      "firstmate_id": "pros-069",
+      "depends_on": [
+        "P029",
+        "P041",
+        "P042"
+      ],
+      "brief": "tasks/P069-outbox-delivery.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "draft-generation",
+      "title": "Generate and persist versioned unsent drafts",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/activities/drafting/"
+      ],
+      "outcome": "An eligible step gets a reproducible grounded draft with current style versions.",
+      "build": [
+        "Load tenant profile, campaign/style/evidence snapshot and compose through the shared prompt package.",
+        "Bound generation/repair attempts and usage; run deterministic content checks.",
+        "Persist against expected versions and stable action identity; stale drafts can be regenerated only while READY."
+      ],
+      "checks": [
+        "A style edit during generation rejects the stale result.",
+        "IN_FLIGHT, UNKNOWN and sent payloads are never overwritten; failed quality holds instead of sending."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P070",
+      "firstmate_id": "pros-070",
+      "depends_on": [
+        "P044",
+        "P038",
+        "P024",
+        "P027",
+        "P012",
+        "P032"
+      ],
+      "brief": "tasks/P070-draft-generation.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "qualification",
+      "title": "Implement evidence-based prospect qualification",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/activities/qualification/"
+      ],
+      "outcome": "Candidates receive auditable ICP and offer/angle decisions.",
+      "build": [
+        "Run independent decisions together where allowed, then dependent decisions from their validated outputs.",
+        "Persist evidence references, input/model versions, uncertainty and billed usage.",
+        "Keep recruiter/ESN and decision-maker rules; no fabricated hiring-signal gate for all prospects."
+      ],
+      "checks": [
+        "Unsupported claims and missing evidence yield hold/skip rather than a fabricated fit.",
+        "Repeated processing is idempotent and no model output directly authorizes a send."
+      ],
+      "contract": "C2 C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/typesafe-ai.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P071",
+      "firstmate_id": "pros-071",
+      "depends_on": [
+        "P037",
+        "P025",
+        "P032"
+      ],
+      "brief": "tasks/P071-qualification.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "discovery",
+      "title": "Implement bounded discovery batch workflows",
+      "group": "Automation",
+      "write_paths": [
+        "packages/workflows/src/discovery/",
+        "apps/worker/src/activities/discovery/"
+      ],
+      "outcome": "Active campaigns ingest bounded search pages without duplicate prospects.",
+      "build": [
+        "Use deterministic workflows and Activities for network/database access with explicit cursor/batch limits.",
+        "Honor account health, discovery budget, tenant ICP/exclusions and suppressed pairs.",
+        "Persist cursor/progress and usage; stop/retry responsibly on rate limits."
+      ],
+      "checks": [
+        "Restart at a page boundary does not duplicate a candidate/sequence.",
+        "A failed page resumes from recorded progress without an unbounded loop or full rescan."
+      ],
+      "contract": "C2 C3 C5",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P072",
+      "firstmate_id": "pros-072",
+      "depends_on": [
+        "P034",
+        "P025",
+        "P071"
+      ],
+      "brief": "tasks/P072-discovery.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "account-sync",
+      "title": "Implement acceptance and account-history reconciliation",
+      "group": "Automation",
+      "write_paths": [
+        "packages/workflows/src/account-sync/",
+        "apps/worker/src/activities/account-sync/"
+      ],
+      "outcome": "Account state, accepted invitations and missed replies are recovered in bounded batches.",
+      "build": [
+        "Process queued normalized account-status/acceptance inbox events and reconcile bounded health, acceptance and recent activity through official adapters.",
+        "Replay recovered messages through the same reply/manual-ownership transaction; reconnect never bypasses it.",
+        "Use cursors, overlap windows and Continue-As-New/history bounds rather than one enormous workflow."
+      ],
+      "checks": [
+        "Downtime followed by an attachment-only reply is recovered before new sending.",
+        "Repeated sync preserves dedupe and stale account health cannot trigger a send."
+      ],
+      "contract": "C2 C3 C5",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P073",
+      "firstmate_id": "pros-073",
+      "depends_on": [
+        "P033",
+        "P035",
+        "P030",
+        "P068",
+        "P051"
+      ],
+      "brief": "tasks/P073-account-sync.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "sequence",
+      "title": "Implement the deterministic prospect sequence Workflow",
+      "group": "Automation",
+      "write_paths": [
+        "packages/workflows/src/prospect-sequence/",
+        "apps/worker/src/activities/prospect-sequence/"
+      ],
+      "outcome": "One prospect lifecycle waits, sends bounded steps and ends reliably on stop conditions.",
+      "build": [
+        "Use stable IDs, small ID-only inputs, durable acceptance waits/timers and C5 pause/reply/account signals.",
+        "Run database/provider work in Activities; recheck current state before every step.",
+        "Stop on reply/manual takeover, suppression, inactive state or sequence exhaustion; do not resume human-owned pairs."
+      ],
+      "checks": [
+        "Time-skipping tests cover the full DM1–DM5 cadence, delayed Activities and stop signals around timers.",
+        "Replay works across worker restart; Workflow code imports no Node/SDK/database side effects."
+      ],
+      "contract": "C5",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P074",
+      "firstmate_id": "pros-074",
+      "depends_on": [
+        "P010",
+        "P067",
+        "P070",
+        "P068"
+      ],
+      "brief": "tasks/P074-sequence.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "scheduler",
+      "title": "Implement campaign scheduling and bounded account coordination",
+      "group": "Automation",
+      "write_paths": [
+        "packages/workflows/src/campaign-control/",
+        "apps/worker/src/activities/campaign-control/"
+      ],
+      "outcome": "Active campaigns continuously coordinate bounded discovery and prospect lifecycles.",
+      "build": [
+        "Use durable schedules/stable IDs and a single account/prospect ownership gate before starting sequences.",
+        "Process activation/pause/reconnect and entitlement events through C5; avoid polling every second per account.",
+        "Start only eligible remaining steps and cap work/backlog across tenants for fair service."
+      ],
+      "checks": [
+        "Duplicate starts, reconnects and repeated schedule ticks do not create duplicate active sequences.",
+        "One tenant's large backlog does not starve reply processing or other accounts."
+      ],
+      "contract": "C3 C5",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P075",
+      "firstmate_id": "pros-075",
+      "depends_on": [
+        "P023",
+        "P072",
+        "P073",
+        "P074",
+        "P069"
+      ],
+      "brief": "tasks/P075-scheduler.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "worker-wiring",
+      "title": "Wire worker entry points, registries and health checks",
+      "group": "Automation",
+      "write_paths": [
+        "apps/worker/src/main.ts",
+        "apps/worker/src/activities/index.ts",
+        "apps/worker/src/health/",
+        "packages/workflows/src/index.ts",
+        "apps/api/instrumentation.ts",
+        "apps/api/app/health/",
+        "apps/app/app/api/health/",
+        "apps/app/instrumentation.ts"
+      ],
+      "outcome": "Compiled Node processes register the completed workflows and Activities.",
+      "build": [
+        "Wire adapters/repositories through explicit dependency injection; configure task queues, timeouts, concurrency and graceful shutdown.",
+        "Validate service-specific environment keys and initialize observability without logging secrets.",
+        "Retain worker version/replay compatibility and independent ingress operation during worker outages."
+      ],
+      "checks": [
+        "Node.js 24 Linux smoke polls an isolated Temporal task queue and handles shutdown.",
+        "Missing critical credentials fail startup visibly; no production traffic is used."
+      ],
+      "contract": "C5",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [
+        "tools/nodejs.md",
+        "tools/temporal.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P076",
+      "firstmate_id": "pros-076",
+      "depends_on": [
+        "P075",
+        "P045",
+        "P042"
+      ],
+      "brief": "tasks/P076-worker-wiring.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "product-wiring",
+      "title": "Connect completed feature screens to server functions",
+      "group": "Integration",
+      "write_paths": [
+        "apps/app/features/*/bindings.ts",
+        "apps/app/components/navigation/feature-registry.ts"
+      ],
+      "outcome": "The fixture-built customer screens operate against authorized real services.",
+      "build": [
+        "Connect each feature's injected server command/query bindings without changing its business implementation.",
+        "Enable routes in the feature registry and preserve server/client boundaries.",
+        "Remove fixture providers from production entrypoints while retaining isolated component fixtures for review."
+      ],
+      "checks": [
+        "Authenticated navigation reaches each completed feature with real DTOs.",
+        "Production bundles contain no mock provider/tenant shortcuts or server credentials."
+      ],
+      "contract": "C4",
+      "external_gates": [],
+      "risk": "integration",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P077",
+      "firstmate_id": "pros-077",
+      "depends_on": [
+        "P047",
+        "P049",
+        "P050",
+        "P051",
+        "P052",
+        "P053",
+        "P054",
+        "P055",
+        "P056",
+        "P057",
+        "P058",
+        "P059",
+        "P026",
+        "P060",
+        "P061",
+        "P062",
+        "P063"
+      ],
+      "brief": "tasks/P077-product-wiring.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "docs-app",
+      "title": "Build the static Fumadocs application",
+      "group": "Public content",
+      "write_paths": [
+        "apps/docs/"
+      ],
+      "outcome": "apps/docs builds a public static French documentation site with local search.",
+      "build": [
+        "Follow the next-forge Fumadocs migration and current Fumadocs APIs.",
+        "Configure MDX, navigation, static export and browser-side search; no server search route dependency.",
+        "Create a minimal content shell with shared product styling; do not copy private technical runbooks into the public index."
+      ],
+      "checks": [
+        "Static output serves pages and browser search from a file/static host without a Node service.",
+        "Private prompts, customer records, secrets and operator docs are absent from output/search."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/fumadocs.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P078",
+      "firstmate_id": "pros-078",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P078-docs-app.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "docs-content",
+      "title": "Write French onboarding and handover help",
+      "group": "Public content",
+      "write_paths": [
+        "apps/docs/content/"
+      ],
+      "outcome": "Customers can connect, configure, edit writing style, pause and recover the product.",
+      "build": [
+        "Write concise help for onboarding, LinkedIn reconnect, campaign scope, DM cadence, editable prompts, billing and human replies.",
+        "Explain laptop-off operation and business sending hours accurately.",
+        "Link to product routes and keep limitations actionable without implementation jargon."
+      ],
+      "checks": [
+        "Links and search terms resolve in the static build.",
+        "Docs promise no automatic replies after handover and no impossible guarantee about already-dispatched sends."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/fumadocs.md",
+        "prompt-personalization.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P079",
+      "firstmate_id": "pros-079",
+      "depends_on": [
+        "P078"
+      ],
+      "brief": "tasks/P079-docs-content.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "marketing",
+      "title": "Build the static marketing site with accurate product copy",
+      "group": "Public content",
+      "write_paths": [
+        "apps/web/"
+      ],
+      "outcome": "The public site explains the freelancer product and links to signup/docs.",
+      "build": [
+        "Reuse the next-forge shared design system and static export.",
+        "Describe autonomous bounded outreach, editable voice and human replies after response.",
+        "Use configured commercial pricing only; avoid invented testimonials or guaranteed LinkedIn results."
+      ],
+      "checks": [
+        "Static build and product/docs links work on mobile and desktop.",
+        "No auth secrets, private prompts or customer information appear in exported assets."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/nextjs.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P080",
+      "firstmate_id": "pros-080",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P080-marketing.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "docker",
+      "title": "Create reproducible app, API and worker images",
+      "group": "Operations",
+      "write_paths": [
+        "infra/docker/",
+        ".dockerignore"
+      ],
+      "outcome": "Production processes run reproducibly on Node with pinned Bun installation.",
+      "build": [
+        "Use frozen workspace installs, minimal runtime images and explicit app/API/worker entrypoints.",
+        "Preserve Temporal native SDK requirements and graceful termination.",
+        "Keep migration tooling in a separate release command/image surface with no baked-in secrets."
+      ],
+      "checks": [
+        "Each Linux image boots with isolated test configuration and exposes the expected health check.",
+        "Worker native dependencies load; production image contains no development credentials."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/docker.md",
+        "tools/nodejs.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P081",
+      "firstmate_id": "pros-081",
+      "depends_on": [
+        "P076",
+        "P077"
+      ],
+      "brief": "tasks/P081-docker.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "render-config",
+      "title": "Define the Render service topology and environment map",
+      "group": "Operations",
+      "write_paths": [
+        "render.yaml",
+        "infra/render/"
+      ],
+      "outcome": "A reviewable deployment definition separates app, API, workers and static sites.",
+      "build": [
+        "Declare EU-region services, health checks and static web/docs outputs using current Render capabilities.",
+        "Map service-specific environment keys and private/public endpoints; secrets are references only.",
+        "Choose pilot sizes matching the cost estimate and document scale-up triggers."
+      ],
+      "checks": [
+        "Validate configuration against current official docs and dry-run/build where available.",
+        "No apply/deploy, purchase or secret creation is hidden in this task."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/render.md",
+        "cost-estimate.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P082",
+      "firstmate_id": "pros-082",
+      "depends_on": [
+        "P081",
+        "P079",
+        "P080"
+      ],
+      "brief": "tasks/P082-render-config.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "r2-setup",
+      "title": "Prepare Wrangler setup for private EU buckets",
+      "group": "Operations",
+      "write_paths": [
+        "infra/r2/",
+        "wrangler.jsonc"
+      ],
+      "outcome": "An operator has exact reviewed Wrangler commands for staging/production object storage.",
+      "build": [
+        "Prepare create/info/CORS/lifecycle commands with explicit EU jurisdiction and environment-specific names.",
+        "Separate management login from scoped S3 runtime keys and keep public access disabled.",
+        "Document verification and cleanup scope; do not execute cloud mutations as part of this code-only task."
+      ],
+      "checks": [
+        "Config/examples match current Wrangler help and Cloudflare AWS v3 endpoint documentation.",
+        "Runbook verifies bucket jurisdiction, CORS and private access; secrets remain placeholders."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "tools/wrangler.md",
+        "tools/cloudflare-r2.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P083",
+      "firstmate_id": "pros-083",
+      "depends_on": [
+        "P007"
+      ],
+      "brief": "tasks/P083-r2-setup.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "release",
+      "title": "Implement CI release and serialized migration procedures",
+      "group": "Operations",
+      "write_paths": [
+        ".github/workflows/release.yml",
+        "tooling/release/",
+        "infra/releases/"
+      ],
+      "outcome": "A release can migrate once and deploy compatible workers with retained evidence.",
+      "build": [
+        "Add environment-scoped release concurrency, separate migration credentials and explicit deployment controls.",
+        "Require current-head checks, replay compatibility and migration/rollback instructions.",
+        "Keep production execution gated to an approved release; no branch may bypass dependency or tenancy checks."
+      ],
+      "checks": [
+        "Dry-run and staging fixtures show one migration owner and a failed migration blocks deployment.",
+        "A worker version rollback does not erase ledger/outbox data or retry UNKNOWN sends."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/github-actions.md",
+        "tools/temporal.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P084",
+      "firstmate_id": "pros-084",
+      "depends_on": [
+        "P008",
+        "P082",
+        "P021",
+        "P083"
+      ],
+      "brief": "tasks/P084-release.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "runbooks",
+      "title": "Write outage, restore and account-recovery runbooks",
+      "group": "Operations",
+      "write_paths": [
+        "docs/operations/"
+      ],
+      "outcome": "Operators can restore service without accidentally restarting outreach.",
+      "build": [
+        "Document provider outage, delayed webhooks, UNKNOWN sends, account challenge, billing outage and database restore.",
+        "Explain how to pause outbound independently of inbox ingestion and how to reconcile before resuming.",
+        "Record alert ownership and redact example logs; keep these docs out of apps/docs."
+      ],
+      "checks": [
+        "A tabletop exercise traces a send timeout and database restore through explicit steps.",
+        "Recovery never blindly replays external side effects or enables two sending owners."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "architecture.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P085",
+      "firstmate_id": "pros-085",
+      "depends_on": [
+        "P082",
+        "P084",
+        "P042"
+      ],
+      "brief": "tasks/P085-runbooks.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "migration-parser",
+      "title": "Parse legacy exports into a validated import preview",
+      "group": "Migration",
+      "write_paths": [
+        "tooling/migration/parse/",
+        "tooling/migration/fixtures/"
+      ],
+      "outcome": "Legacy profiles, templates and pipeline records can be assessed without live writes.",
+      "build": [
+        "Use representative redacted exports from the existing product and document source revision/format.",
+        "Parse profile, offers, prompt edits, original IDs, exclusions, timestamps and message history into C3 import records.",
+        "Report invalid dates, duplicates and unresolved identities; do not add an unlisted XLSX parser without discussion."
+      ],
+      "checks": [
+        "Synthetic fixtures preserve IDs and human-replied status; invalid rows are reported without silent defaults.",
+        "Dry-run emits counts and a reversible mapping report with no cloud mutation."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "normal",
+      "kind": "ship",
+      "sources": [
+        "implementation-plan.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P086",
+      "firstmate_id": "pros-086",
+      "depends_on": [
+        "P011",
+        "P007"
+      ],
+      "brief": "tasks/P086-migration-parser.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "migration-import",
+      "title": "Implement idempotent historical-data import",
+      "group": "Migration",
+      "write_paths": [
+        "tooling/migration/import/"
+      ],
+      "outcome": "An isolated database receives legacy state without restarting past sequences.",
+      "build": [
+        "Import mapped tenant records, profiles, styles, history, exclusions and existing billing associations.",
+        "Apply historical reply/human-ownership state before creating remaining eligible work.",
+        "Use stable import keys and report unresolved rows; never fabricate provider success or charge subscriptions."
+      ],
+      "checks": [
+        "Running the same import twice preserves counts and original identifiers.",
+        "Historical replies and completed sequences produce no new outbound action."
+      ],
+      "contract": "C3",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P087",
+      "firstmate_id": "pros-087",
+      "depends_on": [
+        "P086",
+        "P022",
+        "P023",
+        "P024",
+        "P025",
+        "P026",
+        "P030",
+        "P031"
+      ],
+      "brief": "tasks/P087-migration-import.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "cutover",
+      "title": "Implement cutover checks and the rollback rehearsal",
+      "group": "Migration",
+      "write_paths": [
+        "tooling/migration/cutover/",
+        "docs/migration/"
+      ],
+      "outcome": "A customer can switch from the old plugin to the cloud with one sending owner.",
+      "build": [
+        "Require a recorded old-sender shutdown and cutover time, then reconcile recent activity before activation.",
+        "Preview remaining eligible steps and require resolved identity/account mappings.",
+        "Rollback pauses cloud first, exports new receipts/replies and only then permits legacy reactivation."
+      ],
+      "checks": [
+        "A rehearsal refuses activation while old-sender shutdown is unconfirmed.",
+        "Before/after counts and delayed-reply fixtures preserve history and prevent duplicate ownership."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P088",
+      "firstmate_id": "pros-088",
+      "depends_on": [
+        "P087",
+        "P073",
+        "P075",
+        "P085"
+      ],
+      "brief": "tasks/P088-cutover.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "provider-proof",
+      "title": "Prove live provider capabilities on enrolled test accounts",
+      "group": "Release evidence",
+      "write_paths": [],
+      "outcome": "A redacted capability report confirms the exact APIs the MVP relies on.",
+      "build": [
+        "Use only named enrolled test accounts and controlled recipients within the supplied authorization; do not contact arbitrary prospects.",
+        "Verify Unipile connection/search/invite/acceptance/send/inbound/manual messages/reconnect and actual webhook authentication/deduplication behavior.",
+        "Verify TypeSafe access/schema/French smoke, Claude usage and Stripe test events; record SDK/API versions, limitations and reconciliation evidence."
+      ],
+      "checks": [
+        "Report each capability as passed, failed or unverified with request IDs/redacted evidence.",
+        "Any missing essential capability becomes an explicit blocker/contract revision, never a mock pass."
+      ],
+      "contract": "",
+      "external_gates": [
+        "controlled-provider-access"
+      ],
+      "risk": "critical",
+      "kind": "scout",
+      "sources": [
+        "implementation-plan.md",
+        "sdk-policy.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P089",
+      "firstmate_id": "pros-089",
+      "depends_on": [
+        "P033",
+        "P034",
+        "P035",
+        "P036",
+        "P037",
+        "P038",
+        "P039"
+      ],
+      "brief": "tasks/P089-provider-proof.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "scout",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "delivery-fault-tests",
+      "title": "Verify reply races, crashes and uncertain delivery",
+      "group": "Release evidence",
+      "write_paths": [
+        "tests/integration/delivery/"
+      ],
+      "outcome": "Fault-injection evidence demonstrates the bot stops and recovers as specified.",
+      "build": [
+        "Use real isolated Postgres transactions and controllable provider doubles for worker death, lost leases and crash-after-send.",
+        "Race reply-stop against send authorization across two workers; include attachment-only inbound, duplicate events and manual echoes.",
+        "Exercise delayed events, billing/campaign pause, style-version races and ambiguous reconciliation."
+      ],
+      "checks": [
+        "After durable reply commit no new IN_FLIGHT authorization occurs; already authorized sends are measured separately.",
+        "No blind resend follows UNKNOWN and repeated recovery preserves one action identity."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P090",
+      "firstmate_id": "pros-090",
+      "depends_on": [
+        "P076",
+        "P064"
+      ],
+      "brief": "tasks/P090-delivery-fault-tests.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "tenant-billing-tests",
+      "title": "Verify authentication, tenancy and billing isolation end to end",
+      "group": "Release evidence",
+      "write_paths": [
+        "tests/integration/tenant-billing/"
+      ],
+      "outcome": "Two real tenants cannot cross account, billing or object permissions.",
+      "build": [
+        "Exercise Better Auth session creation/revocation, server actions, query helpers and runtime RLS roles.",
+        "Replay signed Stripe test events including cancellation, old events and duplicate Checkout.",
+        "Attempt cross-tenant provider binding and object access; inactive billing must preserve reply intake."
+      ],
+      "checks": [
+        "All cross-tenant mutations are rejected before side effects.",
+        "Verified billing changes converge correctly after delayed events, with no duplicate subscription."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P091",
+      "firstmate_id": "pros-091",
+      "depends_on": [
+        "P077",
+        "P065",
+        "P021"
+      ],
+      "brief": "tasks/P091-tenant-billing-tests.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "quality-evaluation",
+      "title": "Evaluate French qualification and writing quality",
+      "group": "Release evidence",
+      "write_paths": [
+        "tests/evaluations/french/",
+        "docs/evidence/quality/"
+      ],
+      "outcome": "The chosen prompts/models meet a stated French-domain quality bar.",
+      "build": [
+        "Use held-out labeled cases covering decisions/recruiters, missing signals, irrelevant roles and unsupported claims.",
+        "Measure precision and recall plus factuality, style preference adherence and cost; define acceptance thresholds before running.",
+        "Compare alternative writing models only as an experiment; no silent default change."
+      ],
+      "checks": [
+        "Publish sample counts, disagreement cases, thresholds and a reproducible versioned evaluation report.",
+        "Zero unsupported factual claims in the release test set; explicitly report that finite tests do not prove universal correctness."
+      ],
+      "contract": "",
+      "external_gates": [
+        "model-evaluation-access"
+      ],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "prompt-personalization.md",
+        "tools/typesafe-ai.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P092",
+      "firstmate_id": "pros-092",
+      "depends_on": [
+        "P071",
+        "P070",
+        "P045",
+        "P043"
+      ],
+      "brief": "tasks/P092-quality-evaluation.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "product-e2e",
+      "title": "Verify the complete customer journey in the browser",
+      "group": "Release evidence",
+      "write_paths": [
+        "tests/e2e/product/"
+      ],
+      "outcome": "A customer can configure the product, see automatic activity and take over on reply.",
+      "build": [
+        "Use Playwright with isolated tenants and deterministic provider fixtures for onboarding through handover.",
+        "Cover editable defaults, preview/reset, campaign activation/pause, pipeline filters, billing and reconnect.",
+        "Verify no local Claude installation is needed; check public docs search separately."
+      ],
+      "checks": [
+        "All key paths work with accessible controls, mobile layout and no browser console errors.",
+        "Reply ingestion remains effective when writer/Temporal services are unavailable."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "tools/playwright.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P093",
+      "firstmate_id": "pros-093",
+      "depends_on": [
+        "P077",
+        "P076",
+        "P064",
+        "P065",
+        "P079",
+        "P040"
+      ],
+      "brief": "tasks/P093-product-e2e.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "pilot",
+      "title": "Run the controlled staging pilot and recovery drills",
+      "group": "Release evidence",
+      "write_paths": [],
+      "outcome": "A small enrolled cohort proves laptop-off operation across the complete cadence.",
+      "build": [
+        "Use the approved staging deployment and cohort; record account authorization and spending limits.",
+        "Observe actual replies, business-window scheduling, reconnect and no dual sender; replay restore/rollback drills.",
+        "Run through a complete follow-up cycle, not just one successful send; block expansion on essential failures."
+      ],
+      "checks": [
+        "A standalone report includes timing/receipt evidence, failures, recovery actions and unresolved limits.",
+        "Mock acceptance and seven days of data cannot be substituted for the full lifecycle observation."
+      ],
+      "contract": "",
+      "external_gates": [
+        "staging-pilot-authorized"
+      ],
+      "risk": "critical",
+      "kind": "scout",
+      "sources": [],
+      "exclusive_resources": [],
+      "id": "P094",
+      "firstmate_id": "pros-094",
+      "depends_on": [
+        "P089",
+        "P090",
+        "P091",
+        "P092",
+        "P093",
+        "P088",
+        "P084"
+      ],
+      "brief": "tasks/P094-pilot.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "scout",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    },
+    {
+      "key": "launch-evidence",
+      "title": "Calibrate costs and assemble the launch decision",
+      "group": "Release evidence",
+      "write_paths": [
+        "docs/evidence/launch/",
+        "tooling/cost-calibration/"
+      ],
+      "outcome": "The captain receives a measured operating budget and concrete launch evidence.",
+      "build": [
+        "Replace planning allowances with measured TypeSafe/Claude usage, Temporal history/actions, database growth, network and connector accounts.",
+        "Separate SaaS bills from development-agent credit/API usage; developer labor remains EUR 0.",
+        "Summarize remaining issues, restore/cutover evidence, release commit and cohort limits; do not publish or expand automatically."
+      ],
+      "checks": [
+        "At least seven measured days feed a reproducible calculation, with sample size and extrapolation stated.",
+        "Every release-critical gate is passed or explicitly unresolved; the final recommendation links to reviewed evidence."
+      ],
+      "contract": "",
+      "external_gates": [],
+      "risk": "critical",
+      "kind": "ship",
+      "sources": [
+        "cost-estimate.md",
+        "implementation-plan.md"
+      ],
+      "exclusive_resources": [],
+      "id": "P095",
+      "firstmate_id": "pros-095",
+      "depends_on": [
+        "P094",
+        "P032",
+        "P085"
+      ],
+      "brief": "tasks/P095-launch-evidence.md",
+      "requested_profile": "luna-max-fast",
+      "delivery_mode": "direct-PR",
+      "merge_autonomy": false,
+      "status": "planned",
+      "size_target": "one behavior; usually 150–400 changed logical lines, excluding generated artifacts; split if needed"
+    }
+  ]
+}

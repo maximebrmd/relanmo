@@ -1,0 +1,28 @@
+{
+  "brand": "Relanmo",
+  "created_at": "2026-09-17",
+  "assets": [
+    {
+      "file": "relanmo-logo.png",
+      "role": "Primary horizontal logo on warm ivory",
+      "format": "PNG raster",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 1134675,
+      "sha256": "b6453d6e2b9d37636cf40b29b7fe3e269b9072366c9ab156267d9ae152d8fd5e",
+      "created_with": "image_gen",
+      "edited_after_generation": false
+    },
+    {
+      "file": "relanmo-app-icon.png",
+      "role": "Standalone ivory/coral symbol on forest",
+      "format": "PNG raster",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 943289,
+      "sha256": "ba8b9da7c486d7b658da3de6b6e7f687235f0970f27a3569b76190b75f35005f",
+      "created_with": "image_gen",
+      "edited_after_generation": false
+    }
+  ]
+}
