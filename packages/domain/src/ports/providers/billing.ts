@@ -3,7 +3,6 @@ import type { UtcTimestamp } from "../../contracts/values";
 import type {
   ProviderOperationContext,
   ProviderReadResult,
-  ProviderResult,
   ProviderWriteResult,
 } from "./common";
 
@@ -82,5 +81,5 @@ export type BillingPort = Readonly<{
   ) => Promise<ProviderReadResult<BillingSubscription>>;
   verifyWebhookSignature: (
     input: BillingSignatureVerificationInput
-  ) => Promise<ProviderResult<BillingSignatureVerification>>;
+  ) => Promise<ProviderReadResult<BillingSignatureVerification>>;
 }>;

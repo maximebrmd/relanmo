@@ -114,8 +114,6 @@ export type ProviderWriteFailure =
   | InvalidInputFailure
   | UnavailableCredentialsFailure;
 
-export type ProviderResult<Value> = ProviderFailure | ProviderSuccess<Value>;
-
 export type ProviderReadResult<Value> =
   | ProviderReadFailure
   | ProviderSuccess<Value>;

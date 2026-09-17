@@ -295,6 +295,8 @@ export const normalizedIncomingProviderEventFixture: ProviderIncomingMessageEven
     providerEventId: "provider_event_inbound_1",
     scope: Object.freeze({
       accountId: parseAccountId("account_demo"),
+      conversationId: parseConversationId("conversation_demo"),
+      prospectId: parseProspectId("prospect_demo"),
       tenantId: parseTenantId("tenant_demo"),
     }),
   });
@@ -405,6 +407,7 @@ export const writingInputFixture: WritingInput = Object.freeze({
 });
 
 export const writingResultFixture: WritingResult = Object.freeze({
+  finishReason: "COMPLETE",
   modelVersion: parseModelVersion("writer-fixture-1"),
   observedAt: parseUtcTimestamp("2026-09-17T10:00:00.000Z"),
   text: "Bonjour, votre expérience en recrutement m’intéresse.",

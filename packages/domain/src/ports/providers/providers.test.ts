@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProviderResult } from "./common";
+import {
+  parseAccountId,
+  parseConversationId,
+  parseEvidenceId,
+  parseModelVersion,
+  parseProspectId,
+  parseTenantId,
+} from "../../contracts/ids";
+import type { ProviderReadResult, ProviderWriteResult } from "./common";
+import { TYPESAFE_LIMITS } from "./decisions";
 import {
   createFakeProviderPorts,
   FakeLinkedInPorts,
@@ -12,11 +21,14 @@ import {
   fakeUnavailableCredentialsScenario,
 } from "./fakes";
 import {
+  authorizedObjectKeyFixture,
+  billingCustomerFixture,
   billingCheckoutInputFixture,
   billingPortalInputFixture,
   billingSignatureVerificationInputFixture,
   billingSubscriptionInputFixture,
   emailDeliveryInputFixture,
+  linkedInAccountFixture,
   linkedInAccountStatusInputFixture,
   linkedInConnectInputFixture,
   linkedInConversationInputFixture,
@@ -35,7 +47,15 @@ import {
   writingInputFixture,
 } from "./fixtures";
 
-function valueOf<Value>(result: ProviderResult<Value>): Value {
+function readValue<Value>(result: ProviderReadResult<Value>): Value {
+  expect(result.ok).toBe(true);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  return result.value;
+}
+
+function writeValue<Value>(result: ProviderWriteResult<Value>): Value {
   expect(result.ok).toBe(true);
   if (!result.ok) {
     throw new Error(result.message);
@@ -47,48 +67,50 @@ describe("provider port contracts", () => {
   it("keeps successful LinkedIn operations normalized and correlated", async () => {
     const ports = createFakeProviderPorts();
 
-    const flow = valueOf(
+    const flow = writeValue(
       await ports.linkedin.createConnectFlow(linkedInConnectInputFixture)
     );
     expect(flow.mode).toBe("CONNECT");
 
-    const reconnect = valueOf(
+    const reconnect = writeValue(
       await ports.linkedin.createReconnectFlow(linkedInReconnectInputFixture)
     );
     expect(reconnect.mode).toBe("RECONNECT");
 
-    const account = valueOf(
+    const account = readValue(
       await ports.linkedin.readAccountStatus(linkedInAccountStatusInputFixture)
     );
     expect(account.health.status).toBe("CONNECTED");
     expect(account.capabilities.searchModes.recruiter).toBeNull();
 
-    const page = valueOf(
+    const page = readValue(
       await ports.linkedin.searchCandidates(
         linkedInSearchCandidatesInputFixture
       )
     );
     expect(page.candidates[0]?.provenance).toBe("SEARCH_RESULT");
 
-    const profile = valueOf(
+    const profile = readValue(
       await ports.linkedin.readProfile(linkedInReadProfileInputFixture)
     );
     expect(profile.missingFields).toEqual([]);
 
-    const invitation = valueOf(
+    const invitation = writeValue(
       await ports.linkedin.invite(linkedInInviteInputFixture)
     );
     expect(invitation.providerEvidence.source).toBe("PROVIDER_RECEIPT");
 
-    const message = valueOf(
+    const message = writeValue(
       await ports.linkedin.sendMessage(linkedInSendMessageInputFixture)
     );
-    expect(message.providerMessageId).toBe("provider_message_outbound_2");
+    expect(message.providerMessageId).toBe(
+      "fixture_message_account_demo_prospect_demo_DM1"
+    );
   });
 
   it("preserves attachment-only inbound messages through history and events", async () => {
     const ports = createFakeProviderPorts();
-    const history = valueOf(
+    const history = readValue(
       await ports.linkedin.readRecentConversation(
         linkedInConversationInputFixture
       )
@@ -99,10 +121,10 @@ describe("provider port contracts", () => {
     expect(inbound?.text).toBeNull();
     expect(inbound?.attachments).toHaveLength(1);
 
-    const authenticated = valueOf(
+    const authenticated = readValue(
       await ports.events.authenticate(providerEventAuthenticationInputFixture)
     );
-    const normalized = valueOf(
+    const normalized = readValue(
       await ports.events.normalize({
         authenticated,
         context: providerOperationContextFixture,
@@ -116,7 +138,7 @@ describe("provider port contracts", () => {
       expect(normalized.event.message.attachments).toHaveLength(1);
     }
 
-    const dedupe = valueOf(
+    const dedupe = readValue(
       await ports.events.deriveDedupeIdentity({
         context: providerOperationContextFixture,
         event: normalizedIncomingProviderEventFixture,
@@ -129,10 +151,135 @@ describe("provider port contracts", () => {
     );
   });
 
+  it("keeps reusable fake results scoped to the request identities", async () => {
+    const ports = createFakeProviderPorts();
+    const otherTenantId = parseTenantId("tenant_other");
+    const otherAccount = {
+      ...linkedInAccountFixture,
+      accountId: parseAccountId("account_other"),
+      providerAccountId: "linkedin_account_other",
+      tenantId: otherTenantId,
+    };
+    const otherProspectId = parseProspectId("prospect_other");
+    const otherConversationId = parseConversationId("conversation_other");
+
+    const account = readValue(
+      await ports.linkedin.readAccountStatus({
+        ...linkedInAccountStatusInputFixture,
+        account: otherAccount,
+      })
+    );
+    expect(account.account).toEqual(otherAccount);
+
+    const profile = readValue(
+      await ports.linkedin.readProfile({
+        ...linkedInReadProfileInputFixture,
+        account: otherAccount,
+        providerProfileId: "linkedin_profile_other",
+      })
+    );
+    expect(profile.providerProfileId).toBe("linkedin_profile_other");
+
+    const history = readValue(
+      await ports.linkedin.readRecentConversation({
+        ...linkedInConversationInputFixture,
+        account: otherAccount,
+        conversationId: otherConversationId,
+        prospectId: otherProspectId,
+      })
+    );
+    expect(
+      history.messages.every(
+        (message) =>
+          message.accountId === otherAccount.accountId &&
+          message.tenantId === otherTenantId &&
+          message.prospectId === otherProspectId &&
+          message.conversationId === otherConversationId
+      )
+    ).toBe(true);
+
+    const otherScope = {
+      accountId: otherAccount.accountId,
+      conversationId: otherConversationId,
+      prospectId: otherProspectId,
+      tenantId: otherTenantId,
+    };
+    const normalized = readValue(
+      await ports.events.normalize({
+        authenticated: providerEventAuthenticationFixture,
+        context: providerOperationContextFixture,
+        rawBody: providerEventAuthenticationInputFixture.rawBody,
+        scope: otherScope,
+      })
+    );
+    if (normalized.event.kind === "INCOMING_MESSAGE") {
+      expect(normalized.event.scope).toEqual(otherScope);
+      expect(normalized.event.message.accountId).toBe(otherAccount.accountId);
+      expect(normalized.event.message.tenantId).toBe(otherTenantId);
+      expect(normalized.event.message.prospectId).toBe(otherProspectId);
+      expect(normalized.event.message.conversationId).toBe(otherConversationId);
+    }
+    const dedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: normalized.event,
+      })
+    );
+    expect(dedupe.dedupeKey).toBe(
+      "tenant_other:account_other:provider_event_inbound_1"
+    );
+
+    const subscription = readValue(
+      await ports.billing.readCurrentSubscription({
+        ...billingSubscriptionInputFixture,
+        customer: {
+          ...billingCustomerFixture,
+          providerCustomerId: "billing_customer_other",
+          tenantId: otherTenantId,
+        },
+      })
+    );
+    expect(subscription.tenantId).toBe(otherTenantId);
+
+    const email = writeValue(
+      await ports.email.send({
+        ...emailDeliveryInputFixture,
+        deliveryIdentity: "notification_other_1",
+        tenantId: otherTenantId,
+      })
+    );
+    expect(email.deliveryIdentity).toBe("notification_other_1");
+
+    const otherKey = {
+      ...authorizedObjectKeyFixture,
+      relativeKey: "other.csv",
+    };
+    const object = writeValue(
+      await ports.objects.putPrivateObject({
+        ...privateObjectInputFixture,
+        key: otherKey,
+        tenantId: otherTenantId,
+      })
+    );
+    expect(object.tenantId).toBe(otherTenantId);
+    expect(object.key).toEqual(otherKey);
+
+    const presigned = readValue(
+      await ports.objects.createPresignedRead({
+        ...presignedReadInputFixture,
+        key: otherKey,
+        tenantId: otherTenantId,
+      })
+    );
+    expect(presigned.tenantId).toBe(otherTenantId);
+    expect(presigned.key).toEqual(otherKey);
+  });
+
   it("separates ambiguous writes from retryable reads", async () => {
-    const ambiguous = await new FakeLinkedInPorts(
-      fakeAmbiguousSendScenario
-    ).sendMessage(linkedInSendMessageInputFixture);
+    const ambiguousPorts = createFakeProviderPorts(fakeAmbiguousSendScenario);
+    const ambiguous = await ambiguousPorts.linkedin.sendMessage(
+      linkedInSendMessageInputFixture
+    );
     expect(ambiguous.ok).toBe(false);
     if (!ambiguous.ok) {
       expect(ambiguous.kind).toBe("AMBIGUOUS_WRITE");
@@ -140,6 +287,33 @@ describe("provider port contracts", () => {
         expect(ambiguous.reconciliationRequired).toBe(true);
       }
     }
+
+    const ambiguousRead = await ambiguousPorts.linkedin.readRecentConversation(
+      linkedInConversationInputFixture
+    );
+    expect(readValue(ambiguousRead).messages).toHaveLength(2);
+
+    const ambiguousEventAuthentication = readValue(
+      await ambiguousPorts.events.authenticate(
+        providerEventAuthenticationInputFixture
+      )
+    );
+    const ambiguousEventNormalization = readValue(
+      await ambiguousPorts.events.normalize({
+        authenticated: ambiguousEventAuthentication,
+        context: providerOperationContextFixture,
+        rawBody: providerEventAuthenticationInputFixture.rawBody,
+        scope: normalizedIncomingProviderEventFixture.scope,
+      })
+    );
+    expect(ambiguousEventNormalization.event.kind).toBe("INCOMING_MESSAGE");
+
+    const ambiguousBillingSignature = readValue(
+      await ambiguousPorts.billing.verifyWebhookSignature(
+        billingSignatureVerificationInputFixture
+      )
+    );
+    expect(ambiguousBillingSignature.eventId).toBe("billing_event_demo");
 
     const timeout = await new FakeLinkedInPorts(
       fakeTimeoutReadScenario
@@ -202,7 +376,7 @@ describe("provider port contracts", () => {
 
   it("keeps model decisions advisory and carries usage and uncertainty", async () => {
     const ports = createFakeProviderPorts();
-    const decision = valueOf(
+    const decision = readValue(
       await ports.model.decide(typeSafeDecisionInputFixture)
     );
     expect(decision.answer?.id).toBe("SUITABLE");
@@ -211,47 +385,144 @@ describe("provider port contracts", () => {
     expect(decision.usage.totalTokens).toBe(92);
     expect(Object.hasOwn(decision, "sendAuthorization")).toBe(false);
 
-    const draft = valueOf(await ports.model.compose(writingInputFixture));
+    const draft = readValue(await ports.model.compose(writingInputFixture));
     expect(draft.text).toContain("recrutement");
+    expect(draft.finishReason).toBe("COMPLETE");
     expect(draft.usage.inputTokens).toBeGreaterThan(0);
+
+    const boundedDraft = readValue(
+      await ports.model.compose({
+        ...writingInputFixture,
+        outputBudget: { maxCharacters: 1, maxTokens: 1 },
+      })
+    );
+    expect(boundedDraft.finishReason).toBe("TRUNCATED");
+    expect(boundedDraft.text).toHaveLength(1);
+    expect(boundedDraft.usage.outputTokens).toBeLessThanOrEqual(1);
+    expect(boundedDraft.usage.totalTokens).toBe(
+      boundedDraft.usage.inputTokens + boundedDraft.usage.outputTokens
+    );
+    expect(boundedDraft.modelVersion).toBe(
+      writingInputFixture.sourceVersions.model
+    );
+
+    const otherDecision = readValue(
+      await ports.model.decide({
+        ...typeSafeDecisionInputFixture,
+        evidence: [
+          {
+            claim: "Preuve différente.",
+            evidenceId: parseEvidenceId("evidence_other"),
+          },
+        ],
+        modelVersion: parseModelVersion("typesafe-other-1"),
+        question: {
+          ...typeSafeDecisionInputFixture.question,
+          choices: [{ id: "REJECT", label: "À écarter" }],
+          id: "other-question",
+          schemaVersion: "qualification-v2",
+        },
+        prospectId: parseProspectId("prospect_other"),
+      })
+    );
+    expect(otherDecision.answer?.id).toBe("REJECT");
+    expect(otherDecision.answerEvidenceIds).toEqual(["evidence_other"]);
+    expect(otherDecision.modelVersion).toBe("typesafe-other-1");
+    expect(otherDecision.questionId).toBe("other-question");
+    expect(otherDecision.schemaVersion).toBe("qualification-v2");
+
+    const emptyChoices = await ports.model.decide({
+      ...typeSafeDecisionInputFixture,
+      question: { ...typeSafeDecisionInputFixture.question, choices: [] },
+    });
+    expect(emptyChoices.ok).toBe(false);
+    if (!emptyChoices.ok && emptyChoices.kind === "INVALID_INPUT") {
+      expect(emptyChoices.field).toBe("question.choices");
+      expect(emptyChoices.code).toBe("MALFORMED_INPUT");
+    }
+
+    const tooManyChoices = await ports.model.decide({
+      ...typeSafeDecisionInputFixture,
+      question: {
+        ...typeSafeDecisionInputFixture.question,
+        choices: Array.from(
+          { length: TYPESAFE_LIMITS.maxQuestionChoices + 1 },
+          (_, index) => ({ id: `choice_${index}`, label: `Choice ${index}` })
+        ),
+      },
+    });
+    expect(tooManyChoices.ok).toBe(false);
+    if (!tooManyChoices.ok && tooManyChoices.kind === "INVALID_INPUT") {
+      expect(tooManyChoices.field).toBe("question.choices");
+      expect(tooManyChoices.code).toBe("OUT_OF_BOUNDS");
+    }
+
+    const longPrompt = await ports.model.decide({
+      ...typeSafeDecisionInputFixture,
+      question: {
+        ...typeSafeDecisionInputFixture.question,
+        prompt: "x".repeat(TYPESAFE_LIMITS.maxPromptCharacters + 1),
+      },
+    });
+    expect(longPrompt.ok).toBe(false);
+    if (!longPrompt.ok && longPrompt.kind === "INVALID_INPUT") {
+      expect(longPrompt.field).toBe("question.prompt");
+      expect(longPrompt.code).toBe("OUT_OF_BOUNDS");
+    }
+
+    const tooMuchEvidence = await ports.model.decide({
+      ...typeSafeDecisionInputFixture,
+      evidence: Array.from(
+        { length: TYPESAFE_LIMITS.maxEvidence + 1 },
+        (_, index) => ({
+          claim: `Claim ${index}`,
+          evidenceId: parseEvidenceId(`evidence_${index}`),
+        })
+      ),
+    });
+    expect(tooMuchEvidence.ok).toBe(false);
+    if (!tooMuchEvidence.ok && tooMuchEvidence.kind === "INVALID_INPUT") {
+      expect(tooMuchEvidence.field).toBe("evidence");
+      expect(tooMuchEvidence.code).toBe("OUT_OF_BOUNDS");
+    }
   });
 
   it("covers billing, semantic email, and tenant-private object ports", async () => {
     const ports = createFakeProviderPorts();
 
-    const checkout = valueOf(
+    const checkout = writeValue(
       await ports.billing.createCheckoutSession(billingCheckoutInputFixture)
     );
     expect(checkout.sessionUrl).toContain("billing.example.test");
 
-    const portal = valueOf(
+    const portal = writeValue(
       await ports.billing.createPortalSession(billingPortalInputFixture)
     );
     expect(portal.sessionUrl).toContain("billing.example.test");
 
-    const subscription = valueOf(
+    const subscription = readValue(
       await ports.billing.readCurrentSubscription(
         billingSubscriptionInputFixture
       )
     );
     expect(subscription.status).toBe("ACTIVE");
 
-    const verified = valueOf(
+    const verified = readValue(
       await ports.billing.verifyWebhookSignature(
         billingSignatureVerificationInputFixture
       )
     );
     expect(verified.eventId).toBe("billing_event_demo");
 
-    const email = valueOf(await ports.email.send(emailDeliveryInputFixture));
+    const email = writeValue(await ports.email.send(emailDeliveryInputFixture));
     expect(email.deliveryIdentity).toBe("notification_reply_demo_1");
 
-    const object = valueOf(
+    const object = writeValue(
       await ports.objects.putPrivateObject(privateObjectInputFixture)
     );
     expect(object.tenantId).toBe("tenant_demo");
 
-    const presigned = valueOf(
+    const presigned = readValue(
       await ports.objects.createPresignedRead(presignedReadInputFixture)
     );
     expect(presigned.method).toBe("GET");

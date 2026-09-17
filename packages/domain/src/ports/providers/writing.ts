@@ -29,6 +29,7 @@ export type WritingInput = Readonly<{
 }>;
 
 export type WritingResult = Readonly<{
+  finishReason: "COMPLETE" | "TRUNCATED";
   modelVersion: ModelVersion;
   observedAt: UtcTimestamp;
   text: string;

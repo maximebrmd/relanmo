@@ -8,7 +8,6 @@ import type {
   ProviderName,
   ProviderOperationContext,
   ProviderReadResult,
-  ProviderResult,
   ProviderWriteResult,
 } from "./common";
 import {
@@ -24,6 +23,7 @@ import type { TypeSafeDecisionInput, TypeSafeDecisionPort } from "./decisions";
 import type { EmailDeliveryInput, EmailPort } from "./email";
 import type {
   ProviderEventDedupeInput,
+  ProviderEventDedupeIdentity,
   ProviderEventNormalizationInput,
   ProviderEventPort,
   ProviderEventAuthenticationInput,
@@ -45,6 +45,7 @@ import {
   providerEventAuthenticationFixture,
   providerEventDedupeIdentityFixture,
   providerEventNormalizationFixture,
+  normalizedIncomingProviderEventFixture,
   typeSafeDecisionFixture,
   writingResultFixture,
   emailDeliveryFixture,
@@ -248,12 +249,135 @@ function writeFailure<Value>(
 function eventFailure<Value>(
   context: ProviderOperationContext,
   scenario: FakeFailureScenario
-): ProviderResult<Value> | null {
+): ProviderReadResult<Value> | null {
   const read = readFailure<Value>(context, scenario, "LINKEDIN");
   if (read) {
     return read;
   }
   return null;
+}
+
+function scopedAccountStatus(input: LinkedInAccountStatusInput) {
+  return {
+    ...linkedInAccountStatusFixture,
+    account: input.account,
+  };
+}
+
+function scopedConversationPage(input: LinkedInConversationInput) {
+  return {
+    ...linkedInConversationPageFixture,
+    messages: linkedInConversationPageFixture.messages.map((message) => ({
+      ...message,
+      accountId: input.account.accountId,
+      conversationId: input.conversationId ?? message.conversationId,
+      prospectId: input.prospectId,
+      tenantId: input.account.tenantId,
+    })),
+  };
+}
+
+function scopedEventNormalization(input: ProviderEventNormalizationInput) {
+  const event = normalizedIncomingProviderEventFixture;
+  return {
+    ...providerEventNormalizationFixture,
+    event: {
+      ...event,
+      message: {
+        ...event.message,
+        accountId: input.scope.accountId,
+        conversationId:
+          input.scope.conversationId ?? event.message.conversationId,
+        prospectId: input.scope.prospectId ?? event.message.prospectId,
+        tenantId: input.scope.tenantId,
+      },
+      scope: input.scope,
+    },
+  };
+}
+
+function scopedDedupeIdentity(input: ProviderEventDedupeInput) {
+  const { event } = input;
+  const { providerEventId } = event;
+  const source: ProviderEventDedupeIdentity["source"] = providerEventId
+    ? "PROVIDER_EVENT_ID"
+    : "CANONICAL_PAYLOAD";
+  const eventPart = providerEventId ?? event.kind;
+  return {
+    ...providerEventDedupeIdentityFixture,
+    dedupeKey: `${event.scope.tenantId}:${event.scope.accountId}:${eventPart}`,
+    eventKind: event.kind,
+    providerEventId,
+    scope: event.scope,
+    source,
+  };
+}
+
+function scopedProfile(input: LinkedInReadProfileInput) {
+  return {
+    ...linkedInProfileFixture,
+    providerProfileId: input.providerProfileId,
+  };
+}
+
+function scopedInviteReceipt(input: LinkedInInviteInput) {
+  const providerInvitationId = `fixture_invitation_${input.account.accountId}_${input.prospectId}`;
+  return {
+    ...linkedInInviteReceiptFixture,
+    providerEvidence: {
+      ...linkedInInviteReceiptFixture.providerEvidence,
+      reference: providerInvitationId,
+    },
+    providerInvitationId,
+  };
+}
+
+function scopedMessageReceipt(input: LinkedInSendMessageInput) {
+  const providerMessageId = `fixture_message_${input.account.accountId}_${input.prospectId}_${input.step}`;
+  return {
+    ...linkedInMessageReceiptFixture,
+    providerEvidence: {
+      ...linkedInMessageReceiptFixture.providerEvidence,
+      reference: providerMessageId,
+    },
+    providerMessageId,
+  };
+}
+
+function scopedBillingSubscription(
+  input: Parameters<BillingPort["readCurrentSubscription"]>[0]
+) {
+  return {
+    ...billingSubscriptionFixture,
+    tenantId: input.customer.tenantId,
+  };
+}
+
+function scopedEmailDelivery(input: EmailDeliveryInput) {
+  return {
+    ...emailDeliveryFixture,
+    deliveryIdentity: input.deliveryIdentity,
+    providerMessageId: `fixture_email_${input.deliveryIdentity}`,
+  };
+}
+
+function scopedPrivateObject(input: PrivateObjectInput) {
+  return {
+    ...privateObjectFixture,
+    contentType: input.contentType,
+    key: input.key,
+    sizeBytes: input.content.byteLength,
+    tenantId: input.tenantId,
+  };
+}
+
+function scopedPresignedRead(input: PresignedReadInput) {
+  return {
+    ...presignedReadOperationFixture,
+    key: input.key,
+    tenantId: input.tenantId,
+    url: `https://objects.example.test/presigned/${input.tenantId}/${input.key.relativeKey}`,
+  };
 }
 
 export class FakeLinkedInPorts
@@ -271,7 +395,7 @@ export class FakeLinkedInPorts
 
   async authenticate(
     input: ProviderEventAuthenticationInput
-  ): Promise<ProviderResult<typeof providerEventAuthenticationFixture>> {
+  ): Promise<ProviderReadResult<typeof providerEventAuthenticationFixture>> {
     const invalid = invalidIf(
       input.rawBody.trim().length === 0,
       input.context,
@@ -311,7 +435,10 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInHostedFlowFixture);
+    return providerSuccess(input.context, {
+      ...linkedInHostedFlowFixture,
+      flowReference: `fixture_flow_${input.opaqueState}`,
+    });
   }
 
   async createReconnectFlow(
@@ -336,13 +463,14 @@ export class FakeLinkedInPorts
     }
     return providerSuccess(input.context, {
       ...linkedInHostedFlowFixture,
+      flowReference: `fixture_flow_${input.opaqueState}`,
       mode: "RECONNECT",
     });
   }
 
   async deriveDedupeIdentity(
     input: ProviderEventDedupeInput
-  ): Promise<ProviderResult<typeof providerEventDedupeIdentityFixture>> {
+  ): Promise<ProviderReadResult<typeof providerEventDedupeIdentityFixture>> {
     const failure = eventFailure<typeof providerEventDedupeIdentityFixture>(
       input.context,
       this.#scenario
@@ -350,7 +478,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, providerEventDedupeIdentityFixture);
+    return providerSuccess(input.context, scopedDedupeIdentity(input));
   }
 
   async inspectAcceptance(
@@ -387,12 +515,12 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInInviteReceiptFixture);
+    return providerSuccess(input.context, scopedInviteReceipt(input));
   }
 
   async normalize(
     input: ProviderEventNormalizationInput
-  ): Promise<ProviderResult<typeof providerEventNormalizationFixture>> {
+  ): Promise<ProviderReadResult<typeof providerEventNormalizationFixture>> {
     const invalid = invalidIf(
       input.rawBody.trim().length === 0,
       input.context,
@@ -409,7 +537,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, providerEventNormalizationFixture);
+    return providerSuccess(input.context, scopedEventNormalization(input));
   }
 
   async readAccountCapabilities(
@@ -440,7 +568,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInAccountStatusFixture);
+    return providerSuccess(input.context, scopedAccountStatus(input));
   }
 
   async readProfile(
@@ -463,7 +591,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInProfileFixture);
+    return providerSuccess(input.context, scopedProfile(input));
   }
 
   async readRecentConversation(
@@ -486,7 +614,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInConversationPageFixture);
+    return providerSuccess(input.context, scopedConversationPage(input));
   }
 
   async searchCandidates(
@@ -532,7 +660,7 @@ export class FakeLinkedInPorts
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, linkedInMessageReceiptFixture);
+    return providerSuccess(input.context, scopedMessageReceipt(input));
   }
 }
 
@@ -563,23 +691,73 @@ export class FakeModelPorts implements TypeSafeDecisionPort, WritingPort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, writingResultFixture);
+    const outputTokens = Math.min(
+      writingResultFixture.usage.outputTokens,
+      input.outputBudget.maxTokens
+    );
+    const tokenBoundCharacters =
+      outputTokens >= writingResultFixture.usage.outputTokens
+        ? writingResultFixture.text.length
+        : Math.max(
+            1,
+            Math.floor(
+              (writingResultFixture.text.length * outputTokens) /
+                writingResultFixture.usage.outputTokens
+            )
+          );
+    const text = writingResultFixture.text.slice(
+      0,
+      Math.min(input.outputBudget.maxCharacters, tokenBoundCharacters)
+    );
+    const truncated =
+      text.length < writingResultFixture.text.length ||
+      outputTokens < writingResultFixture.usage.outputTokens;
+    return providerSuccess(input.context, {
+      ...writingResultFixture,
+      finishReason: truncated ? "TRUNCATED" : "COMPLETE",
+      modelVersion: input.sourceVersions.model,
+      text,
+      usage: {
+        ...writingResultFixture.usage,
+        outputTokens,
+        totalTokens: writingResultFixture.usage.inputTokens + outputTokens,
+      },
+    });
   }
 
   async decide(
     input: TypeSafeDecisionInput
   ): Promise<ProviderReadResult<typeof typeSafeDecisionFixture>> {
-    const invalid = invalidIf(
-      input.question.choices.length === 0 ||
-        input.question.choices.length > TYPESAFE_LIMITS.maxQuestionChoices ||
-        input.question.prompt.length > TYPESAFE_LIMITS.maxPromptCharacters ||
-        input.evidence.length > TYPESAFE_LIMITS.maxEvidence,
-      input.context,
-      "question.choices",
-      "question must contain at least one choice"
-    );
-    if (invalid) {
-      return invalid;
+    if (input.question.choices.length === 0) {
+      return providerInvalidInput(
+        input.context,
+        "question.choices",
+        "question must contain at least one choice"
+      );
+    }
+    if (input.question.choices.length > TYPESAFE_LIMITS.maxQuestionChoices) {
+      return providerInvalidInput(
+        input.context,
+        "question.choices",
+        `question cannot contain more than ${TYPESAFE_LIMITS.maxQuestionChoices} choices`,
+        "OUT_OF_BOUNDS"
+      );
+    }
+    if (input.question.prompt.length > TYPESAFE_LIMITS.maxPromptCharacters) {
+      return providerInvalidInput(
+        input.context,
+        "question.prompt",
+        `question prompt cannot exceed ${TYPESAFE_LIMITS.maxPromptCharacters} characters`,
+        "OUT_OF_BOUNDS"
+      );
+    }
+    if (input.evidence.length > TYPESAFE_LIMITS.maxEvidence) {
+      return providerInvalidInput(
+        input.context,
+        "evidence",
+        `evidence cannot contain more than ${TYPESAFE_LIMITS.maxEvidence} items`,
+        "OUT_OF_BOUNDS"
+      );
     }
     const failure = readFailure<typeof typeSafeDecisionFixture>(
       input.context,
@@ -589,7 +767,19 @@ export class FakeModelPorts implements TypeSafeDecisionPort, WritingPort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, typeSafeDecisionFixture);
+    const answer = input.question.choices[0] ?? null;
+    const answerEvidenceIds = input.evidence[0]
+      ? [input.evidence[0].evidenceId]
+      : [];
+    return providerSuccess(input.context, {
+      ...typeSafeDecisionFixture,
+      answer,
+      answerEvidenceIds,
+      modelVersion: input.modelVersion,
+      questionId: input.question.id,
+      schemaVersion: input.question.schemaVersion,
+      uncertainty: answerEvidenceIds.length > 0 ? "LOW" : "HIGH",
+    });
   }
 }
 
@@ -639,7 +829,7 @@ export class FakeBillingPort implements BillingPort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, billingSubscriptionFixture);
+    return providerSuccess(input.context, scopedBillingSubscription(input));
   }
 
   async verifyWebhookSignature(
@@ -693,7 +883,7 @@ export class FakeEmailPort implements EmailPort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, emailDeliveryFixture);
+    return providerSuccess(input.context, scopedEmailDelivery(input));
   }
 }
 
@@ -724,7 +914,7 @@ export class FakeObjectStoragePort implements ObjectStoragePort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, presignedReadOperationFixture);
+    return providerSuccess(input.context, scopedPresignedRead(input));
   }
 
   async putPrivateObject(
@@ -747,7 +937,7 @@ export class FakeObjectStoragePort implements ObjectStoragePort {
     if (failure) {
       return failure;
     }
-    return providerSuccess(input.context, privateObjectFixture);
+    return providerSuccess(input.context, scopedPrivateObject(input));
   }
 }
 

@@ -1,7 +1,12 @@
-import type { AccountId, ProspectId, TenantId } from "../../contracts/ids";
+import type {
+  AccountId,
+  ConversationId,
+  ProspectId,
+  TenantId,
+} from "../../contracts/ids";
 import type { InboundMessage, OutboundMessage } from "../../contracts/message";
 import type { UtcTimestamp } from "../../contracts/values";
-import type { ProviderOperationContext, ProviderResult } from "./common";
+import type { ProviderOperationContext, ProviderReadResult } from "./common";
 import type {
   LinkedInCapabilities,
   LinkedInHealth,
@@ -29,6 +34,8 @@ export type ProviderEventAuthentication = Readonly<{
 
 export type ProviderEventScope = Readonly<{
   accountId: AccountId;
+  conversationId: ConversationId | null;
+  prospectId: ProspectId | null;
   tenantId: TenantId;
 }>;
 
@@ -114,11 +121,11 @@ export type ProviderEventDedupeIdentity = Readonly<{
 export type ProviderEventPort = Readonly<{
   authenticate: (
     input: ProviderEventAuthenticationInput
-  ) => Promise<ProviderResult<ProviderEventAuthentication>>;
+  ) => Promise<ProviderReadResult<ProviderEventAuthentication>>;
   deriveDedupeIdentity: (
     input: ProviderEventDedupeInput
-  ) => Promise<ProviderResult<ProviderEventDedupeIdentity>>;
+  ) => Promise<ProviderReadResult<ProviderEventDedupeIdentity>>;
   normalize: (
     input: ProviderEventNormalizationInput
-  ) => Promise<ProviderResult<ProviderEventNormalization>>;
+  ) => Promise<ProviderReadResult<ProviderEventNormalization>>;
 }>;
