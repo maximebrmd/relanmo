@@ -86,6 +86,53 @@ export type InboxEventEnvelope =
   | InboxOutgoingEvent
   | InboxUnrecognizedEvent;
 
+export const INBOX_IDENTITY_FIELDS = [
+  "accountId",
+  "conversationId",
+  "prospectId",
+  "tenantId",
+] as const;
+export type InboxIdentityField = (typeof INBOX_IDENTITY_FIELDS)[number];
+
+export type InboxEventScopeValidation =
+  | Readonly<{
+      valid: true;
+    }>
+  | Readonly<{
+      mismatches: readonly InboxIdentityField[];
+      valid: false;
+    }>;
+
+/**
+ * Normalized message envelopes must repeat the exact message identity in
+ * scope. Unrecognized envelopes have no normalized message to compare.
+ */
+export function validateInboxEventScope(
+  event: InboxEventEnvelope
+): InboxEventScopeValidation {
+  if (event.kind === "UNRECOGNIZED") {
+    return { valid: true };
+  }
+
+  const mismatches: InboxIdentityField[] = [];
+  if (event.scope.accountId !== event.message.accountId) {
+    mismatches.push("accountId");
+  }
+  if (event.scope.conversationId !== event.message.conversationId) {
+    mismatches.push("conversationId");
+  }
+  if (event.scope.prospectId !== event.message.prospectId) {
+    mismatches.push("prospectId");
+  }
+  if (event.scope.tenantId !== event.message.tenantId) {
+    mismatches.push("tenantId");
+  }
+
+  return mismatches.length === 0
+    ? { valid: true }
+    : { mismatches, valid: false };
+}
+
 export type InboxProcessingLease = Readonly<{
   expiresAt: UtcTimestamp;
   fence: number;
@@ -129,17 +176,31 @@ export type RecordInboxEventResult =
 export type QuarantineInboxEventInput = Readonly<{
   event: InboxEventEnvelope;
   eventId: InboxEventId;
-  reason: "MALFORMED" | "UNKNOWN_MAPPING" | "TENANT_MISMATCH";
+  reason:
+    | "IDENTITY_MISMATCH"
+    | "MALFORMED"
+    | "UNKNOWN_MAPPING"
+    | "TENANT_MISMATCH";
   tenantId: TenantId;
 }>;
 
-export type QuarantineInboxEventResult = Readonly<{
-  accountId: AccountId | null;
-  event: InboxEventRecord;
-  holdAccount: boolean;
-  outcome: "QUARANTINED";
-  reason: QuarantineInboxEventInput["reason"];
-}>;
+/** A known affected account can never be quarantined without a hold. */
+export type QuarantineAccountOutcome =
+  | Readonly<{
+      accountId: AccountId;
+      holdAccount: true;
+    }>
+  | Readonly<{
+      accountId: null;
+      holdAccount: false;
+    }>;
+
+export type QuarantineInboxEventResult = QuarantineAccountOutcome &
+  Readonly<{
+    event: InboxEventRecord;
+    outcome: "QUARANTINED";
+    reason: QuarantineInboxEventInput["reason"];
+  }>;
 
 export type ClaimInboxInput = Readonly<{
   leaseExpiresAt: UtcTimestamp;
@@ -189,7 +250,12 @@ export type ListInboxDeadLettersResult = Readonly<{
   events: readonly InboxEventRecord[];
 }>;
 
-/** Inbox persistence is a durable first step; no model classification belongs in this port. */
+/**
+ * Inbox persistence is a durable first step; no model classification belongs
+ * in this port. Implementations validate normalized scope/message identity
+ * before state changes and commit quarantine plus a known-account hold
+ * atomically.
+ */
 export interface InboxRepository {
   acknowledge: (
     input: AcknowledgeInboxInput,
@@ -419,14 +485,13 @@ export type AtomicReplyStopResult =
       Readonly<{
         outcome: "DUPLICATE";
       }>)
-  | Readonly<{
-      accountId: AccountId | null;
-      event: InboxEventRecord | null;
-      holdAccount: true;
-      outboxEvents: readonly OutboxEventRecord[];
-      outcome: "QUARANTINED";
-      reason: "MALFORMED" | "UNKNOWN_MAPPING" | "TENANT_MISMATCH";
-    }>;
+  | (QuarantineAccountOutcome &
+      Readonly<{
+        event: InboxEventRecord;
+        outboxEvents: readonly OutboxEventRecord[];
+        outcome: "QUARANTINED";
+        reason: QuarantineInboxEventInput["reason"];
+      }>);
 
 export type ManualTakeoverInput = Readonly<{
   event: InboxOutgoingEvent;
@@ -478,17 +543,26 @@ export type ManualTakeoverResult =
         | "BOT_ECHO_CONFIRMED"
         | "HELD_FOR_RECONCILIATION"
         | "TAKEN_OVER";
-    }>;
+    }>
+  | (QuarantineAccountOutcome &
+      Readonly<{
+        event: InboxEventRecord;
+        outcome: "QUARANTINED";
+        reason: QuarantineInboxEventInput["reason"];
+      }>);
 
 /**
  * The two control operations are aggregate transaction boundaries. They must
- * persist the durable envelope/inbox row, message, pair ownership,
+ * validate envelope/message identity, then persist the durable envelope/inbox
+ * row, message, pair ownership,
  * READY invalidation and outbox rows together; after a committed stop,
  * authorization cannot create IN_FLIGHT work. An outgoing provider event is
  * matched against the ledger inside this same transaction: exact matches are
  * bot echoes, unmatched owner messages take the pair over, and inconclusive
- * matches hold the account for reconciliation. Re-delivery returns DUPLICATE
- * after the first decision instead of repeating the side effects.
+ * matches hold the account for reconciliation. A scope mismatch is
+ * quarantined with the known-account hold instead of choosing an identity.
+ * Re-delivery returns DUPLICATE after the first decision instead of repeating
+ * the side effects.
  */
 export interface AtomicReplyStopRepository {
   recordManualTakeover: (

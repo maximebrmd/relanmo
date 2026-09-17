@@ -86,11 +86,14 @@ import type {
   InboxOutgoingEvent,
   InboxUnrecognizedEvent,
   ManualTakeoverResult,
+  QuarantineAccountOutcome,
   QuarantineInboxEventResult,
   RecordInboxEventResult,
   WorkflowStopOutboxEvent,
 } from "./events";
+import { validateInboxEventScope } from "./events";
 import type {
+  ClaimBotEligibilityInput,
   ClaimBotEligibilityResult,
   PairOwnershipRecord,
 } from "./prospects";
@@ -99,7 +102,10 @@ const timestamp = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const tenantId = parseTenantId("tenant_demo");
 const otherTenantId = parseTenantId("tenant_other");
 const accountId = parseAccountId("account_demo");
+const otherAccountId = parseAccountId("account_other");
+const otherConversationId = parseConversationId("conversation_other");
 const prospectId = parseProspectId("prospect_demo");
+const otherProspectId = parseProspectId("prospect_other");
 
 function testPersistenceId<Id extends string>(value: string): Id {
   // SAFETY: Synthetic test IDs are deliberately scoped to this fixture and never reach production storage.
@@ -189,6 +195,22 @@ const pairOwnership: PairOwnershipRecord = {
     tenantId,
   }),
   revision: 2,
+  updatedAt: timestamp,
+};
+
+const firstClaimOwnership: PairOwnershipRecord = {
+  accountProspect: parseAccountProspectOwnership({
+    accountId,
+    ownership: {
+      kind: "BOT_ELIGIBLE",
+      ownerUserId: null,
+      reason: "INITIAL_ACTIVATION",
+      recordedAt: timestamp,
+    },
+    prospectId,
+    tenantId,
+  }),
+  revision: 1,
   updatedAt: timestamp,
 };
 
@@ -503,6 +525,36 @@ describe("persistence identity and revision contracts", () => {
     );
   });
 
+  it("represents the concurrent first-claim race from a null expected revision", () => {
+    const firstClaimInput: ClaimBotEligibilityInput = {
+      accountId,
+      campaignId: parseCampaignId("campaign_alpha"),
+      expectedRevision: null,
+      prospectId,
+      recordedAt: timestamp,
+      tenantId,
+    };
+    const secondClaimInput = {
+      ...firstClaimInput,
+      campaignId: parseCampaignId("campaign_beta"),
+    } satisfies ClaimBotEligibilityInput;
+    const firstClaim: ClaimBotEligibilityResult = {
+      outcome: "CLAIMED",
+      ownership: firstClaimOwnership,
+    };
+    const secondClaim: ClaimBotEligibilityResult = {
+      current: firstClaimOwnership,
+      expectedRevision: secondClaimInput.expectedRevision,
+      outcome: "REVISION_CONFLICT",
+    };
+
+    expect(firstClaimInput.expectedRevision).toBeNull();
+    expect(secondClaimInput.expectedRevision).toBeNull();
+    expect(firstClaim.outcome).toBe("CLAIMED");
+    expect(secondClaim.current.revision).toBe(1);
+    expect(secondClaim.expectedRevision).toBeNull();
+  });
+
   it("uses the same current-version guard for optimistic mutation and authorization", () => {
     const {
       snapshot: {
@@ -598,6 +650,73 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       "canonical-unrecognized-event-1"
     );
     expect(result.holdAccount).toBe(true);
+  });
+
+  it("quarantines every normalized scope/message identity mismatch", () => {
+    const mismatchedAccount: InboxIncomingEvent = {
+      ...incomingInboxEvent,
+      scope: { ...incomingInboxEvent.scope, accountId: otherAccountId },
+    };
+    const mismatchedProspect: InboxIncomingEvent = {
+      ...incomingInboxEvent,
+      scope: { ...incomingInboxEvent.scope, prospectId: otherProspectId },
+    };
+    const mismatchedConversation: InboxIncomingEvent = {
+      ...incomingInboxEvent,
+      scope: {
+        ...incomingInboxEvent.scope,
+        conversationId: otherConversationId,
+      },
+    };
+    const mismatchedOutgoing: InboxOutgoingEvent = {
+      ...outgoingInboxEvent,
+      scope: { ...outgoingInboxEvent.scope, prospectId: otherProspectId },
+    };
+    const mismatchCases = [
+      { event: mismatchedAccount, field: "accountId" },
+      { event: mismatchedProspect, field: "prospectId" },
+      { event: mismatchedConversation, field: "conversationId" },
+    ] as const;
+
+    for (const { event, field } of mismatchCases) {
+      const validation = validateInboxEventScope(event);
+      expect(validation.valid).toBe(false);
+      if (validation.valid) {
+        continue;
+      }
+      expect(validation.mismatches).toContain(field);
+    }
+
+    const quarantined: QuarantineInboxEventResult = {
+      accountId,
+      event: {
+        ...inboxEvent,
+        event: mismatchedAccount,
+        processedAt: null,
+        quarantinedAt: timestamp,
+        state: "QUARANTINED",
+      },
+      holdAccount: true,
+      outcome: "QUARANTINED",
+      reason: "IDENTITY_MISMATCH",
+    };
+    const noKnownAccount: QuarantineAccountOutcome = {
+      accountId: null,
+      holdAccount: false,
+    };
+    const manualQuarantine: ManualTakeoverResult = {
+      accountId,
+      event: { ...outgoingInboxRecord, event: mismatchedOutgoing },
+      holdAccount: true,
+      outcome: "QUARANTINED",
+      reason: "IDENTITY_MISMATCH",
+    };
+
+    expect(quarantined.reason).toBe("IDENTITY_MISMATCH");
+    expect(quarantined.accountId).toBe(accountId);
+    expect(quarantined.holdAccount).toBe(true);
+    expect(noKnownAccount.holdAccount).toBe(false);
+    expect(manualQuarantine.outcome).toBe("QUARANTINED");
   });
 
   it("makes bot echoes, owner takeovers and inconclusive matches distinct", () => {

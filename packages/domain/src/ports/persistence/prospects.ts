@@ -197,6 +197,7 @@ export type GetPairOwnershipResult = Readonly<{
   ownership: PairOwnershipRecord | null;
 }>;
 
+/** `null` is the compare-and-set expectation that no ownership row exists. */
 export type ClaimBotEligibilityInput = Readonly<{
   accountId: AccountId;
   campaignId: CampaignId;
@@ -217,7 +218,7 @@ export type ClaimBotEligibilityResult =
     }>
   | Readonly<{
       current: PairOwnershipRecord;
-      expectedRevision: number;
+      expectedRevision: number | null;
       outcome: "REVISION_CONFLICT";
     }>;
 
