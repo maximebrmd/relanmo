@@ -335,6 +335,27 @@ describe("domain contract fixtures", () => {
         step: "DM1",
       })
     ).toThrow();
+    expect(() =>
+      parseDuePlan({
+        businessTimeZone: "Europe/Paris",
+        businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+        closureAt: "2026-09-18T10:00:00.000Z",
+        earliestAt: "2026-09-17T10:00:00.000Z",
+        intendedAt: "2026-09-19T10:00:00.000Z",
+        step: "DM1",
+      })
+    ).toThrow();
+
+    const delayedPlan = parseDuePlan({
+      businessTimeZone: "Europe/Paris",
+      businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
+      closureAt: "2026-09-20T10:00:00.000Z",
+      earliestAt: "2026-09-18T10:00:00.000Z",
+      intendedAt: "2026-09-17T10:00:00.000Z",
+      step: "DM1",
+    });
+    expect(delayedPlan.intendedAt).toBe("2026-09-17T10:00:00.000Z");
+    expect(delayedPlan.earliestAt).toBe("2026-09-18T10:00:00.000Z");
   });
 
   it("rejects contradictory ownership reasons and campaign version snapshots", () => {

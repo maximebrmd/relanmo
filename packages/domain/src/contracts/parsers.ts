@@ -1129,6 +1129,12 @@ export function parseDuePlan(value: unknown): DuePlan {
     parseUtcTimestamp
   );
   const earliestAt = parseUtcTimestamp(readRequired(record, "earliestAt"));
+  const intendedAt = parseUtcTimestamp(readRequired(record, "intendedAt"));
+  if (earliestAt < intendedAt) {
+    throw new ContractValidationError(
+      "duePlan earliest opportunity cannot precede its intended target"
+    );
+  }
   if (closureAt !== null && closureAt < earliestAt) {
     throw new ContractValidationError(
       "duePlan closure cannot precede the earliest send opportunity"
@@ -1139,7 +1145,7 @@ export function parseDuePlan(value: unknown): DuePlan {
     businessWindow,
     closureAt,
     earliestAt,
-    intendedAt: parseUtcTimestamp(readRequired(record, "intendedAt")),
+    intendedAt,
     step: parseSequenceStep(readRequired(record, "step")),
   });
 }
