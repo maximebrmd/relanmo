@@ -141,6 +141,17 @@ function invalidIf(
   return condition ? providerInvalidInput(context, field, message) : null;
 }
 
+function fingerprintPayload(payload: string): string {
+  let hash = 14_695_981_039_346_656_037n;
+  const modulus = 18_446_744_073_709_551_616n;
+  const multiplier = 1_099_511_628_211n;
+  for (const character of payload) {
+    hash =
+      (hash * multiplier + BigInt(character.codePointAt(0) ?? 0)) % modulus;
+  }
+  return `stable64:${hash.toString(16).padStart(16, "0")}`;
+}
+
 function readFailure<Value>(
   context: ProviderOperationContext,
   scenario: FakeFailureScenario,
@@ -311,6 +322,7 @@ function canonicalEventPayload(event: NormalizedProviderEvent): string {
     }
     case "UNRECOGNIZED": {
       return JSON.stringify({
+        canonicalPayloadFingerprint: event.canonicalPayloadFingerprint,
         kind: event.kind,
         observedAt: event.observedAt,
       });
@@ -331,11 +343,13 @@ function scopedEventNormalization(input: ProviderEventNormalizationInput) {
       }
     : null;
   const { conversationId, prospectId } = scope;
+  const canonicalPayloadFingerprint = fingerprintPayload(input.rawBody);
 
   if (conversationId === null || prospectId === null) {
     return {
       ...providerEventNormalizationFixture,
       event: {
+        canonicalPayloadFingerprint,
         kind: "UNRECOGNIZED" as const,
         observedAt: normalizedIncomingProviderEventFixture.occurredAt,
         providerEventId,

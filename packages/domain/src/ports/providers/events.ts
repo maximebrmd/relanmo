@@ -82,6 +82,8 @@ export type ProviderAccountStatusEvent = Readonly<{
 }>;
 
 export type ProviderUnrecognizedEvent = Readonly<{
+  /** A stable, non-secret fingerprint of the canonical provider payload. */
+  canonicalPayloadFingerprint: string;
   kind: "UNRECOGNIZED";
   observedAt: UtcTimestamp;
   providerEventId: string | null;

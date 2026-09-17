@@ -316,6 +316,79 @@ describe("provider port contracts", () => {
     expect(normalized.event.providerEventId).toBe(providerEventId);
     expect(normalized.evidence?.reference).toBe(providerEventId);
 
+    const unknownAuthenticated = {
+      ...providerEventAuthenticationFixture,
+      authenticationReference: "authentication_unknown_1",
+      providerEventId: null,
+    };
+    const unknownRawBody = '{"unknown":"payload-a"}';
+    const firstUnknown = readValue(
+      await ports.events.normalize({
+        authenticated: unknownAuthenticated,
+        context: providerOperationContextFixture,
+        rawBody: unknownRawBody,
+        scope: unresolvedScope,
+      })
+    );
+    const replayUnknown = readValue(
+      await ports.events.normalize({
+        authenticated: {
+          ...unknownAuthenticated,
+          authenticationReference: "authentication_unknown_replay",
+        },
+        context: providerOperationContextFixture,
+        rawBody: unknownRawBody,
+        scope: unresolvedScope,
+      })
+    );
+    const distinctUnknown = readValue(
+      await ports.events.normalize({
+        authenticated: {
+          ...unknownAuthenticated,
+          authenticationReference: "authentication_unknown_2",
+        },
+        context: providerOperationContextFixture,
+        rawBody: '{"unknown":"payload-b"}',
+        scope: unresolvedScope,
+      })
+    );
+    if (
+      firstUnknown.event.kind !== "UNRECOGNIZED" ||
+      replayUnknown.event.kind !== "UNRECOGNIZED" ||
+      distinctUnknown.event.kind !== "UNRECOGNIZED"
+    ) {
+      throw new Error("expected unknown provider events to be quarantined");
+    }
+    expect(firstUnknown.event.canonicalPayloadFingerprint).toBe(
+      replayUnknown.event.canonicalPayloadFingerprint
+    );
+    expect(firstUnknown.event.canonicalPayloadFingerprint).not.toBe(
+      distinctUnknown.event.canonicalPayloadFingerprint
+    );
+
+    const firstUnknownDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: firstUnknown.event,
+      })
+    );
+    const replayUnknownDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: replayUnknown.event,
+      })
+    );
+    const distinctUnknownDedupe = readValue(
+      await ports.events.deriveDedupeIdentity({
+        context: providerOperationContextFixture,
+        event: distinctUnknown.event,
+      })
+    );
+    expect(replayUnknownDedupe.dedupeKey).toBe(firstUnknownDedupe.dedupeKey);
+    expect(distinctUnknownDedupe.dedupeKey).not.toBe(
+      firstUnknownDedupe.dedupeKey
+    );
+
     const firstEvent = {
       ...normalizedIncomingProviderEventFixture,
       occurredAt: parseUtcTimestamp("2026-09-17T10:00:00.000Z"),
