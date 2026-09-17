@@ -5,7 +5,7 @@ import {
   expectString,
   isMember,
   parseOpaqueString,
-} from "./runtime.js";
+} from "./runtime";
 
 export type Brand<Value, Name extends string> = Value & {
   readonly __brand: Name;

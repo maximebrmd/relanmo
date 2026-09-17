@@ -1,17 +1,17 @@
-import type { Action, InvitationActionPayload } from "./action.js";
-import { parseCampaignId } from "./ids.js";
-import type { CampaignId } from "./ids.js";
-import type { IncomingMessageEvent, Message } from "./message.js";
-import type { AccountProspectOwnership, Ownership } from "./ownership.js";
+import type { Action, InvitationActionPayload } from "./action";
+import { parseCampaignId } from "./ids";
+import type { CampaignId } from "./ids";
+import type { IncomingMessageEvent, Message } from "./message";
+import type { AccountProspectOwnership, Ownership } from "./ownership";
 import {
   parseAccountProspectOwnership,
   parseAction,
   parseIncomingMessageEvent,
   parseMessage,
   parseOwnership,
-} from "./parsers.js";
-import type { DefaultSequencePlan } from "./values.js";
-import { DEFAULT_SEQUENCE_PLAN } from "./values.js";
+} from "./parsers";
+import type { DefaultSequencePlan } from "./values";
+import { DEFAULT_SEQUENCE_PLAN } from "./values";
 
 const FIXTURE_TIME = "2026-09-17T10:00:00.000Z";
 const SOURCE_VERSIONS = {

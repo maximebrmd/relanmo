@@ -4,8 +4,8 @@ import type {
   MessageId,
   ProspectId,
   TenantId,
-} from "./ids.js";
-import type { UtcTimestamp } from "./values.js";
+} from "./ids";
+import type { UtcTimestamp } from "./values";
 
 export const ATTACHMENT_KINDS = [
   "IMAGE",

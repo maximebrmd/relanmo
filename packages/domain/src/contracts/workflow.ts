@@ -1,5 +1,5 @@
-import type { ActionUnknownReason } from "./action.js";
-import type { EligibilityReasonCode } from "./eligibility.js";
+import type { ActionUnknownReason } from "./action";
+import type { EligibilityReasonCode } from "./eligibility";
 import type {
   AccountId,
   ActionId,
@@ -12,15 +12,11 @@ import type {
   ProspectId,
   TenantId,
   WorkflowId,
-} from "./ids.js";
-import { parseWorkflowId } from "./ids.js";
-import type { Ownership, OwnershipReason } from "./ownership.js";
-import { ContractValidationError } from "./runtime.js";
-import type {
-  DirectMessageStep,
-  SequenceStep,
-  UtcTimestamp,
-} from "./values.js";
+} from "./ids";
+import { parseWorkflowId } from "./ids";
+import type { Ownership, OwnershipReason } from "./ownership";
+import { ContractValidationError } from "./runtime";
+import type { DirectMessageStep, SequenceStep, UtcTimestamp } from "./values";
 
 export const WORKFLOW_ID_PREFIX = "rlm1" as const;
 

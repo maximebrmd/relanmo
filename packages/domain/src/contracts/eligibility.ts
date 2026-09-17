@@ -4,9 +4,9 @@ import type {
   ProspectId,
   TenantId,
   VersionId,
-} from "./ids.js";
-import type { Ownership, SuppressionEntry } from "./ownership.js";
-import type { UtcTimestamp, SequenceStep } from "./values.js";
+} from "./ids";
+import type { Ownership, SuppressionEntry } from "./ownership";
+import type { UtcTimestamp, SequenceStep } from "./values";
 
 export const ELIGIBILITY_REASON_CODES = [
   "INCOMING_MESSAGE",

@@ -4,7 +4,7 @@ import {
   ACTION_FAILURE_REASONS,
   ACTION_STATES,
   ACTION_UNKNOWN_REASONS,
-} from "./action.js";
+} from "./action";
 import type {
   Action,
   ActionFailureReason,
@@ -14,21 +14,18 @@ import type {
   ActionLifecycleEvent,
   ActionPayload,
   ActionUnknownReason,
-} from "./action.js";
-import type { DuePlan } from "./due-plan.js";
-import {
-  ELIGIBILITY_OUTCOMES,
-  ELIGIBILITY_REASON_CODES,
-} from "./eligibility.js";
+} from "./action";
+import type { DuePlan } from "./due-plan";
+import { ELIGIBILITY_OUTCOMES, ELIGIBILITY_REASON_CODES } from "./eligibility";
 import type {
   EligibilityCheck,
   EligibilityReason,
   EligibilityReasonCode,
   EligibilityResult,
   EligibilitySnapshot,
-} from "./eligibility.js";
-import { EVIDENCE_PROVENANCE } from "./evidence.js";
-import type { Evidence, EvidenceProvenance } from "./evidence.js";
+} from "./eligibility";
+import { EVIDENCE_PROVENANCE } from "./evidence";
+import type { Evidence, EvidenceProvenance } from "./evidence";
 import {
   parseAccountId,
   parseActionId,
@@ -46,30 +43,30 @@ import {
   parseUserId,
   parseVersionId,
   parseWorkflowId,
-} from "./ids.js";
+} from "./ids";
 import {
   ATTACHMENT_KINDS,
   MESSAGE_DIRECTIONS,
   MESSAGE_SOURCES,
-} from "./message.js";
+} from "./message";
 import type {
   Attachment,
   IncomingMessageEvent,
   Message,
   MessageBase,
-} from "./message.js";
+} from "./message";
 import {
   OWNERSHIP_KINDS,
   OWNERSHIP_REASONS,
   SUPPRESSION_REASONS,
-} from "./ownership.js";
+} from "./ownership";
 import type {
   AccountProspectOwnership,
   Ownership,
   OwnershipReason,
   SuppressionEntry,
   SuppressionReason,
-} from "./ownership.js";
+} from "./ownership";
 import {
   ContractValidationError,
   expectArrayOf,
@@ -84,20 +81,16 @@ import {
   isNull,
   readRequired,
   safeParse,
-} from "./runtime.js";
-import type { SafeParseResult } from "./runtime.js";
+} from "./runtime";
+import type { SafeParseResult } from "./runtime";
 import {
   parseBusinessTimeZone,
   parseDirectMessageStep,
   parseSequenceStep,
   parseUtcTimestamp,
-} from "./values.js";
-import { VERSION_KINDS } from "./versions.js";
-import type {
-  DraftSourceVersions,
-  VersionKind,
-  VersionRef,
-} from "./versions.js";
+} from "./values";
+import { VERSION_KINDS } from "./versions";
+import type { DraftSourceVersions, VersionKind, VersionRef } from "./versions";
 import {
   OUTBOX_EVENT_KINDS,
   WORKFLOW_ACTIVITY_NAMES,
@@ -105,7 +98,7 @@ import {
   WORKFLOW_SIGNAL_NAMES,
   WORKFLOW_ID_PREFIX,
   WORKFLOW_UNITS,
-} from "./workflow.js";
+} from "./workflow";
 import type {
   DiscoveryQualification,
   WorkflowActivityInput,
@@ -113,7 +106,7 @@ import type {
   WorkflowActivityResult,
   WorkflowIdentity,
   WorkflowSignal,
-} from "./workflow.js";
+} from "./workflow";
 
 function member<const T extends readonly string[]>(
   value: unknown,

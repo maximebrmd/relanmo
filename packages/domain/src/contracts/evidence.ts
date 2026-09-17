@@ -1,5 +1,5 @@
-import type { AccountId, EvidenceId, ProspectId, TenantId } from "./ids.js";
-import type { UtcTimestamp } from "./values.js";
+import type { AccountId, EvidenceId, ProspectId, TenantId } from "./ids";
+import type { UtcTimestamp } from "./values";
 
 export const EVIDENCE_PROVENANCE = [
   "PROVIDER_PROFILE",

@@ -1,4 +1,4 @@
-import type { UtcTimestamp, BusinessTimeZone, SequenceStep } from "./values.js";
+import type { UtcTimestamp, BusinessTimeZone, SequenceStep } from "./values";
 
 export type DuePlan = Readonly<{
   businessTimeZone: BusinessTimeZone;

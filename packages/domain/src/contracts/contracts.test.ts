@@ -8,14 +8,14 @@ import {
   invitationWithoutNoteActionFixture,
   outgoingBotEchoMessageFixture,
   uncertainSendActionFixture,
-} from "./fixtures.js";
+} from "./fixtures";
 import {
   parseAccountId,
   parseBatchId,
   parseCampaignId,
   parseProspectId,
   parseTenantId,
-} from "./ids.js";
+} from "./ids";
 import {
   parseAction,
   parseActionLifecycleEvent,
@@ -30,9 +30,9 @@ import {
   parseWorkflowSignal,
   safeParseAction,
   safeParseMessage,
-} from "./parsers.js";
-import { DEFAULT_SEQUENCE_CLOSURE } from "./values.js";
-import { WORKFLOW_ACTIVITY_NAMES, workflowIdFor } from "./workflow.js";
+} from "./parsers";
+import { DEFAULT_SEQUENCE_CLOSURE } from "./values";
+import { WORKFLOW_ACTIVITY_NAMES, workflowIdFor } from "./workflow";
 
 const timestamp = "2026-09-17T10:00:00.000Z";
 

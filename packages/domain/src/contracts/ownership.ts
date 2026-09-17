@@ -1,5 +1,5 @@
-import type { AccountId, ProspectId, TenantId, UserId } from "./ids.js";
-import type { UtcTimestamp } from "./values.js";
+import type { AccountId, ProspectId, TenantId, UserId } from "./ids";
+import type { UtcTimestamp } from "./values";
 
 export const OWNERSHIP_REASONS = [
   "INITIAL_ACTIVATION",

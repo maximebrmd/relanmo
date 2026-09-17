@@ -7,13 +7,9 @@ import type {
   ProspectId,
   SendAttemptId,
   TenantId,
-} from "./ids.js";
-import type {
-  DirectMessageStep,
-  SequenceStep,
-  UtcTimestamp,
-} from "./values.js";
-import type { DraftSourceVersions } from "./versions.js";
+} from "./ids";
+import type { DirectMessageStep, SequenceStep, UtcTimestamp } from "./values";
+import type { DraftSourceVersions } from "./versions";
 
 export type InvitationActionPayload = Readonly<{
   kind: "INVITATION_WITHOUT_NOTE";

@@ -1,7 +1,7 @@
 /* oxlint-disable anti-slop/no-unknown-parameters -- Value parsers are explicit untrusted-input boundaries. */
 
-import type { Brand } from "./ids.js";
-import { ContractValidationError, expectString, isMember } from "./runtime.js";
+import type { Brand } from "./ids";
+import { ContractValidationError, expectString, isMember } from "./runtime";
 
 export type UtcTimestamp = Brand<string, "UtcTimestamp">;
 

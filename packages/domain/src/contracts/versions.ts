@@ -1,5 +1,5 @@
-import type { ModelVersion, VersionId } from "./ids.js";
-import type { UtcTimestamp } from "./values.js";
+import type { ModelVersion, VersionId } from "./ids";
+import type { UtcTimestamp } from "./values";
 
 export const VERSION_KINDS = [
   "PROFILE",
