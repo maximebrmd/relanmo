@@ -7,6 +7,7 @@ import {
   compareUtcTimestamps,
   laterUtcTimestamp,
   localWallTimeAt,
+  localWallTimeForDate,
 } from "./timezone";
 
 function ts(value: string): UtcTimestamp {
@@ -67,6 +68,36 @@ describe("localWallTimeAt", () => {
       weekday: "MONDAY",
       year: 2026,
     });
+  });
+});
+
+describe("localWallTimeForDate", () => {
+  it("clamps a local wall time inside the spring-forward gap to the transition instant", () => {
+    // 02:30 never occurs on 2026-03-29: Europe/Paris clocks jump straight
+    // from 02:00 to 03:00. The first valid instant at or after 02:30 is
+    // that transition itself, local 03:00 (2026-03-29T01:00:00.000Z UTC).
+    const result = localWallTimeForDate(
+      { day: 29, hour: 2, minute: 30, month: 3, second: 0, year: 2026 },
+      BUSINESS_TIME_ZONE
+    );
+    expect(result).toBe(ts("2026-03-29T01:00:00.000Z"));
+    expect(localWallTimeAt(result, BUSINESS_TIME_ZONE)).toEqual({
+      day: 29,
+      hour: 3,
+      minute: 0,
+      month: 3,
+      second: 0,
+      weekday: "SUNDAY",
+      year: 2026,
+    });
+  });
+
+  it("resolves a local wall time outside any gap exactly", () => {
+    const result = localWallTimeForDate(
+      { day: 21, hour: 9, minute: 15, month: 9, second: 0, year: 2026 },
+      BUSINESS_TIME_ZONE
+    );
+    expect(result).toBe(ts("2026-09-21T07:15:00.000Z"));
   });
 });
 

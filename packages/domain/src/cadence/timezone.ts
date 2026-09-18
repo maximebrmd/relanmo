@@ -126,6 +126,30 @@ export function localWallTimeAt(
   };
 }
 
+/**
+ * Binary-searches the exact instant at which the zone's UTC offset first
+ * becomes `targetOffset`, given a bound already at that offset (`afterMs`)
+ * and a bound still at the prior offset (`beforeMs`).
+ */
+function findOffsetTransitionInstant(
+  beforeMs: number,
+  afterMs: number,
+  timeZone: BusinessTimeZone,
+  targetOffset: number
+): number {
+  let lowMs = beforeMs;
+  let highMs = afterMs;
+  while (highMs - lowMs > 1) {
+    const midMs = lowMs + Math.floor((highMs - lowMs) / 2);
+    if (offsetMinutesAt(midMs, timeZone) === targetOffset) {
+      highMs = midMs;
+    } else {
+      lowMs = midMs;
+    }
+  }
+  return highMs;
+}
+
 function utcInstantForLocalWallTime(
   local: LocalWallTime,
   timeZone: BusinessTimeZone
@@ -144,8 +168,20 @@ function utcInstantForLocalWallTime(
   if (secondOffset === firstOffset) {
     return candidateMs;
   }
-  // The first guess landed on the other side of a DST transition; resolve with
-  // the offset that actually applies at the candidate instant.
+  if (secondOffset < firstOffset) {
+    // The requested local wall-clock time falls inside a spring-forward gap
+    // (a local hour that never occurs). Resolve to the transition instant
+    // itself -- the first valid instant at or after the requested time --
+    // instead of an instant that round-trips to a different local time.
+    return findOffsetTransitionInstant(
+      candidateMs,
+      naiveUtcMs,
+      timeZone,
+      firstOffset
+    );
+  }
+  // Fall-back: the requested local wall-clock time is ambiguous (it occurs
+  // twice). Resolve with the offset that applies at the candidate instant.
   return naiveUtcMs - secondOffset * 60_000;
 }
 

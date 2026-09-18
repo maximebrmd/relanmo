@@ -97,12 +97,12 @@ describe("nextPermittedInstant", () => {
     ).toThrow();
   });
 
-  it("skips a configured window whose opening falls inside the spring-forward DST gap", () => {
+  it("skips a configured window entirely consumed by the spring-forward DST gap", () => {
     // 2026-03-29 is the Europe/Paris spring-forward transition: local clocks
-    // jump 02:00 -> 03:00, so 02:30 never occurs that day. A naive resolution
-    // round-trips it to local 03:30, which falls outside this 02:30-03:00
-    // window. The next valid candidate is Monday's ordinary opening.
-    const dstGapConfig = parseBusinessWindowConfiguration({
+    // jump 02:00 -> 03:00, so 02:30 never occurs that day, and the window's
+    // clamped opening (03:00) is not before its own 03:00 close -- no valid
+    // remainder exists. The next valid candidate is Monday's ordinary opening.
+    const fullyConsumedConfig = parseBusinessWindowConfiguration({
       businessTimeZone: "Europe/Paris",
       windows: [
         { closesAt: "03:00", opensAt: "02:30", weekday: "SUNDAY" },
@@ -111,7 +111,25 @@ describe("nextPermittedInstant", () => {
     });
 
     expect(
-      nextPermittedInstant(ts("2026-03-28T10:00:00.000Z"), dstGapConfig)
+      nextPermittedInstant(ts("2026-03-28T10:00:00.000Z"), fullyConsumedConfig)
     ).toBe(ts("2026-03-30T07:00:00.000Z"));
+  });
+
+  it("clamps a window that only partially overlaps the spring-forward DST gap to its valid remainder", () => {
+    // Same transition day, but this window stays open past the gap
+    // (02:30-03:30), so the earliest permitted instant is the transition
+    // boundary itself: local 03:00, the first valid instant at or after the
+    // configured 02:30 opening.
+    const partiallyOverlappingConfig = parseBusinessWindowConfiguration({
+      businessTimeZone: "Europe/Paris",
+      windows: [{ closesAt: "03:30", opensAt: "02:30", weekday: "SUNDAY" }],
+    });
+
+    expect(
+      nextPermittedInstant(
+        ts("2026-03-28T10:00:00.000Z"),
+        partiallyOverlappingConfig
+      )
+    ).toBe(ts("2026-03-29T01:00:00.000Z"));
   });
 });
