@@ -49,8 +49,10 @@ bun run --filter @relanmo/domain typecheck
 | Fresh typecheck | `bun run typecheck:fresh` | Clears generated outputs, regenerates Next route types, then runs Turbo with `--force`. |
 | Builds | `bun run build` | Builds all affected workspace targets through Turbo. |
 | Bun app/API smoke | `bun run verify:bun` | Builds and starts `app` and `api` through their exact Bun Next.js start scripts, then probes them locally. |
-| Node worker smoke | `bun run verify:node` | Compiles the worker TypeScript entry and executes `dist/index.js` with Node. |
-| Baseline tests | `bun run test` | Runs the current workspace test scripts; pass-with-no-tests is intentional until test tasks land. |
+| Package/export verifier | `bun run verify:exports` | Resolves the published package and subpath exports, checks browser rejection conditions, scans workflow-safe imports, and checks disabled feature bindings. |
+| Boundary smoke | `bun run verify:boundaries` | Builds a temporary Next Client Component and expects a server surface to reject through its browser export condition. |
+| Node worker smoke | `bun run verify:node` | Imports portable server surfaces under Node 24, then compiles the worker TypeScript entry and executes `dist/index.js` with Node. |
+| Baseline tests | `bun run test` | Runs the app/API no-test checks and the 55 merged domain contract tests through Turbo. |
 
 `typecheck:fresh` removes only generated `.next/`, `.turbo/`, `dist/` and `out/` directories under `apps/*` and `packages/*`, plus the root `.turbo/` cache. It does not remove dependencies or source files. Next.js route helpers are regenerated in `app`, `web`, `api` and `docs` before TypeScript runs, so a successful check does not depend on stale build artifacts.
 
@@ -62,7 +64,7 @@ RELANMO_NODE_BIN=/path/to/node-v24.21.0 \
   bun run verify:node
 ```
 
-The current worker entry is deliberately a shell; the smoke proves Node can execute compiled TypeScript, not that a live Temporal worker or provider is configured. The test command currently has no test files in the scaffold and does not claim coverage or live integration proof.
+The current worker entry is deliberately a shell; the smoke proves Node can execute compiled TypeScript and the portable server entrypoints, not that a live Temporal worker or provider is configured. The domain test task covers merged contract fixtures and parsers; it does not claim live integration proof.
 
 App and API production starts use Bun exactly:
 

@@ -2,13 +2,80 @@
   "name": "@relanmo/workflows",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    },
+    "./workflow-safe": {
+      "types": "./src/workflow-safe.ts",
+      "default": "./src/workflow-safe.ts"
+    },
+    "./discovery": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/discovery/index.ts",
+      "default": "./src/discovery/index.ts"
+    },
+    "./discovery/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/discovery/*.ts",
+      "default": "./src/discovery/*.ts"
+    },
+    "./account-sync": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/account-sync/index.ts",
+      "default": "./src/account-sync/index.ts"
+    },
+    "./account-sync/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/account-sync/*.ts",
+      "default": "./src/account-sync/*.ts"
+    },
+    "./prospect-sequence": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/prospect-sequence/index.ts",
+      "default": "./src/prospect-sequence/index.ts"
+    },
+    "./prospect-sequence/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/prospect-sequence/*.ts",
+      "default": "./src/prospect-sequence/*.ts"
+    },
+    "./campaign-control": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/campaign-control/index.ts",
+      "default": "./src/campaign-control/index.ts"
+    },
+    "./campaign-control/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/campaign-control/*.ts",
+      "default": "./src/campaign-control/*.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@relanmo/domain": "workspace:*",
+    "@temporalio/activity": "1.24.0",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/common": "1.24.0",
+    "@temporalio/workflow": "1.24.0",
+    "server-only": "0.0.1"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
+    "@temporalio/testing": "1.24.0",
+    "@types/node": "24.13.5",
     "typescript": "7.0.2"
   }
 }

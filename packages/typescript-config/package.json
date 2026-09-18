@@ -2,6 +2,12 @@
   "name": "@relanmo/typescript-config",
   "version": "0.0.0",
   "private": true,
+  "exports": {
+    "./base.json": "./base.json",
+    "./nextjs.json": "./nextjs.json",
+    "./react-library.json": "./react-library.json",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   }

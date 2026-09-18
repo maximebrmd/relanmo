@@ -2,8 +2,7 @@
   "extends": "@relanmo/typescript-config/nextjs.json",
   "compilerOptions": {
     "paths": {
-      "@/*": ["./*"],
-      "@relanmo/*": ["../../packages/*"]
+      "@/*": ["./*"]
     }
   },
   "include": [

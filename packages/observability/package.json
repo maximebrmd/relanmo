@@ -2,13 +2,39 @@
   "name": "@relanmo/observability",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./error": {
+      "types": "./error.ts",
+      "default": "./error.ts"
+    },
+    "./prospecting": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/prospecting/index.ts",
+      "default": "./src/prospecting/index.ts"
+    },
+    "./prospecting/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/prospecting/*.ts",
+      "default": "./src/prospecting/*.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@sentry/node": "10.75.0",
+    "server-only": "0.0.1"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
+    "@types/node": "24.13.5",
     "typescript": "7.0.2"
   }
 }

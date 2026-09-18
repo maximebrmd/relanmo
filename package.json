@@ -18,8 +18,10 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "typecheck:fresh": "node tooling/commands/typecheck-fresh.mjs",
+    "verify:boundaries": "node tooling/dependencies/client-boundary-smoke.mjs",
+    "verify:exports": "node tooling/dependencies/verify-exports.mjs",
     "verify:install": "bun install --frozen-lockfile",
-    "verify:node": "node tooling/commands/node-smoke.mjs",
+    "verify:node": "node tooling/dependencies/node-runtime-smoke.mjs && node tooling/commands/node-smoke.mjs",
     "verify:bun": "node tooling/commands/bun-app-api-smoke.mjs"
   },
   "devDependencies": {
@@ -29,7 +31,8 @@
     "turbo": "2.10.13",
     "typescript": "7.0.2",
     "ultracite": "7.12.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.1",
+    "wrangler": "4.134.0"
   },
   "engines": {
     "node": ">=24.21.0 <25"

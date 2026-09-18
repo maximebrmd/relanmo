@@ -9,10 +9,20 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@relanmo/auth": "workspace:*",
+    "@relanmo/connectors": "workspace:*",
+    "@relanmo/database": "workspace:*",
+    "@relanmo/domain": "workspace:*",
+    "@relanmo/email": "workspace:*",
     "@relanmo/next-config": "workspace:*",
+    "@relanmo/observability": "workspace:*",
+    "@relanmo/payments": "workspace:*",
+    "@relanmo/storage": "workspace:*",
+    "@sentry/nextjs": "10.75.0",
     "next": "16.3.5",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",

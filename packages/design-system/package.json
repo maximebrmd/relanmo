@@ -2,6 +2,35 @@
   "name": "@relanmo/design-system",
   "version": "0.0.0",
   "private": true,
+  "main": "./index.tsx",
+  "types": "./index.tsx",
+  "exports": {
+    ".": {
+      "types": "./index.tsx",
+      "default": "./index.tsx"
+    },
+    "./components/*": {
+      "types": "./components/*.tsx",
+      "default": "./components/*.tsx"
+    },
+    "./hooks/*": {
+      "types": "./hooks/*.ts",
+      "default": "./hooks/*.ts"
+    },
+    "./lib/*": {
+      "types": "./lib/*.ts",
+      "default": "./lib/*.ts"
+    },
+    "./providers/*": {
+      "types": "./providers/*.tsx",
+      "default": "./providers/*.tsx"
+    },
+    "./styles/*": {
+      "types": "./styles/*",
+      "default": "./styles/*"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"

@@ -2,13 +2,70 @@
   "name": "@relanmo/database",
   "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/client/index.ts",
+      "default": "./src/client/index.ts"
+    },
+    "./client/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/client/*.ts",
+      "default": "./src/client/*.ts"
+    },
+    "./transactions": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/transactions/index.ts",
+      "default": "./src/transactions/index.ts"
+    },
+    "./transactions/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/transactions/*.ts",
+      "default": "./src/transactions/*.ts"
+    },
+    "./schema": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/schema/index.ts",
+      "default": "./src/schema/index.ts"
+    },
+    "./schema/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/schema/*.ts",
+      "default": "./src/schema/*.ts"
+    },
+    "./repositories": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/repositories/index.ts",
+      "default": "./src/repositories/index.ts"
+    },
+    "./repositories/*": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/repositories/*/index.ts",
+      "default": "./src/repositories/*/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
+  "dependencies": {
+    "@relanmo/domain": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0",
+    "server-only": "0.0.1"
+  },
   "devDependencies": {
     "@relanmo/typescript-config": "workspace:*",
+    "@types/node": "24.13.5",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.10",
     "typescript": "7.0.2"
   }
 }
