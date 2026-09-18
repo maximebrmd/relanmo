@@ -47,6 +47,28 @@ describe("evaluateContentGuard", () => {
     expect(result.outcome).toBe("PASS");
   });
 
+  it("fails a claim that cites a validly-scoped, approved evidence id but asserts something that evidence does not support", () => {
+    // The evidence fixture is a hiring-post signal; the claim asserts a
+    // prior working relationship instead. The evidence id is real, approved
+    // and belongs to the right tenant/prospect, so only a check against the
+    // claim's own text (not just the citation) can catch this.
+    const check = contentGuardCheckFixture({
+      draft: draftFixture({
+        claims: [
+          {
+            evidenceId: EVIDENCE_ID_HIRING_POST,
+            text: "nous avons déjà travaillé ensemble sur un projet précédent",
+          },
+        ],
+      }),
+    });
+
+    const result = evaluateContentGuard(check);
+
+    expect(result.outcome).toBe("HOLD");
+    expect(reasonCodes(result)).toEqual(["CLAIM_NOT_GROUNDED"]);
+  });
+
   it("fails a claim citing an evidence id that was never approved for this send (unsupported claim)", () => {
     const check = contentGuardCheckFixture({
       draft: draftFixture({

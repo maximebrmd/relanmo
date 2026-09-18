@@ -65,6 +65,7 @@ export const CONTENT_GUARD_REASON_CODES = [
   "FORBIDDEN_PHRASE",
   "UNKNOWN_EVIDENCE",
   "UNSUPPORTED_CLAIM",
+  "CLAIM_NOT_GROUNDED",
   "MAX_ATTEMPTS_EXCEEDED",
 ] as const;
 export type ContentGuardReasonCode =
