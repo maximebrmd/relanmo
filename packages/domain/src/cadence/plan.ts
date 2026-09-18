@@ -82,6 +82,7 @@ function computeIntendedAt(
 function computeClosureAt(
   dm1AnchorAt: UtcTimestamp,
   actualDm5SendAt: UtcTimestamp | null,
+  earliestAt: UtcTimestamp,
   timeZone: BusinessTimeZone
 ): UtcTimestamp {
   const closureFloor = addLocalCalendarDays(
@@ -89,15 +90,18 @@ function computeClosureAt(
     DEFAULT_SEQUENCE_CLOSURE.minimumDaysAfterDm1,
     timeZone
   );
-  if (actualDm5SendAt === null) {
-    return closureFloor;
+  // Closure can never precede the current step's own earliest send
+  // opportunity: parseDuePlan rejects a plan where closureAt < earliestAt.
+  let closureAt = laterUtcTimestamp(closureFloor, earliestAt);
+  if (actualDm5SendAt !== null) {
+    const afterDelayedDm5 = addLocalCalendarDays(
+      actualDm5SendAt,
+      DEFAULT_SEQUENCE_CLOSURE.minimumDaysAfterDelayedDm5,
+      timeZone
+    );
+    closureAt = laterUtcTimestamp(closureAt, afterDelayedDm5);
   }
-  const afterDelayedDm5 = addLocalCalendarDays(
-    actualDm5SendAt,
-    DEFAULT_SEQUENCE_CLOSURE.minimumDaysAfterDelayedDm5,
-    timeZone
-  );
-  return laterUtcTimestamp(closureFloor, afterDelayedDm5);
+  return closureAt;
 }
 
 /**
@@ -127,7 +131,12 @@ export function planDirectMessageDuePlan(input: CadenceStepInput): DuePlan {
     timeZone
   );
   const earliestAt = nextPermittedInstant(intendedAt, businessWindow);
-  const closureAt = computeClosureAt(dm1AnchorAt, actualDm5SendAt, timeZone);
+  const closureAt = computeClosureAt(
+    dm1AnchorAt,
+    actualDm5SendAt,
+    earliestAt,
+    timeZone
+  );
 
   return {
     businessTimeZone: timeZone,

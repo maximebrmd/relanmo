@@ -83,6 +83,13 @@ export function nextPermittedInstant(
         },
         config.businessTimeZone
       );
+      // A configured opening time can fall inside a DST spring-forward gap
+      // (a local wall-clock hour that never occurs), in which case resolving
+      // it round-trips to an instant outside this window. Skip such a
+      // candidate rather than returning an instant that isn't actually open.
+      if (!isWithinBusinessWindow(opensAt, config)) {
+        continue;
+      }
       if (compareUtcTimestamps(opensAt, instant) <= 0) {
         continue;
       }

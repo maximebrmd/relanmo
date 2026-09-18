@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parseDuePlan } from "../contracts/parsers";
 import type { DirectMessageStep, UtcTimestamp } from "../contracts/values";
 import {
   DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
@@ -79,9 +80,11 @@ const cases: readonly Case[] = [
     // Monday 2026-10-12. DM5's target (dm1+14 = Monday 10-05) is far earlier
     // than the minimum 5-day gap from that late DM4 send (Saturday 10-17),
     // so the gap dominates and is then moved off the weekend into Monday.
+    // That earliest opportunity (10-19) now falls past the DM1+21 floor
+    // (10-12), so closure floors against it rather than preceding it.
     actualDm5SendAt: null,
     dm1AnchorAt: "2026-09-21T07:15:00.000Z",
-    expectedClosureAt: "2026-10-12T07:15:00.000Z",
+    expectedClosureAt: "2026-10-19T07:00:00.000Z",
     expectedEarliestAt: "2026-10-19T07:00:00.000Z",
     expectedIntendedAt: "2026-10-17T07:15:00.000Z",
     name: "a late actual DM4 send pushes DM5's minimum gap past its target and off a weekend",
@@ -134,6 +137,10 @@ describe("planDirectMessageDuePlan", () => {
       expect(plan.intendedAt).toBe(ts(expectedIntendedAt));
       expect(plan.earliestAt).toBe(ts(expectedEarliestAt));
       expect(plan.closureAt).toBe(ts(expectedClosureAt));
+
+      // The frozen C1 contract parser rejects a plan whose closure precedes
+      // its own earliest send opportunity; every computed plan must satisfy it.
+      expect(() => parseDuePlan(plan)).not.toThrow();
     }
   );
 
