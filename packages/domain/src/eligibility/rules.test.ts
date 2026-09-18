@@ -474,7 +474,10 @@ describe("evaluateEligibility: scheduling holds", () => {
     expect(result.retryAt).toBe("2026-09-18T08:00:00.000Z");
   });
 
-  it("picks the earliest retry time when multiple scheduling holds apply", () => {
+  it("picks the latest retry time when multiple scheduling holds apply", () => {
+    // Retrying at the earlier constraint (NOT_DUE's earliestAt) would still be
+    // re-held by the business window, which only opens later: the reported
+    // retryAt must be the latest (maximum) of the active timed holds.
     const result = evaluateEligibility(
       buildCheck(DM1_RAW_CHECK, {
         businessWindow: {
@@ -488,7 +491,32 @@ describe("evaluateEligibility: scheduling holds", () => {
       })
     );
     expect(result.outcome).toBe("HOLD");
-    expect(result.retryAt).toBe("2026-09-19T10:00:00.000Z");
+    expect(result.retryAt).toBe("2026-09-20T08:00:00.000Z");
+  });
+
+  it("computes a retry time that clears every simultaneous timed hold", () => {
+    const nextOpenAt = "2026-09-20T08:00:00.000Z";
+    const earliestAt = "2026-09-19T10:00:00.000Z";
+
+    const heldResult = evaluateEligibility(
+      buildCheck(DM1_RAW_CHECK, {
+        businessWindow: { nextOpenAt, status: "CLOSED" },
+        duePlan: { ...DM1_DUE_PLAN, earliestAt },
+      })
+    );
+    expect(heldResult.outcome).toBe("HOLD");
+    expect(heldResult.retryAt).toBe(nextOpenAt);
+
+    // A single retry exactly at the reported time, with the window now open,
+    // clears both the due-time and business-window constraints at once.
+    const retriedResult = evaluateEligibility(
+      buildCheck(DM1_RAW_CHECK, {
+        businessWindow: { nextOpenAt: null, status: "OPEN" },
+        duePlan: { ...DM1_DUE_PLAN, earliestAt },
+        evaluatedAt: nextOpenAt,
+      })
+    );
+    expect(retriedResult.outcome).toBe("ALLOWED");
   });
 
   it.each([

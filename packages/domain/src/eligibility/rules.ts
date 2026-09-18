@@ -412,19 +412,23 @@ function collectVerdicts(
   ];
 }
 
-function earliestRetryAt(
+/**
+ * The retry time for a HOLD result must clear every active timed constraint,
+ * not just the soonest one: retrying at the earliest of several simultaneous
+ * holds (e.g. NOT_DUE and OUTSIDE_SEND_WINDOW) would still be re-held by
+ * whichever constraint has not cleared yet. Use the latest (maximum) retryAt
+ * across active HOLD verdicts so a single retry at the reported time is due.
+ */
+function latestRetryAt(
   verdicts: readonly EligibilityVerdict[]
 ): UtcTimestamp | null {
-  let earliest: UtcTimestamp | null = null;
+  let latest: UtcTimestamp | null = null;
   for (const entry of verdicts) {
-    if (
-      entry.retryAt !== null &&
-      (earliest === null || entry.retryAt < earliest)
-    ) {
-      earliest = entry.retryAt;
+    if (entry.retryAt !== null && (latest === null || entry.retryAt > latest)) {
+      latest = entry.retryAt;
     }
   }
-  return earliest;
+  return latest;
 }
 
 function buildResult(
@@ -477,7 +481,7 @@ function buildResult(
     ...base,
     outcome: "HOLD",
     reasons: nonEmptyReasons,
-    retryAt: earliestRetryAt(verdicts),
+    retryAt: latestRetryAt(verdicts),
   });
 }
 
