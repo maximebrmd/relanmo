@@ -99,6 +99,24 @@ describe("localWallTimeForDate", () => {
     );
     expect(result).toBe(ts("2026-09-21T07:15:00.000Z"));
   });
+
+  it("resolves 01:00 on the spring-forward Sunday to its own valid instant, not the gap", () => {
+    // 01:00 local occurs once, an hour before the 02:00->03:00 jump: it is
+    // not in the gap and must not be clamped to the 03:00 transition.
+    const result = localWallTimeForDate(
+      { day: 29, hour: 1, minute: 0, month: 3, second: 0, year: 2026 },
+      BUSINESS_TIME_ZONE
+    );
+    expect(result).toBe(ts("2026-03-29T00:00:00.000Z"));
+  });
+
+  it("resolves 01:30 on the spring-forward Sunday to its own valid instant, not the gap", () => {
+    const result = localWallTimeForDate(
+      { day: 29, hour: 1, minute: 30, month: 3, second: 0, year: 2026 },
+      BUSINESS_TIME_ZONE
+    );
+    expect(result).toBe(ts("2026-03-29T00:30:00.000Z"));
+  });
 });
 
 describe("compareUtcTimestamps and laterUtcTimestamp", () => {

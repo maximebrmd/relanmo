@@ -163,18 +163,27 @@ function utcInstantForLocalWallTime(
     local.second
   );
   const firstOffset = offsetMinutesAt(naiveUtcMs, timeZone);
-  const candidateMs = naiveUtcMs - firstOffset * 60_000;
-  const secondOffset = offsetMinutesAt(candidateMs, timeZone);
+  const firstCandidateMs = naiveUtcMs - firstOffset * 60_000;
+  const secondOffset = offsetMinutesAt(firstCandidateMs, timeZone);
   if (secondOffset === firstOffset) {
-    return candidateMs;
+    return firstCandidateMs;
   }
+  const secondCandidateMs = naiveUtcMs - secondOffset * 60_000;
   if (secondOffset < firstOffset) {
-    // The requested local wall-clock time falls inside a spring-forward gap
-    // (a local hour that never occurs). Resolve to the transition instant
-    // itself -- the first valid instant at or after the requested time --
-    // instead of an instant that round-trips to a different local time.
+    // A spring-forward transition is nearby, but interpreting the local
+    // digits as if they were UTC (the naive guess above) can coincidentally
+    // land exactly on the transition instant even for an ordinary, valid
+    // local time shortly before it -- that alone doesn't prove a gap.
+    // Verify the second candidate actually round-trips to secondOffset
+    // before concluding the requested local time never occurred.
+    if (offsetMinutesAt(secondCandidateMs, timeZone) === secondOffset) {
+      return secondCandidateMs;
+    }
+    // Neither offset round-trips: the requested local wall-clock time
+    // falls inside the gap. Resolve to the transition instant itself --
+    // the first valid instant at or after the requested time.
     return findOffsetTransitionInstant(
-      candidateMs,
+      firstCandidateMs,
       naiveUtcMs,
       timeZone,
       firstOffset
@@ -182,7 +191,7 @@ function utcInstantForLocalWallTime(
   }
   // Fall-back: the requested local wall-clock time is ambiguous (it occurs
   // twice). Resolve with the offset that applies at the candidate instant.
-  return naiveUtcMs - secondOffset * 60_000;
+  return secondCandidateMs;
 }
 
 /** Resolves a local Europe/Paris wall-clock time to its UTC instant, honoring DST. */
