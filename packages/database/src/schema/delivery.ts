@@ -462,3 +462,74 @@ export const actionEvents = pgTable(
     index("action_events_action_idx").on(table.actionId, table.recordedAt),
   ]
 );
+
+/**
+ * Cross-fragment foreign-key intent for P020 (packages/database/src/schema/
+ * integration owner). This fragment does not import the sibling tenancy
+ * (P015), campaigns (P016) or leads (P017) schema files; P020 adds the real
+ * `.references()` once every fragment has merged, matching the pattern in
+ * P017's leadsExternalForeignKeyIntent.
+ */
+export const deliveryExternalForeignKeyIntent = [
+  { column: "actions.tenant_id", references: "tenants.id (P015 tenancy.ts)" },
+  {
+    column: "actions.account_id",
+    references: "provider_accounts.id (P017 leads.ts)",
+  },
+  {
+    column: "actions.prospect_id",
+    references: "prospects.id (P017 leads.ts)",
+  },
+  {
+    column: "actions.campaign_id",
+    references: "campaigns.id (P016 campaigns.ts)",
+  },
+  {
+    column: "actions.campaign_version_id",
+    references: "campaign_versions.id (P016 campaigns.ts)",
+  },
+  {
+    column: "send_attempts.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "send_attempts.account_id",
+    references: "provider_accounts.id (P017 leads.ts)",
+  },
+  {
+    column: "send_receipts.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "account_leases.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "account_leases.account_id",
+    references: "provider_accounts.id (P017 leads.ts)",
+  },
+  {
+    column: "quota_reservations.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "quota_reservations.account_id",
+    references: "provider_accounts.id (P017 leads.ts)",
+  },
+  {
+    column: "quota_reservations.campaign_id",
+    references: "campaigns.id (P016 campaigns.ts)",
+  },
+  {
+    column: "webhook_events.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "outbox_events.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+  {
+    column: "action_events.tenant_id",
+    references: "tenants.id (P015 tenancy.ts)",
+  },
+] as const;

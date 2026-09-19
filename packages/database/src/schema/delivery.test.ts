@@ -5,6 +5,7 @@ import {
   accountLeases,
   actionEvents,
   actions,
+  deliveryExternalForeignKeyIntent,
   outboxEvents,
   quotaReservations,
   sendAttempts,
@@ -190,5 +191,23 @@ describe("delivery ledger schema fragment", () => {
       "recorded_at",
     ]);
     expect(indexNames(actionEvents)).toContain("action_events_action_idx");
+  });
+
+  it("lists every cross-fragment foreign-key intent for P020 to integrate", () => {
+    expect(deliveryExternalForeignKeyIntent.length).toBeGreaterThan(0);
+    const columns = deliveryExternalForeignKeyIntent.map(
+      (entry) => entry.column
+    );
+    expect(columns).toContain("actions.account_id");
+    expect(columns).toContain("actions.prospect_id");
+    expect(columns).toContain("actions.campaign_id");
+    expect(columns).toContain("actions.campaign_version_id");
+    expect(columns).toContain("send_attempts.account_id");
+    expect(columns).toContain("account_leases.account_id");
+    expect(columns).toContain("quota_reservations.campaign_id");
+    for (const entry of deliveryExternalForeignKeyIntent) {
+      expect(entry.column.length).toBeGreaterThan(0);
+      expect(entry.references.length).toBeGreaterThan(0);
+    }
   });
 });
