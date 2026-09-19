@@ -9,7 +9,6 @@ This file is mirrored at the Relanmo application repository root. The repository
 - Discuss any new dependency outside next-forge's documented choices and the previously agreed stack with the user, and obtain agreement before installing it or changing manifests. Present the purpose, alternatives, code impact and cost first. Continue unrelated work while waiting.
 - Previously approved choices remain approved. Fumadocs, Wrangler and the AWS SDK v3 R2 integration are explicitly requested. Review normal transitive dependencies and required peers with the approved library; do not hide an independently chosen service or library in a scaffold.
 - Check current library documentation for exact APIs and compatibility. Pin tested versions with Bun and commit the single `bun.lock`.
-- Generate Better Auth's Drizzle schema with the version-pinned `auth` CLI package (bin `auth`/`better-auth`, not `@better-auth/cli`), matching the installed `better-auth` version exactly; run it ad hoc via `bunx`, never add it to a manifest. See `packages/auth/src/schema-config.ts` for the pinned generator command and schema-relevant config. Each schema fragment under `packages/database/src/schema/<name>.ts` is importable via that package's `./schema/*` export without editing the shared `schema/index.ts` barrel, which stays owned by the migration integration task.
 
 ## Required stack and layout
 
