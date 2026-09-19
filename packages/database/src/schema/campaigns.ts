@@ -4,6 +4,7 @@ import type {
   CampaignSequenceStep,
   CampaignTargeting,
 } from "@relanmo/domain/contracts/product";
+import type { SequenceClosureConfiguration } from "@relanmo/domain/ports/persistence/campaigns";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -19,7 +20,7 @@ import {
 
 // External foreign-key intent for P020 (packages/database/src/schema/index.ts integration):
 //   campaigns.tenant_id -> tenancy.tenants.id (P015)
-//   campaign_versions.created_by -> auth.user.id (nullable)
+//   campaign_versions.created_by -> auth.user.id
 // This fragment compiles independently and does not import the unmerged tenancy schema.
 export const campaignStatus = pgEnum("campaign_status", [...CAMPAIGN_STATUSES]);
 
@@ -69,17 +70,23 @@ export const campaignVersions = pgTable(
     revision: integer("revision").notNull(),
     name: text("name").notNull(),
     offer: text("offer").notNull(),
+    icpDescription: text("icp_description").notNull(),
     dailyQuota: integer("daily_quota").notNull(),
+    dailyInvitationQuota: integer("daily_invitation_quota").notNull(),
+    dailyMessageQuota: integer("daily_message_quota").notNull(),
     exclusions: jsonb("exclusions").notNull().$type<readonly string[]>(),
     targeting: jsonb("targeting").notNull().$type<CampaignTargeting>(),
     sequence: jsonb("sequence")
       .notNull()
       .$type<readonly CampaignSequenceStep[]>(),
+    sequenceClosure: jsonb("sequence_closure")
+      .notNull()
+      .$type<SequenceClosureConfiguration>(),
     businessWindow: jsonb("business_window")
       .notNull()
       .$type<BusinessWindowConfiguration>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    createdBy: text("created_by"),
+    createdBy: text("created_by").notNull(),
   },
   (table) => [
     uniqueIndex("campaignVersions_campaignId_revision_idx").on(

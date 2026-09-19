@@ -50,14 +50,30 @@ describe("campaigns schema fragment", () => {
       "revision",
       "name",
       "offer",
+      "icp_description",
       "daily_quota",
+      "daily_invitation_quota",
+      "daily_message_quota",
       "exclusions",
       "targeting",
       "sequence",
+      "sequence_closure",
       "business_window",
       "created_at",
       "created_by",
     ]);
+  });
+
+  it("requires the C3 quotas, ICP description, closure configuration and author on every version", () => {
+    for (const column of [
+      campaignVersions.dailyInvitationQuota,
+      campaignVersions.dailyMessageQuota,
+      campaignVersions.icpDescription,
+      campaignVersions.sequenceClosure,
+      campaignVersions.createdBy,
+    ]) {
+      expect(column.notNull).toBe(true);
+    }
   });
 
   it("never updates a campaign_versions row in place", () => {

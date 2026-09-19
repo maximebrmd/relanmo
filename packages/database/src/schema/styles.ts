@@ -1,12 +1,16 @@
+import type { ModelVersion } from "@relanmo/domain/contracts";
 import { FRENCH_TONES, STYLE_SOURCES } from "@relanmo/domain/contracts/product";
 import type { StyleStepOverride } from "@relanmo/domain/contracts/product";
-import { relations } from "drizzle-orm";
+import type { StyleOverrideSettings } from "@relanmo/domain/ports/persistence/campaigns";
+import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -15,12 +19,15 @@ import { campaigns } from "./campaigns";
 
 // External foreign-key intent for P020 (packages/database/src/schema/index.ts integration):
 //   style_profiles.tenant_id -> tenancy.tenants.id (P015)
-//   style_profile_versions.created_by -> auth.user.id (nullable)
-//   prompt_override_versions.created_by -> auth.user.id (nullable)
+//   style_profile_versions.created_by -> auth.user.id (required for STYLE_EXPLICIT rows)
+//   prompt_override_versions.created_by -> auth.user.id
 // This fragment compiles independently and does not import the unmerged tenancy schema.
 // campaigns is a same-task fragment (also owned by P016), not a sibling import.
 export const styleSource = pgEnum("style_source", [...STYLE_SOURCES]);
 export const frenchTone = pgEnum("french_tone", [...FRENCH_TONES]);
+
+const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
+export const styleFormality = pgEnum("style_formality", STYLE_FORMALITY_LEVELS);
 
 const STYLE_PROFILE_VERSION_KINDS = [
   "STYLE_EXPLICIT",
@@ -72,9 +79,23 @@ export const styleProfileVersions = pgTable(
       .references(() => styleProfiles.id, { onDelete: "cascade" }),
     tenantId: text("tenant_id").notNull(),
     kind: styleProfileVersionKind("kind").notNull(),
-    tone: frenchTone("tone").notNull(),
+    revision: integer("revision").notNull(),
+    tone: frenchTone("tone"),
+    formality: styleFormality("formality"),
+    greeting: text("greeting"),
+    closing: text("closing"),
+    maxCharacters: integer("max_characters"),
+    forbiddenPhrases: jsonb("forbidden_phrases")
+      .notNull()
+      .$type<readonly string[]>()
+      .default([]),
+    confidence: real("confidence"),
+    model: text("model").$type<ModelVersion>(),
     instructions: text("instructions"),
-    examples: jsonb("examples").notNull().$type<readonly string[]>(),
+    examples: jsonb("examples")
+      .notNull()
+      .$type<readonly string[]>()
+      .default([]),
     // Evidence backing a STYLE_INFERRED suggestion; empty for STYLE_EXPLICIT rows.
     evidenceIds: jsonb("evidence_ids")
       .notNull()
@@ -86,11 +107,19 @@ export const styleProfileVersions = pgTable(
   (table) => [
     index("styleProfileVersions_styleProfileId_idx").on(table.styleProfileId),
     index("styleProfileVersions_tenantId_idx").on(table.tenantId),
+    check(
+      "styleProfileVersions_explicitRequirements_check",
+      sql`${table.kind} <> 'STYLE_EXPLICIT' OR (${table.createdBy} IS NOT NULL AND ${table.formality} IS NOT NULL AND ${table.tone} IS NOT NULL)`
+    ),
+    check(
+      "styleProfileVersions_inferredModel_check",
+      sql`${table.kind} <> 'STYLE_INFERRED' OR ${table.model} IS NOT NULL`
+    ),
   ]
 );
 
-// Campaign-scoped DM-step template overrides, applied ahead of the tenant-wide style
-// profile per prompt-personalization.md's precedence order. One row per campaign.
+// Campaign-scoped style and DM-step template overrides, applied ahead of the tenant-wide
+// style profile per prompt-personalization.md's precedence order. One row per campaign.
 export const promptOverrides = pgTable(
   "prompt_overrides",
   {
@@ -113,8 +142,8 @@ export const promptOverrides = pgTable(
   (table) => [index("promptOverrides_tenantId_idx").on(table.tenantId)]
 );
 
-// Immutable per-save snapshot of step overrides, reconstructing the exact template text
-// an existing draft was composed against.
+// Immutable per-save snapshot of style settings and step overrides, reconstructing the
+// exact inputs an existing draft was composed against.
 export const promptOverrideVersions = pgTable(
   "prompt_override_versions",
   {
@@ -123,11 +152,17 @@ export const promptOverrideVersions = pgTable(
       .notNull()
       .references(() => promptOverrides.id, { onDelete: "cascade" }),
     tenantId: text("tenant_id").notNull(),
+    revision: integer("revision").notNull(),
+    settings: jsonb("settings")
+      .notNull()
+      .$type<StyleOverrideSettings>()
+      .default({}),
     stepOverrides: jsonb("step_overrides")
       .notNull()
-      .$type<readonly StyleStepOverride[]>(),
+      .$type<readonly StyleStepOverride[]>()
+      .default([]),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    createdBy: text("created_by"),
+    createdBy: text("created_by").notNull(),
   },
   (table) => [
     index("promptOverrideVersions_promptOverrideId_idx").on(

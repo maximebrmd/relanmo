@@ -58,13 +58,21 @@ describe("styles schema fragment", () => {
     expect(styleProfiles.source.default).toBe("DEFAULT");
   });
 
-  it("gives style_profile_versions the fields to reconstruct an accepted inferred style with its provenance", () => {
+  it("gives style_profile_versions the fields to reconstruct explicit and inferred styles with provenance", () => {
     expect(columnNames(styleProfileVersions)).toEqual([
       "id",
       "style_profile_id",
       "tenant_id",
       "kind",
+      "revision",
       "tone",
+      "formality",
+      "greeting",
+      "closing",
+      "max_characters",
+      "forbidden_phrases",
+      "confidence",
+      "model",
       "instructions",
       "examples",
       "evidence_ids",
@@ -78,6 +86,26 @@ describe("styles schema fragment", () => {
     ).toBe(false);
   });
 
+  it("stores the version revision and leaves kind-specific settings nullable until written", () => {
+    expect(styleProfileVersions.revision.notNull).toBe(true);
+    expect(styleProfileVersions.tone.notNull).toBe(false);
+    expect(styleProfileVersions.formality.notNull).toBe(false);
+    expect(styleProfileVersions.greeting.notNull).toBe(false);
+    expect(styleProfileVersions.closing.notNull).toBe(false);
+    expect(styleProfileVersions.maxCharacters.notNull).toBe(false);
+    expect(styleProfileVersions.confidence.notNull).toBe(false);
+    expect(styleProfileVersions.model.notNull).toBe(false);
+  });
+
+  it("keeps kind-specific required fields enforced by table checks", () => {
+    expect(
+      getTableConfig(styleProfileVersions).checks.map((check) => check.name)
+    ).toEqual([
+      "styleProfileVersions_explicitRequirements_check",
+      "styleProfileVersions_inferredModel_check",
+    ]);
+  });
+
   it("scopes prompt overrides to exactly one campaign each", () => {
     expect(promptOverrides.campaignId.isUnique).toBe(true);
     expect(columnNames(promptOverrides)).toEqual([
@@ -89,6 +117,22 @@ describe("styles schema fragment", () => {
       "created_at",
       "updated_at",
     ]);
+  });
+
+  it("gives prompt_override_versions the revisioned C3 settings and C4 step overrides", () => {
+    expect(columnNames(promptOverrideVersions)).toEqual([
+      "id",
+      "prompt_override_id",
+      "tenant_id",
+      "revision",
+      "settings",
+      "step_overrides",
+      "created_at",
+      "created_by",
+    ]);
+    expect(promptOverrideVersions.revision.notNull).toBe(true);
+    expect(promptOverrideVersions.settings.notNull).toBe(true);
+    expect(promptOverrideVersions.createdBy.notNull).toBe(true);
   });
 
   it("never updates a prompt_override_versions row in place", () => {
