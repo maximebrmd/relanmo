@@ -68,9 +68,10 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
-// Enum column types back the frozen persistence contracts in
-// @relanmo/domain/src/ports/persistence/{actions,events}.ts; keep the value
-// lists aligned with those exports rather than redeclaring them here.
+// Enum column types keep their value lists aligned with the owning domain
+// exports (@relanmo/domain/contracts/{action,workflow} and
+// @relanmo/domain/ports/persistence/{actions,events}) rather than
+// redeclaring them here.
 export const actionStateEnum = pgEnum("action_state", ACTION_STATES);
 export const actionFailureReasonEnum = pgEnum(
   "action_failure_reason",
