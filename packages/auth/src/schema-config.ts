@@ -1,6 +1,9 @@
 import type { BetterAuthOptions } from "better-auth";
 
 // Generator is published as package "auth" (bin: auth/better-auth), pinned to the better-auth version for reproducible output.
+// Run exactly this command: `bunx --bun` (forcing Bun's own runtime instead of the CLI's declared
+// Node runtime) silently drops six .defaultNow() calls from the output vs. plain `bunx`. Verified
+// reproducible both ways; only the plain form below matches the committed schema fragment.
 export const authSchemaGeneratorVersions = {
   betterAuth: "1.7.5",
   drizzleAdapter: "1.7.5",

@@ -9,18 +9,19 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-// Generated with `bunx auth@1.7.5 generate` against @relanmo/auth's authSchemaConfig; keep both files aligned.
-// createdAt/updatedAt intentionally carry no DB-level default: the pinned generator omits .defaultNow() here
-// (verified reproducible across repeated runs) because better-auth's own adapter (db/schema.mjs) always sets
-// these fields explicitly in JS at insert/update time before the write reaches Drizzle.
+// Generated with `bunx auth@1.7.5 generate` (plain — no `--bun` flag; that flag forces Bun's own
+// runtime and changes the output, dropping the six .defaultNow() calls below) against
+// @relanmo/auth's authSchemaConfig; keep both files aligned. See authSchemaGeneratorVersions in
+// schema-config.ts for the exact command.
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
+    .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
 });
@@ -31,7 +32,7 @@ export const session = pgTable(
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => new Date())
       .notNull(),
@@ -61,7 +62,7 @@ export const loginAccount = pgTable(
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => new Date())
       .notNull(),
@@ -76,8 +77,9 @@ export const verification = pgTable(
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
+      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },

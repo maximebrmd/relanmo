@@ -63,17 +63,21 @@ describe("auth schema fragment", () => {
     );
   });
 
-  it("omits a DB-level default on createdAt, since better-auth's adapter always sets it at insert time", () => {
-    expect(user.createdAt.hasDefault).toBe(false);
-    expect(session.createdAt.hasDefault).toBe(false);
-    expect(loginAccount.createdAt.hasDefault).toBe(false);
-    expect(verification.createdAt.hasDefault).toBe(false);
+  it("gives every table's createdAt a DB-level defaultNow(), matching the pinned generator", () => {
+    for (const table of [user, session, loginAccount, verification]) {
+      expect(table.createdAt.hasDefault).toBe(true);
+      expect(table.createdAt.default).toBeDefined();
+      expect(table.createdAt.onUpdateFn).toBeUndefined();
+    }
   });
 
-  it("keeps updatedAt driven by $onUpdate rather than a static DB default", () => {
+  it("gives user/verification updatedAt both defaultNow() and $onUpdate, but session/loginAccount only $onUpdate", () => {
+    expect(user.updatedAt.default).toBeDefined();
+    expect(verification.updatedAt.default).toBeDefined();
+    expect(session.updatedAt.default).toBeUndefined();
+    expect(loginAccount.updatedAt.default).toBeUndefined();
     for (const table of [user, session, loginAccount, verification]) {
       expect(table.updatedAt.hasDefault).toBe(true);
-      expect(table.updatedAt.defaultFn).toBeUndefined();
       expect(table.updatedAt.onUpdateFn).toBeTypeOf("function");
     }
   });
