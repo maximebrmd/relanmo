@@ -70,8 +70,8 @@ describe("leads schema fragment", () => {
       const instants = getTableConfig(table).columns.filter(
         (column) => column.dataType === "date"
       );
-      expect(instants.map((column) => column.name).sort()).toEqual(
-        [...columns].sort()
+      expect(new Set(instants.map((column) => column.name))).toEqual(
+        new Set(columns)
       );
       for (const column of instants) {
         expect(column.getSQLType()).toBe("timestamp with time zone");
