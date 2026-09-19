@@ -77,15 +77,14 @@ export const auditEvents = pgTable(
       table.tenantId,
       table.idempotencyKey
     ),
-    // Non-blocking review note: this now also checks each entry is a {key, value} shaped
-    // object (matching AuditField), not just that details is an array. No size bound is
-    // added; C3 does not specify one, so that stays a follow-up.
+    // Non-blocking review note: this also checks each entry is a {key, value} shaped
+    // object (matching AuditField), not just that details is an array. Postgres forbids
+    // a subquery inside a CHECK clause, so this uses jsonb_path_exists (a plain function
+    // call, not a correlated subquery) instead of jsonb_array_elements/EXISTS. No size
+    // bound is added; C3 does not specify one, so that stays a follow-up.
     check(
       "audit_events_details_array_check",
-      sql`jsonb_typeof(${table.details}) = 'array' and not exists (
-        select 1 from jsonb_array_elements(${table.details}) as element
-        where jsonb_typeof(element) <> 'object' or not (element ? 'key')
-      )`
+      sql`jsonb_typeof(${table.details}) = 'array' and not jsonb_path_exists(${table.details}, '$[*] ? (@.type() != "object" || !exists(@.key))')`
     ),
   ]
 );
