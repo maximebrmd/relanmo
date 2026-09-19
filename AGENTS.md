@@ -9,7 +9,6 @@ This file is mirrored at the Relanmo application repository root. The repository
 - Discuss any new dependency outside next-forge's documented choices and the previously agreed stack with the user, and obtain agreement before installing it or changing manifests. Present the purpose, alternatives, code impact and cost first. Continue unrelated work while waiting.
 - Previously approved choices remain approved. Fumadocs, Wrangler and the AWS SDK v3 R2 integration are explicitly requested. Review normal transitive dependencies and required peers with the approved library; do not hide an independently chosen service or library in a scaffold.
 - Check current library documentation for exact APIs and compatibility. Pin tested versions with Bun and commit the single `bun.lock`.
-- `packages/database` has no `test` script yet, so `bun run test`/Turbo silently skip its `src/schema/*.test.ts` files; run them directly (`../../node_modules/.bin/vitest run` from `packages/database`, or an equivalent scoped vitest invocation) until the integration owner wires the script into that package's manifest.
 
 ## Required stack and layout
 

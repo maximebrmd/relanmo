@@ -12,11 +12,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 // `kind` is constrained to USAGE_KINDS, frozen by C3's UsageRepository port
-// (packages/domain/src/ports/persistence/billing.ts). Keep both aligned.
-const usageKindCheck = sql.join(
-  USAGE_KINDS.map((kind) => sql`${kind}`),
-  sql.raw(", ")
-);
+// (packages/domain/src/ports/persistence/billing.ts). Keep both aligned. `.inlineParams()`
+// matches P015's tenancy.ts and renders literal SQL, since bind placeholders are not valid
+// inside a CHECK clause.
 
 // Cross-fragment FK intent for P020 (packages/domain/src/ports/persistence/README.md):
 // tenantId -> tenants.id; accountId -> provider_accounts.id; actionId -> actions.id on
@@ -41,7 +39,10 @@ export const usageEvents = pgTable(
   (table) => [
     index("usageEvents_tenantId_idx").on(table.tenantId),
     index("usageEvents_tenantId_kind_idx").on(table.tenantId, table.kind),
-    check("usage_events_kind_check", sql`${table.kind} in (${usageKindCheck})`),
+    check(
+      "usage_events_kind_check",
+      sql`${table.kind} in ${USAGE_KINDS}`.inlineParams()
+    ),
     check(
       "usage_events_measurement_check",
       sql`${table.measurement} in ('ACTUAL', 'ESTIMATED')`
@@ -76,9 +77,15 @@ export const auditEvents = pgTable(
       table.tenantId,
       table.idempotencyKey
     ),
+    // Non-blocking review note: this now also checks each entry is a {key, value} shaped
+    // object (matching AuditField), not just that details is an array. No size bound is
+    // added; C3 does not specify one, so that stays a follow-up.
     check(
       "audit_events_details_array_check",
-      sql`jsonb_typeof(${table.details}) = 'array'`
+      sql`jsonb_typeof(${table.details}) = 'array' and not exists (
+        select 1 from jsonb_array_elements(${table.details}) as element
+        where jsonb_typeof(element) <> 'object' or not (element ? 'key')
+      )`
     ),
   ]
 );

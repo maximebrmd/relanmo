@@ -12,11 +12,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 // `state` columns below are constrained to ENTITLEMENT_STATES, frozen by C3's
-// BillingRepository port (packages/domain/src/ports/persistence/billing.ts). Keep both aligned.
-const entitlementStateCheck = sql.join(
-  ENTITLEMENT_STATES.map((state) => sql`${state}`),
-  sql.raw(", ")
-);
+// BillingRepository port (packages/domain/src/ports/persistence/billing.ts). Keep both
+// aligned. `.inlineParams()` matches P015's tenancy.ts and renders literal SQL, since bind
+// placeholders are not valid inside a CHECK clause.
 
 // Cross-fragment FK intent for P020 (packages/domain/src/ports/persistence/README.md):
 // tenantId -> tenants.id on every table below. providerCustomerId/providerSubscriptionId/
@@ -48,7 +46,7 @@ export const subscriptions = pgTable(
     index("subscriptions_tenantId_idx").on(table.tenantId),
     check(
       "subscriptions_state_check",
-      sql`${table.state} in (${entitlementStateCheck})`
+      sql`${table.state} in ${ENTITLEMENT_STATES}`.inlineParams()
     ),
   ]
 );
@@ -73,7 +71,7 @@ export const billingEntitlements = pgTable(
   (table) => [
     check(
       "billing_entitlements_state_check",
-      sql`${table.state} in (${entitlementStateCheck})`
+      sql`${table.state} in ${ENTITLEMENT_STATES}`.inlineParams()
     ),
   ]
 );
@@ -101,11 +99,17 @@ export const billingEvents = pgTable(
     unique("billingEvents_providerEventId_key").on(table.providerEventId),
     check(
       "billing_events_state_check",
-      sql`${table.state} in (${entitlementStateCheck})`
+      sql`${table.state} in ${ENTITLEMENT_STATES}`.inlineParams()
     ),
     check(
       "billing_events_currency_check",
       sql`${table.currency} is null or ${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    // Non-blocking review note: currency and amountMinorUnits are independently nullable
+    // columns, so pin them to both-or-neither instead of allowing one without the other.
+    check(
+      "billing_events_currency_amount_pair_check",
+      sql`(${table.currency} is null) = (${table.amountMinorUnits} is null)`
     ),
   ]
 );
