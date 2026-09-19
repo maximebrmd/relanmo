@@ -28,7 +28,7 @@ Use the task cards and shared contracts under `planning/prospecting-system/crew/
 
 One task, isolated worktree and small reviewable PR per implementation crewmate. Dispatch only after prerequisite results are accepted on the integration base and write paths are unclaimed. Independent review precedes merging; a green PR on an old base does not satisfy current-commit checks. Keep the configured captain merge authority.
 
-Assign a single integration owner to manifests, `bun.lock`, shared exports, global configuration and migration journals. Feature crewmates do not edit these or global agent instructions incidentally. Request a focused integration task when a shared change is necessary. Different schema fragments may be developed concurrently; migration generation and application are serialized.
+Assign a single integration owner to manifests, `bun.lock`, shared exports, global configuration and migration journals. Feature crewmates do not edit these or global agent instructions incidentally. Request a focused integration task when a shared change is necessary. Different schema fragments may be developed concurrently; migration generation and application are serialized. `packages/database` has no `test` script yet, so its colocated schema tests (e.g. `src/schema/*.test.ts`) do not run under `bun run test`; run them directly with `bunx vitest run <path>` from `packages/database` until an integration task wires the package into that script.
 
 Continue unrelated fixture-based tasks while a live credential or dependency decision is pending. Record external checks honestly. Coding completion does not authorize production prospecting, paid provisioning, public deployment or customer cutover.
 
