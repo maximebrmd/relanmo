@@ -192,10 +192,17 @@ export const TENANCY_EXTERNAL_FOREIGN_KEY_INTENT = [
     referencesTable: "tenants.id",
   },
   { column: "actions.tenant_id", referencesTable: "tenants.id" },
+  { column: "send_attempts.tenant_id", referencesTable: "tenants.id" },
+  { column: "account_leases.tenant_id", referencesTable: "tenants.id" },
+  { column: "quota_reservations.tenant_id", referencesTable: "tenants.id" },
+  { column: "webhook_events.tenant_id", referencesTable: "tenants.id" },
+  { column: "outbox_events.tenant_id", referencesTable: "tenants.id" },
   {
     column: "billing_customers.tenant_id",
     referencesTable: "tenants.id",
   },
+  { column: "subscriptions.tenant_id", referencesTable: "tenants.id" },
+  { column: "billing_events.tenant_id", referencesTable: "tenants.id" },
   { column: "usage_events.tenant_id", referencesTable: "tenants.id" },
   { column: "audit_events.tenant_id", referencesTable: "tenants.id" },
 ] as const;
