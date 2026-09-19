@@ -36,7 +36,23 @@ function requireValue(source: EnvSource, key: string): string {
   return value;
 }
 
-function parseConnectionUrl(value: string, key: string): string {
+const DEFAULT_POSTGRES_PORT = "5432";
+
+/**
+ * A scheme-independent identity for a connection URL (host, port, database
+ * path, username). `postgres://` and `postgresql://` name the same
+ * endpoint, as does an explicit default port vs. an omitted one; comparing
+ * raw connection strings would miss both, so the separation check below
+ * compares this instead.
+ */
+function connectionIdentity(url: URL): string {
+  const port = url.port || DEFAULT_POSTGRES_PORT;
+  return `${url.hostname.toLowerCase()}:${port}${url.pathname}:${url.username}`;
+}
+
+type ParsedConnectionUrl = Readonly<{ identity: string; raw: string }>;
+
+function parseConnectionUrl(value: string, key: string): ParsedConnectionUrl {
   let parsed: URL;
   try {
     parsed = new URL(value);
@@ -48,7 +64,7 @@ function parseConnectionUrl(value: string, key: string): string {
       `${key} must use the postgres:// or postgresql:// scheme`
     );
   }
-  return value;
+  return { identity: connectionIdentity(parsed), raw: value };
 }
 
 function parseBoundedInteger(
@@ -80,22 +96,22 @@ function parseBoundedInteger(
  * so portable modules stay importable without a configured environment.
  */
 export function parseDatabaseEnv(source: EnvSource = process.env): DatabaseEnv {
-  const runtimeUrl = parseConnectionUrl(
+  const runtime = parseConnectionUrl(
     requireValue(source, "DATABASE_URL"),
     "DATABASE_URL"
   );
-  const migrationUrl = parseConnectionUrl(
+  const migration = parseConnectionUrl(
     requireValue(source, "DATABASE_URL_UNPOOLED"),
     "DATABASE_URL_UNPOOLED"
   );
-  if (runtimeUrl === migrationUrl) {
+  if (runtime.identity === migration.identity) {
     throw new DatabaseConfigError(
       "DATABASE_URL and DATABASE_URL_UNPOOLED must be separate connection strings; runtime traffic must not share the privileged migration connection"
     );
   }
 
   return Object.freeze({
-    migrationUrl,
+    migrationUrl: migration.raw,
     poolConnectionTimeoutMs: parseBoundedInteger(
       source,
       "DATABASE_POOL_CONNECTION_TIMEOUT_MS",
@@ -114,6 +130,6 @@ export function parseDatabaseEnv(source: EnvSource = process.env): DatabaseEnv {
       DEFAULT_POOL_MAX,
       POOL_MAX_BOUNDS
     ),
-    runtimeUrl,
+    runtimeUrl: runtime.raw,
   });
 }

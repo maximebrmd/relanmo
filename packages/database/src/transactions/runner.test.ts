@@ -13,8 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { stopLocalPostgresAdmin } from "../../tests/support/local-postgres";
 import type { IsolatedTestDatabase } from "../../tests/support/test-database";
 import { createIsolatedTestDatabase } from "../../tests/support/test-database";
-import { createDatabaseRuntimeClient, parseDatabaseEnv } from "../client";
-import type { DatabaseRuntimeClient } from "../client";
+import { createDatabaseRuntimeClient } from "../client";
+import type { DatabaseEnv, DatabaseRuntimeClient } from "../client";
 import type { TransactionExecutor } from "./registry";
 import { resolveTransactionExecutor } from "./registry";
 import { createPersistenceTransactionRunner } from "./runner";
@@ -44,15 +44,25 @@ function scopeFor(tenant: string): TenantTransactionScope {
   };
 }
 
+/**
+ * Builds a DatabaseEnv directly rather than through `parseDatabaseEnv`.
+ * The isolated test database's runtime/migration URLs point at the same
+ * disposable local Postgres (there is no separate privileged role to
+ * model), so they share connection identity by design; `parseDatabaseEnv`'s
+ * separation guard is unit-tested on its own in `env.test.ts`, including
+ * this exact equivalent-endpoint scenario.
+ */
 function makeClient(
   target: IsolatedTestDatabase,
   poolMax: number
 ): DatabaseRuntimeClient {
-  const env = parseDatabaseEnv({
-    DATABASE_POOL_MAX: String(poolMax),
-    DATABASE_URL: target.runtimeUrl,
-    DATABASE_URL_UNPOOLED: target.migrationUrl,
-  });
+  const env: DatabaseEnv = {
+    migrationUrl: target.migrationUrl,
+    poolConnectionTimeoutMs: 5000,
+    poolIdleTimeoutMs: 10_000,
+    poolMax,
+    runtimeUrl: target.runtimeUrl,
+  };
   return createDatabaseRuntimeClient(env);
 }
 

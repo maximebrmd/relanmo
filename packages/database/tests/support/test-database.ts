@@ -21,13 +21,24 @@ function sanitizeIdentifier(name: string): string {
   return name.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
 }
 
-/** Unique per worktree, process and call, so parallel runs never collide. */
+/**
+ * Unique per worktree, process and call, so parallel runs never collide.
+ * The random suffix is what actually guarantees uniqueness, so its width
+ * (and the fixed prefix's) is reserved first; only the label is truncated
+ * to fit the remaining budget. Truncating the assembled string instead
+ * would silently eat into the suffix for long labels and let two calls
+ * collide.
+ */
 export function generateTestDatabaseName(label: string): string {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
-  const name = sanitizeIdentifier(
-    `relanmo_test_${worktreeTag()}_${process.pid}_${label}_${suffix}`
+  const prefix = `relanmo_test_${worktreeTag()}_${process.pid}_`;
+  const suffixSegment = `_${suffix}`;
+  const labelBudget = Math.max(
+    POSTGRES_IDENTIFIER_MAX_LENGTH - prefix.length - suffixSegment.length,
+    0
   );
-  return name.slice(0, POSTGRES_IDENTIFIER_MAX_LENGTH);
+  const safeLabel = sanitizeIdentifier(label).slice(0, labelBudget);
+  return `${prefix}${safeLabel}${suffixSegment}`;
 }
 
 function withDatabase(

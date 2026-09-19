@@ -66,6 +66,36 @@ describe("parseDatabaseEnv", () => {
     ).toThrow(DatabaseConfigError);
   });
 
+  it("rejects the same endpoint spelled with an equivalent scheme", () => {
+    // postgres:// and postgresql:// name the same endpoint; a raw string
+    // comparison would miss this and let runtime traffic reuse the
+    // privileged migration connection.
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://user:pass@priv-host:5432/app",
+        DATABASE_URL_UNPOOLED: "postgresql://user:pass@priv-host:5432/app",
+      })
+    ).toThrow(DatabaseConfigError);
+  });
+
+  it("rejects the same endpoint with an explicit default port vs. an omitted one", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://user:pass@priv-host/app",
+        DATABASE_URL_UNPOOLED: "postgres://user:pass@priv-host:5432/app",
+      })
+    ).toThrow(DatabaseConfigError);
+  });
+
+  it("accepts genuinely different endpoints that happen to reuse a hostname", () => {
+    const env = parseDatabaseEnv({
+      DATABASE_URL: "postgres://user:pass@host:5432/app",
+      DATABASE_URL_UNPOOLED: "postgres://user:pass@host:5433/app",
+    });
+    expect(env.runtimeUrl).toBe("postgres://user:pass@host:5432/app");
+    expect(env.migrationUrl).toBe("postgres://user:pass@host:5433/app");
+  });
+
   it("rejects a non-numeric pool size", () => {
     expect(() =>
       parseDatabaseEnv({ ...VALID_ENV, DATABASE_POOL_MAX: "not-a-number" })

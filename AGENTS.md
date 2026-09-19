@@ -16,8 +16,6 @@ Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Ox
 
 Use `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Set up R2 buckets through Wrangler; application object operations use the AWS S3 v3 SDK. Do not restore Clerk, Prisma, Supabase or Mintlify defaults over these choices.
 
-Runtime database config is `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct/migration), validated eagerly by `packages/database/src/client/`. `packages/database/src/transactions/` sets tenant context transaction-locally on the `app.tenant_id` GUC (`set_config(..., true)`); RLS work (P021) must read that same GUC name. Repositories reach the connection bound to a `PersistenceTransaction` via `resolveTransactionExecutor`, never by holding their own pool/client. Local-Postgres test harness lives in `packages/database/tests/support/` (Docker-based by default, `DATABASE_TEST_ADMIN_URL` overrides it, skips cleanly when neither is available). `packages/database` has no `test` script wired into `bun run test` yet — run its vitest suites directly until an integration task adds one.
-
 ## Product invariants
 
 Any incoming prospect message stops automated outreach before model classification. Humans handle replies. Preserve the send ledger, uncertain-send reconciliation, account isolation and bounded sequences.
