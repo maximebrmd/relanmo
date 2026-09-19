@@ -10,6 +10,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 // Generated with `bunx auth@1.7.5 generate` against @relanmo/auth's authSchemaConfig; keep both files aligned.
+// createdAt/updatedAt intentionally carry no DB-level default: the pinned generator omits .defaultNow() here
+// (verified reproducible across repeated runs) because better-auth's own adapter (db/schema.mjs) always sets
+// these fields explicitly in JS at insert/update time before the write reaches Drizzle.
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

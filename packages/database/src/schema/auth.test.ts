@@ -63,6 +63,21 @@ describe("auth schema fragment", () => {
     );
   });
 
+  it("omits a DB-level default on createdAt, since better-auth's adapter always sets it at insert time", () => {
+    expect(user.createdAt.hasDefault).toBe(false);
+    expect(session.createdAt.hasDefault).toBe(false);
+    expect(loginAccount.createdAt.hasDefault).toBe(false);
+    expect(verification.createdAt.hasDefault).toBe(false);
+  });
+
+  it("keeps updatedAt driven by $onUpdate rather than a static DB default", () => {
+    for (const table of [user, session, loginAccount, verification]) {
+      expect(table.updatedAt.hasDefault).toBe(true);
+      expect(table.updatedAt.defaultFn).toBeUndefined();
+      expect(table.updatedAt.onUpdateFn).toBeTypeOf("function");
+    }
+  });
+
   it("gives the database-backed rate limit table a unique key", () => {
     expect(rateLimit.key.isUnique).toBe(true);
     expect(columnNames(rateLimit)).toEqual([
