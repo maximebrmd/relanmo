@@ -35,6 +35,50 @@ describe("leads schema fragment", () => {
     expect(providerAccounts.providerAccountId.isUnique).toBe(true);
   });
 
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    const expectedInstants = [
+      {
+        table: providerAccounts,
+        columns: [
+          "health_observed_at",
+          "last_successful_reconciliation_at",
+          "created_at",
+          "updated_at",
+        ],
+      },
+      { table: prospects, columns: ["created_at", "updated_at"] },
+      { table: evidence, columns: ["captured_at", "created_at"] },
+      {
+        table: conversations,
+        columns: [
+          "ownership_recorded_at",
+          "human_owned_at",
+          "last_incoming_at",
+          "last_message_at",
+          "created_at",
+          "updated_at",
+        ],
+      },
+      {
+        table: messages,
+        columns: ["occurred_at", "received_at", "recorded_at"],
+      },
+      { table: suppressionEntries, columns: ["recorded_at"] },
+    ] as const;
+
+    for (const { table, columns } of expectedInstants) {
+      const instants = getTableConfig(table).columns.filter(
+        (column) => column.dataType === "date"
+      );
+      expect(instants.map((column) => column.name).sort()).toEqual(
+        [...columns].sort()
+      );
+      for (const column of instants) {
+        expect(column.getSQLType()).toBe("timestamp with time zone");
+      }
+    }
+  });
+
   it("scopes a conversation to exactly one account/prospect pair, independent of campaign", () => {
     expect(uniqueColumnSets(conversations)).toContainEqual([
       "account_id",

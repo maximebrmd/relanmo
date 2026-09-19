@@ -44,17 +44,22 @@ export const providerAccounts = pgTable(
     providerUserId: text("provider_user_id"),
     status: text("status", { enum: PROVIDER_ACCOUNT_STATUSES }).notNull(),
     healthReason: text("health_reason"),
-    healthObservedAt: timestamp("health_observed_at").notNull(),
+    healthObservedAt: timestamp("health_observed_at", {
+      withTimezone: true,
+    }).notNull(),
     healthCapabilities: jsonb("health_capabilities")
       .$type<readonly string[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
     lastSuccessfulReconciliationAt: timestamp(
-      "last_successful_reconciliation_at"
+      "last_successful_reconciliation_at",
+      { withTimezone: true }
     ),
     revision: integer("revision").notNull().default(0),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -85,8 +90,10 @@ export const prospects = pgTable(
     location: text("location"),
     profileUrl: text("profile_url"),
     status: text("status", { enum: PROSPECT_STATUSES }).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -120,8 +127,10 @@ export const evidence = pgTable(
     sourceUrl: text("source_url"),
     normalizedClaim: text("normalized_claim").notNull(),
     contentHash: text("content_hash"),
-    capturedAt: timestamp("captured_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     unique("evidence_prospect_source_claim_key").on(
@@ -156,13 +165,17 @@ export const conversations = pgTable(
     }).notNull(),
     // External FK intent for P020: -> auth `user`.id (packages/database/src/schema/auth.ts).
     ownerUserId: text("owner_user_id").$type<UserId>(),
-    ownershipRecordedAt: timestamp("ownership_recorded_at").notNull(),
+    ownershipRecordedAt: timestamp("ownership_recorded_at", {
+      withTimezone: true,
+    }).notNull(),
     ownershipRevision: integer("ownership_revision").notNull().default(0),
-    humanOwnedAt: timestamp("human_owned_at"),
-    lastIncomingAt: timestamp("last_incoming_at"),
-    lastMessageAt: timestamp("last_message_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    humanOwnedAt: timestamp("human_owned_at", { withTimezone: true }),
+    lastIncomingAt: timestamp("last_incoming_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -210,9 +223,11 @@ export const messages = pgTable(
       .default(sql`'[]'::jsonb`),
     // Provider-reported occurrence time, kept separate from our own ingestion time so a
     // delayed webhook cannot be mistaken for a delayed prospect reply.
-    occurredAt: timestamp("occurred_at").notNull(),
-    receivedAt: timestamp("received_at").notNull(),
-    recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     unique("messages_account_providerMessageId_key").on(
@@ -247,7 +262,7 @@ export const suppressionEntries = pgTable(
       .notNull()
       .references(() => prospects.id, { onDelete: "cascade" }),
     reason: text("reason", { enum: SUPPRESSION_REASONS }).notNull(),
-    recordedAt: timestamp("recorded_at").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   },
   (table) => [
     unique("suppression_entries_account_prospect_key").on(
