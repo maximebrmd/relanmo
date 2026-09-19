@@ -36,7 +36,7 @@ describe("evaluateContentGuard", () => {
         claims: [
           {
             evidenceId: EVIDENCE_ID_HIRING_POST,
-            text: "vous recrutez actuellement un data engineer",
+            text: "vous recrutez un data engineer",
           },
         ],
       }),
@@ -45,6 +45,44 @@ describe("evaluateContentGuard", () => {
     const result = evaluateContentGuard(check);
 
     expect(result.outcome).toBe("PASS");
+  });
+
+  it("fails a false claim that shares only a single generic connector word with a real, correctly-scoped evidence record", () => {
+    // Regression for a prior review finding: sharing one generic/connector
+    // token (here "votre") with the evidence's normalized claim must not by
+    // itself count as grounding once the claim has other, unrelated
+    // significant content. The evidence id is real, approved and belongs to
+    // the right tenant/prospect; only the stopword-filtered, high-overlap
+    // check on the claim's own text catches this.
+    const evidence = parseEvidence({
+      accountId: null,
+      capturedAt: "2026-09-17T10:00:00.000Z",
+      contentHash: null,
+      evidenceId: EVIDENCE_ID_HIRING_POST,
+      normalizedClaim:
+        "votre entreprise recherche un poste de comptable senior",
+      prospectId: PROSPECT_DEMO,
+      provenance: "PROVIDER_POST",
+      sourceId: "source_1",
+      sourceUrl: null,
+      tenantId: TENANT_DEMO,
+    });
+    const check = contentGuardCheckFixture({
+      draft: draftFixture({
+        claims: [
+          {
+            evidenceId: EVIDENCE_ID_HIRING_POST,
+            text: "Merci pour votre patience, nous avons déjà signé le contrat ensemble",
+          },
+        ],
+      }),
+      evidence: [evidence],
+    });
+
+    const result = evaluateContentGuard(check);
+
+    expect(result.outcome).toBe("HOLD");
+    expect(reasonCodes(result)).toEqual(["CLAIM_NOT_GROUNDED"]);
   });
 
   it("fails a claim that cites a validly-scoped, approved evidence id but asserts something that evidence does not support", () => {
@@ -105,7 +143,7 @@ describe("evaluateContentGuard", () => {
         claims: [
           {
             evidenceId: EVIDENCE_ID_HIRING_POST,
-            text: "vous recrutez actuellement un data engineer",
+            text: "vous recrutez un data engineer",
           },
         ],
       }),
