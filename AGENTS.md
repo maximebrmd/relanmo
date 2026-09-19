@@ -16,6 +16,8 @@ Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Ox
 
 Use `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Set up R2 buckets through Wrangler; application object operations use the AWS S3 v3 SDK. Do not restore Clerk, Prisma, Supabase or Mintlify defaults over these choices.
 
+`packages/database` has no `test` script yet, so `bun run test` (Turbo) does not execute its `*.test.ts` files; run them directly with `bunx vitest run packages/database/src/schema` until an integration task wires the script. A current-state row with a pointer into its own immutable `*_versions` table (e.g. `campaigns.activeVersionId` / `styleProfiles.acceptedInferredVersionId`) is circular with that versions table's back-reference; declare the pointer as a plain column without `.references()` (enforce the FK only in the child-to-parent direction) to satisfy this repo's `no-use-before-define` lint rule.
+
 ## Product invariants
 
 Any incoming prospect message stops automated outreach before model classification. Humans handle replies. Preserve the send ledger, uncertain-send reconciliation, account isolation and bounded sequences.
