@@ -19,11 +19,13 @@ try {
 
   const result = spawnSync(bunExecutable, ["run", "typecheck"], {
     cwd: repositoryRoot,
-    encoding: "utf8",
+    encoding: "utf-8",
   });
 
   if (result.error) {
-    throw new Error(`Unable to run the typecheck fixture: ${result.error.message}`);
+    throw new Error(
+      `Unable to run the typecheck fixture: ${result.error.message}`
+    );
   }
 
   if (result.status === 0) {
@@ -31,7 +33,10 @@ try {
   }
 
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  if (!output.includes("__ci_typecheck_failure.ts") || !output.includes("TS2322")) {
+  if (
+    !output.includes("__ci_typecheck_failure.ts") ||
+    !output.includes("TS2322")
+  ) {
     process.stdout.write(result.stdout ?? "");
     process.stderr.write(result.stderr ?? "");
     throw new Error(
@@ -39,7 +44,9 @@ try {
     );
   }
 
-  console.info("The authoritative typecheck rejected the controlled type error.");
+  console.info(
+    "The authoritative typecheck rejected the controlled type error."
+  );
 } finally {
   await rm(fixturePath, { force: true });
 }
