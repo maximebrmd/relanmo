@@ -1,67 +1,45 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const repositoryRoot = path.join(import.meta.dirname, "../..");
 const bunExecutable =
   process.env.RELANMO_BUN_BIN ?? process.env.npm_execpath ?? "bun";
-const fixtureDirectory = await mkdtemp(
-  path.join(os.tmpdir(), "relanmo-typecheck-fixture-")
+const fixturePath = path.join(
+  repositoryRoot,
+  "packages/domain/src/__ci_typecheck_failure.ts"
 );
 
 try {
   await writeFile(
-    path.join(fixtureDirectory, "tsconfig.json"),
-    JSON.stringify(
-      {
-        compilerOptions: {
-          module: "NodeNext",
-          moduleResolution: "NodeNext",
-          noEmit: true,
-          skipLibCheck: true,
-          strict: true,
-          target: "ES2022",
-        },
-        files: ["fixture.ts"],
-      },
-      null,
-      2
-    )
-  );
-  await writeFile(
-    path.join(fixtureDirectory, "fixture.ts"),
-    "const shouldBeText: string = 42;\nvoid shouldBeText;\n"
+    fixturePath,
+    "const controlledTypecheckFailure: string = 42;\nvoid controlledTypecheckFailure;\n",
+    { flag: "wx" }
   );
 
-  const result = spawnSync(
-    bunExecutable,
-    [
-      "x",
-      "--no-install",
-      "tsc",
-      "--project",
-      path.join(fixtureDirectory, "tsconfig.json"),
-    ],
-    {
-      cwd: repositoryRoot,
-      stdio: "inherit",
-    }
-  );
+  const result = spawnSync(bunExecutable, ["run", "typecheck"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
 
   if (result.error) {
-    console.error(
-      `Unable to run the typecheck fixture: ${result.error.message}`
-    );
-    process.exit(1);
+    throw new Error(`Unable to run the typecheck fixture: ${result.error.message}`);
   }
 
   if (result.status === 0) {
-    console.error("The controlled type-error fixture unexpectedly passed.");
-    process.exit(1);
+    throw new Error("The controlled type-error fixture unexpectedly passed.");
   }
 
-  console.info("Controlled type-error fixture failed as expected.");
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (!output.includes("__ci_typecheck_failure.ts") || !output.includes("TS2322")) {
+    process.stdout.write(result.stdout ?? "");
+    process.stderr.write(result.stderr ?? "");
+    throw new Error(
+      "The authoritative typecheck failed without reporting the controlled error."
+    );
+  }
+
+  console.info("The authoritative typecheck rejected the controlled type error.");
 } finally {
-  await rm(fixtureDirectory, { force: true, recursive: true });
+  await rm(fixturePath, { force: true });
 }
