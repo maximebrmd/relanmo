@@ -57,11 +57,19 @@ for (const pullRequestUrl of pullRequestUrls) {
 
   console.info(`Closing and reopening ${pullRequestUrl}`);
   runGhAxi(["pr", "close", number, "--repo", repository]);
+  const reopenArgs = ["pr", "reopen", number, "--repo", repository];
   try {
-    runGhAxi(["pr", "reopen", number, "--repo", repository]);
-  } catch (error) {
-    console.error(`Reopen failed for ${pullRequestUrl}; retry it immediately.`);
-    throw error;
+    runGhAxi(reopenArgs);
+  } catch {
+    console.error(`Reopen failed for ${pullRequestUrl}; retrying once.`);
+    try {
+      runGhAxi(reopenArgs);
+    } catch (error) {
+      throw new Error(
+        `Reopen failed twice for ${pullRequestUrl}. Recover with: gh-axi pr reopen ${number} --repo ${repository}`,
+        { cause: error }
+      );
+    }
   }
 }
 
