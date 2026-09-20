@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 const repository = "maximebrmd/relanmo";
-const workflow = "ci.yml";
+const workflow = "CI";
 const apply = process.argv.length === 3 && process.argv[2] === "--apply";
 const pullRequestUrls = [
   "https://github.com/maximebrmd/relanmo/pull/18",
