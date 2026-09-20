@@ -29,6 +29,7 @@ try {
       "vitest",
       "run",
       "packages/database",
+      "packages/auth",
       "--reporter=default",
       "--reporter=json",
       "--outputFile",
