@@ -595,6 +595,79 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
             ).rejects.toMatchObject({ code: "42501" });
             await worker.query("rollback to savepoint style_profile_insert");
 
+            await worker.query("savepoint cross_tenant_quota");
+            await expect(
+              worker.query(
+                `insert into send_attempts
+                   (id, tenant_id, action_id, account_id, request_id, fence,
+                    worker_id, payload, source_versions, quota_reservation_id,
+                    authorized_at, lease_expires_at)
+                 values
+                   ($1, $2, 'action-a', 'provider-account-a', $3, 1,
+                    'isolation-worker',
+                    '{"kind":"INVITATION_WITHOUT_NOTE","note":null,"step":"INVITATION"}',
+                    '{}', 'quota-b', now(), now() + interval '1 hour')`,
+                [
+                  "send-attempt-cross-tenant-quota",
+                  TENANT_A,
+                  "request-cross-tenant-quota",
+                ]
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await worker.query("rollback to savepoint cross_tenant_quota");
+
+            const sameTenantAttempt = await worker.query(
+              `insert into send_attempts
+                 (id, tenant_id, action_id, account_id, request_id, fence,
+                  worker_id, payload, source_versions, quota_reservation_id,
+                  authorized_at, lease_expires_at)
+               values
+                 ($1, $2, 'action-a', 'provider-account-a', $3, 1,
+                  'isolation-worker',
+                  '{"kind":"INVITATION_WITHOUT_NOTE","note":null,"step":"INVITATION"}',
+                  '{}', 'quota-a', now(), now() + interval '1 hour')`,
+              [
+                "send-attempt-same-tenant",
+                TENANT_A,
+                "request-same-tenant",
+              ]
+            );
+            expect(sameTenantAttempt.rowCount).toBe(1);
+
+            await worker.query("savepoint cross_tenant_attempt_insert");
+            await expect(
+              worker.query(
+                `insert into actions
+                   (id, tenant_id, account_id, prospect_id, campaign_id,
+                    campaign_version_id, step, payload, evidence_ids,
+                    source_versions, created_at, state, state_at, attempt_id)
+                 select $1, tenant_id, account_id, prospect_id, campaign_id,
+                        campaign_version_id, 'DM1', payload, evidence_ids,
+                        source_versions, now(), 'READY', now(), 'send-attempt-b'
+                   from actions
+                  where id = 'action-a'`,
+                ["action-cross-tenant-attempt"]
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await worker.query(
+              "rollback to savepoint cross_tenant_attempt_insert"
+            );
+
+            await worker.query("savepoint cross_tenant_attempt_update");
+            await expect(
+              worker.query(
+                "update actions set attempt_id = 'send-attempt-b' where id = 'action-a'"
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await worker.query(
+              "rollback to savepoint cross_tenant_attempt_update"
+            );
+
+            const sameTenantAction = await worker.query(
+              "update actions set attempt_id = 'send-attempt-same-tenant' where id = 'action-a'"
+            );
+            expect(sameTenantAction.rowCount).toBe(1);
+
             const lifecycleUpdate = await worker.query(
               "update actions set state = state where false"
             );

@@ -170,6 +170,22 @@ BEGIN
          WHERE campaign_versions.id = actions.campaign_version_id
            AND campaign_versions.tenant_id = actions.tenant_id
       )
+      AND actions.attempt_id IS NULL
+    );
+
+  CREATE POLICY actions_tenant_attempt_update
+    ON actions AS RESTRICTIVE
+    FOR UPDATE TO relanmo_app, relanmo_worker
+    USING (true)
+    WITH CHECK (
+      actions.attempt_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM send_attempts
+         WHERE send_attempts.id = actions.attempt_id
+           AND send_attempts.tenant_id = actions.tenant_id
+           AND send_attempts.action_id = actions.id
+           AND send_attempts.account_id = actions.account_id
+      )
     );
 
   CREATE POLICY quota_reservations_tenant_parents_insert
@@ -206,6 +222,13 @@ BEGIN
         SELECT 1 FROM provider_accounts
          WHERE provider_accounts.id = send_attempts.account_id
            AND provider_accounts.tenant_id = send_attempts.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM quota_reservations
+         WHERE quota_reservations.id = send_attempts.quota_reservation_id
+           AND quota_reservations.tenant_id = send_attempts.tenant_id
+           AND quota_reservations.action_id = send_attempts.action_id
+           AND quota_reservations.account_id = send_attempts.account_id
       )
     );
 
