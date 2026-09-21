@@ -182,6 +182,26 @@ describe("French prompt defaults", () => {
     ).toBe("DECISION_MAKER");
   });
 
+  it("requires identifiable company evidence for executive titles", () => {
+    for (const headline of ["Founder", "CTO", "CEO @ "]) {
+      const qualification = qualifyIcp({
+        headline,
+        observedSignalText: null,
+      });
+
+      expect(qualification.eligible).toBe(false);
+      expect(qualification.exclusion).toBe("NOT_ICP");
+      expect(qualification.invitationAllowed).toBe(false);
+    }
+
+    expect(
+      qualifyIcp({
+        headline: "Founder @ Lumenor Studio",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
+  });
+
   it("does not combine unrelated signal words into on-market intent", () => {
     const qualification = qualifyIcp({
       headline: "CTO @ Nordwave SaaS",

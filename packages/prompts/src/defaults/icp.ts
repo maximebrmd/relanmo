@@ -140,6 +140,23 @@ function containsMarker(haystack: string, markers: readonly string[]): boolean {
   });
 }
 
+function headlineCompany(headline: string): string | null {
+  const lower = folded(headline);
+  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(lower);
+  if (delimiter?.index === undefined) {
+    return null;
+  }
+
+  const company = lower.slice(delimiter.index + delimiter[0].length).trim();
+  return /[a-z0-9]/u.test(company) ? company : null;
+}
+
+function headlineRole(headline: string): string {
+  const lower = folded(headline);
+  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(lower);
+  return delimiter?.index === undefined ? lower : lower.slice(0, delimiter.index);
+}
+
 /** Explicit on-market freelance-demand wording is a hard ICP exclusion. */
 export function detectOnMarketIntent(signalText: string | null): boolean {
   if (signalText === null || signalText.trim().length === 0) {
@@ -158,7 +175,7 @@ export function classifyIcpAudience(
   headline: string
 ): IcpAudience | "PEER_NOT_BUYER" | null {
   const lower = folded(headline);
-  const role = lower.split(/\s+(?:@|\||·|—)\s+/u, 1)[0] ?? lower;
+  const role = headlineRole(headline);
   if (containsMarker(role, PEER_MARKERS)) {
     return "PEER_NOT_BUYER";
   }
@@ -169,8 +186,9 @@ export function classifyIcpAudience(
   ) {
     return "RECRUITER_ESN";
   }
+  const isExecutive = containsMarker(role, EXECUTIVE_DECISION_MAKER_MARKERS);
   if (
-    containsMarker(role, EXECUTIVE_DECISION_MAKER_MARKERS) ||
+    (isExecutive && headlineCompany(headline) !== null) ||
     (containsMarker(role, FUNCTIONAL_LEADERSHIP_MARKERS) &&
       containsMarker(role, TARGET_FUNCTION_MARKERS))
   ) {
