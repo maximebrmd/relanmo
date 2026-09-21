@@ -4,6 +4,7 @@ export {
 } from "./decision-port";
 export type {
   TypeSafeDecisionAdapter,
+  TypeSafeDecisionBatch,
   TypeSafeDecisionPortOptions,
   TypeSafeDependentDecisionInput,
   TypeSafeIndependentDecisionInput,

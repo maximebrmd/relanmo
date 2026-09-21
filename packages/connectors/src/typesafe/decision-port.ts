@@ -52,6 +52,11 @@ import {
 } from "@typesafe-ai/sdk";
 
 export const TYPESAFE_ADAPTER_LIMITS = {
+  maxChoiceLabelCharacters: 500,
+  maxEvidenceClaimCharacters: 4_000,
+  maxIndependentQuestions: 16,
+  maxPayloadCharacters: 32_000,
+  maxPriorDecisions: 64,
   holdBelowConfidence: 0.5,
   maxRetries: 2,
   maxTimeoutMs: 10_000,
@@ -86,6 +91,11 @@ export type TypeSafeDependentDecisionInput = TypeSafeDecisionInput &
     priorDecisions: readonly TypeSafeDecision[];
   }>;
 
+export type TypeSafeDecisionBatch = Readonly<{
+  decisions: readonly TypeSafeDecision[];
+  usage: ModelUsage;
+}>;
+
 export type TypeSafeDecisionAdapter = TypeSafeDecisionPort &
   Readonly<{
     decideDependent: (
@@ -93,7 +103,7 @@ export type TypeSafeDecisionAdapter = TypeSafeDecisionPort &
     ) => Promise<ProviderReadResult<TypeSafeDecision>>;
     decideIndependent: (
       input: TypeSafeIndependentDecisionInput
-    ) => Promise<ProviderReadResult<readonly TypeSafeDecision[]>>;
+    ) => Promise<ProviderReadResult<TypeSafeDecisionBatch>>;
   }>;
 
 const EMPTY_USAGE: ModelUsage = Object.freeze({
@@ -123,36 +133,33 @@ function duplicateId(values: readonly string[]): string | undefined {
   return undefined;
 }
 
-function finiteTokens(value: number): number {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-    return Math.trunc(value);
-  }
-  return 0;
-}
-
 function usageFrom(usage: {
   input_tokens: number;
   output_tokens: number;
-}): ModelUsage {
-  const inputTokens = finiteTokens(usage.input_tokens);
-  const outputTokens = finiteTokens(usage.output_tokens);
+}): ModelUsage | null {
+  if (
+    !Number.isSafeInteger(usage.input_tokens) ||
+    usage.input_tokens < 0 ||
+    !Number.isSafeInteger(usage.output_tokens) ||
+    usage.output_tokens < 0 ||
+    !Number.isSafeInteger(usage.input_tokens + usage.output_tokens)
+  ) {
+    return null;
+  }
   return Object.freeze({
     billedAmountMicros: null,
     currency: null,
-    inputTokens,
-    outputTokens,
-    totalTokens: inputTokens + outputTokens,
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    totalTokens: usage.input_tokens + usage.output_tokens,
   });
 }
 
-function modelVersionFrom(
-  reported: string,
-  fallback: ModelVersion
-): ModelVersion {
+function modelVersionFrom(reported: string): ModelVersion | null {
   try {
     return parseModelVersion(reported);
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -203,9 +210,9 @@ function holdDecision(input: {
 
 function firstDecision(
   context: ProviderOperationContext,
-  decisions: readonly TypeSafeDecision[]
+  batch: TypeSafeDecisionBatch
 ): ProviderReadResult<TypeSafeDecision> {
-  const [decision] = decisions;
+  const [decision] = batch.decisions;
   if (!decision) {
     return providerInvalidInput(
       context,
@@ -213,7 +220,10 @@ function firstDecision(
       "decision request produced no answer"
     );
   }
-  return providerSuccess(context, decision);
+  return providerSuccess(
+    context,
+    Object.freeze({ ...decision, usage: batch.usage })
+  );
 }
 
 function retryAfterAt(
@@ -262,6 +272,20 @@ function validateQuestionInput(
       "question choice ids must not be empty"
     );
   }
+  if (
+    question.choices.some(
+      (option) =>
+        option.label.length >
+        TYPESAFE_ADAPTER_LIMITS.maxChoiceLabelCharacters
+    )
+  ) {
+    return providerInvalidInput(
+      context,
+      "question.choices",
+      `question choice labels cannot exceed ${TYPESAFE_ADAPTER_LIMITS.maxChoiceLabelCharacters} characters`,
+      "OUT_OF_BOUNDS"
+    );
+  }
   if (question.prompt.length > TYPESAFE_LIMITS.maxPromptCharacters) {
     return providerInvalidInput(
       context,
@@ -278,6 +302,108 @@ function validateQuestionInput(
       "OUT_OF_BOUNDS"
     );
   }
+  if (
+    evidence.some(
+      (item) =>
+        item.claim.length >
+        TYPESAFE_ADAPTER_LIMITS.maxEvidenceClaimCharacters
+    )
+  ) {
+    return providerInvalidInput(
+      context,
+      "evidence",
+      `evidence claims cannot exceed ${TYPESAFE_ADAPTER_LIMITS.maxEvidenceClaimCharacters} characters`,
+      "OUT_OF_BOUNDS"
+    );
+  }
+  return null;
+}
+
+function requestCharacterCount(
+  input: TypeSafeIndependentDecisionInput,
+  priorDecisions: readonly TypeSafeDecision[]
+): number {
+  let count =
+    input.modelVersion.length +
+    input.prospectId.length +
+    input.tenantId.length;
+  for (const item of input.evidence) {
+    count += item.evidenceId.length + item.claim.length;
+  }
+  for (const question of input.questions) {
+    count +=
+      question.id.length + question.prompt.length + question.schemaVersion.length;
+    for (const option of question.choices) {
+      count += option.id.length + option.label.length;
+    }
+  }
+  for (const decision of priorDecisions) {
+    count +=
+      decision.questionId.length +
+      decision.schemaVersion.length +
+      decision.uncertainty.length +
+      (decision.answer?.id.length ?? 0);
+  }
+  return count;
+}
+
+function validateRequestInput(
+  input: TypeSafeIndependentDecisionInput,
+  priorDecisions: readonly TypeSafeDecision[]
+): ProviderReadResult<never> | null {
+  if (input.questions.length === 0) {
+    return providerInvalidInput(
+      input.context,
+      "questions",
+      "decision requests need at least one question"
+    );
+  }
+  if (
+    input.questions.length > TYPESAFE_ADAPTER_LIMITS.maxIndependentQuestions
+  ) {
+    return providerInvalidInput(
+      input.context,
+      "questions",
+      `decision requests cannot contain more than ${TYPESAFE_ADAPTER_LIMITS.maxIndependentQuestions} questions`,
+      "OUT_OF_BOUNDS"
+    );
+  }
+  if (priorDecisions.length > TYPESAFE_ADAPTER_LIMITS.maxPriorDecisions) {
+    return providerInvalidInput(
+      input.context,
+      "priorDecisions",
+      `dependent requests cannot contain more than ${TYPESAFE_ADAPTER_LIMITS.maxPriorDecisions} prior decisions`,
+      "OUT_OF_BOUNDS"
+    );
+  }
+  for (const question of input.questions) {
+    const invalid = validateQuestionInput(
+      input.context,
+      input.evidence,
+      question
+    );
+    if (invalid) {
+      return invalid;
+    }
+  }
+  if (duplicateId(input.questions.map((question) => question.id))) {
+    return providerInvalidInput(
+      input.context,
+      "questions",
+      "decision questions must use unique ids"
+    );
+  }
+  if (
+    requestCharacterCount(input, priorDecisions) >
+    TYPESAFE_ADAPTER_LIMITS.maxPayloadCharacters
+  ) {
+    return providerInvalidInput(
+      input.context,
+      "questions",
+      `decision payload cannot exceed ${TYPESAFE_ADAPTER_LIMITS.maxPayloadCharacters} characters`,
+      "OUT_OF_BOUNDS"
+    );
+  }
   return null;
 }
 
@@ -285,10 +411,9 @@ function mapQuestionDecision(
   question: TypeSafeQuestion,
   input: TypeSafeIndependentDecisionInput,
   result: SystemOneResult<Questions>,
-  evaluatedAt: Date
+  evaluatedAt: Date,
+  modelVersion: ModelVersion
 ): TypeSafeDecision {
-  const usage = usageFrom(result.usage);
-  const modelVersion = modelVersionFrom(result.model, input.modelVersion);
   const raw = result.answers[question.id];
   if (!raw || raw.type !== "choice") {
     return holdDecision({
@@ -296,7 +421,6 @@ function mapQuestionDecision(
       evidence: input.evidence,
       modelVersion,
       question,
-      usage,
     });
   }
   const selected = question.choices.find((option) => option.id === raw.choice);
@@ -306,7 +430,6 @@ function mapQuestionDecision(
       evidence: input.evidence,
       modelVersion,
       question,
-      usage,
     });
   }
   const uncertainty = uncertaintyFrom(raw.confidence);
@@ -316,7 +439,6 @@ function mapQuestionDecision(
       evidence: input.evidence,
       modelVersion,
       question,
-      usage,
     });
   }
   return Object.freeze({
@@ -327,7 +449,7 @@ function mapQuestionDecision(
     questionId: question.id,
     schemaVersion: question.schemaVersion,
     uncertainty,
-    usage,
+    usage: EMPTY_USAGE,
   });
 }
 
@@ -425,7 +547,11 @@ async function decideQuestions(
   priorDecisions: readonly TypeSafeDecision[],
   now: () => Date,
   loadClient: () => TypeSafeSystemOneClient | "CREDENTIALS_UNAVAILABLE"
-): Promise<ProviderReadResult<readonly TypeSafeDecision[]>> {
+): Promise<ProviderReadResult<TypeSafeDecisionBatch>> {
+  const invalid = validateRequestInput(input, priorDecisions);
+  if (invalid) {
+    return invalid;
+  }
   const evaluatedAt = now();
   const remainingMs =
     Date.parse(input.context.deadlineAt) - evaluatedAt.getTime();
@@ -492,11 +618,31 @@ async function decideQuestions(
         timeout: timeoutMs,
       }
     );
+    const usage = usageFrom(result.usage);
+    const modelVersion = modelVersionFrom(result.model);
+    if (!usage || !modelVersion) {
+      return providerRetryableReadFailure(
+        input.context,
+        "UPSTREAM_READ_FAILURE",
+        "typesafe returned malformed model or usage metadata"
+      );
+    }
     return providerSuccess(
       input.context,
-      input.questions.map((question) =>
-        mapQuestionDecision(question, input, result, evaluatedAt)
-      )
+      Object.freeze({
+        decisions: Object.freeze(
+          input.questions.map((question) =>
+            mapQuestionDecision(
+              question,
+              input,
+              result,
+              evaluatedAt,
+              modelVersion
+            )
+          )
+        ),
+        usage,
+      })
     );
   } catch (error) {
     return mapSdkFailure(error, input.context, evaluatedAt);
@@ -556,11 +702,15 @@ export function createTypeSafeDecisionPort(
     },
 
     async decideDependent(input) {
-      const invalid = validateQuestionInput(
-        input.context,
-        input.evidence,
-        input.question
-      );
+      const decisionInput = {
+        context: input.context,
+        evidence: input.evidence,
+        modelVersion: input.modelVersion,
+        prospectId: input.prospectId,
+        questions: [input.question],
+        tenantId: input.tenantId,
+      };
+      const invalid = validateRequestInput(decisionInput, input.priorDecisions);
       if (invalid) {
         return invalid;
       }
@@ -583,14 +733,7 @@ export function createTypeSafeDecisionPort(
         );
       }
       const result = await decideQuestions(
-        {
-          context: input.context,
-          evidence: input.evidence,
-          modelVersion: input.modelVersion,
-          prospectId: input.prospectId,
-          questions: [input.question],
-          tenantId: input.tenantId,
-        },
+        decisionInput,
         input.priorDecisions,
         now,
         loadClient
@@ -602,30 +745,6 @@ export function createTypeSafeDecisionPort(
     },
 
     async decideIndependent(input) {
-      if (input.questions.length === 0) {
-        return providerInvalidInput(
-          input.context,
-          "questions",
-          "independent qualification/evidence requests need at least one question"
-        );
-      }
-      for (const question of input.questions) {
-        const invalid = validateQuestionInput(
-          input.context,
-          input.evidence,
-          question
-        );
-        if (invalid) {
-          return invalid;
-        }
-      }
-      if (duplicateId(input.questions.map((question) => question.id))) {
-        return providerInvalidInput(
-          input.context,
-          "questions",
-          "independent questions must use unique ids"
-        );
-      }
       return await decideQuestions(input, [], now, loadClient);
     },
   };
