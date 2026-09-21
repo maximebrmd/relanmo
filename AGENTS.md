@@ -1,6 +1,6 @@
 # Development requirements for the prospecting system
 
-This file is mirrored at the Relanmo application repository root. The repository is seeded with planning and brand assets; it does not yet contain the application implementation. P001 must preserve this initial history, the planning pack and brand assets while scaffolding next-forge.
+This file is the Relanmo application repository root agent memory. Keep the planning pack and brand assets under `planning/prospecting-system/`.
 
 ## Dependencies
 
@@ -15,6 +15,12 @@ This file is mirrored at the Relanmo application repository root. The repository
 Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Oxlint and Oxfmt plus its vendored anti-slop preset, Bun as package manager, and official TypeScript-compatible SDKs where available. Retain Temporal, Unipile and TypeSafe from the agreed architecture. Bun runs the Next.js app/API processes; Node.js 24 runs Temporal workers.
 
 Use `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Set up R2 buckets through Wrangler; application object operations use the AWS S3 v3 SDK. Do not restore Clerk, Prisma, Supabase or Mintlify defaults over these choices.
+
+## Auth schema generation
+
+Generate Better Auth Drizzle tables with the command recorded in `packages/auth/src/schema-config.ts` (`authSchemaGeneratorVersions`). Use plain `bunx auth@<pin> generate`; `bunx --bun` changes the output by dropping `.defaultNow()` calls. Keep `packages/database/src/schema/auth.ts` aligned with that config.
+
+`@relanmo/auth` already depends on `@relanmo/database`, so it must not import the database schema fragment. `@relanmo/database` must not depend on `@relanmo/auth`. Table-name literals stay in parallel in `schema-config.ts` and `auth.ts`; `bun run test` runs both packages' Vitest suites so drift fails CI.
 
 ## Product invariants
 
