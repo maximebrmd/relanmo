@@ -254,6 +254,35 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
             );
             expect(other.rowCount).toBe(0);
 
+            await app.query("savepoint cross_tenant_parent");
+            await expect(
+              app.query(
+                `insert into prospects
+                   (id, tenant_id, account_id, provider_profile_id, status)
+                 values ($1, $2, $3, $4, 'ACTIVE')`,
+                [
+                  "prospect-cross-tenant-app",
+                  TENANT_A,
+                  "provider-account-b",
+                  "profile-cross-tenant-app",
+                ]
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await app.query("rollback to savepoint cross_tenant_parent");
+
+            const sameTenantProspect = await app.query(
+              `insert into prospects
+                 (id, tenant_id, account_id, provider_profile_id, status)
+               values ($1, $2, $3, $4, 'ACTIVE')`,
+              [
+                "prospect-same-tenant-app",
+                TENANT_A,
+                "provider-account-a",
+                "profile-same-tenant-app",
+              ]
+            );
+            expect(sameTenantProspect.rowCount).toBe(1);
+
             await expect(
               app.query(
                 "insert into campaigns (id, tenant_id) values ($1, $2)",
@@ -527,6 +556,45 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
               "select id from campaigns order by id"
             );
             expect(campaigns.rows.map((row) => row.id)).toEqual(["campaign-a"]);
+
+            await worker.query("savepoint cross_tenant_parent");
+            await expect(
+              worker.query(
+                `insert into prospects
+                   (id, tenant_id, account_id, provider_profile_id, status)
+                 values ($1, $2, $3, $4, 'ACTIVE')`,
+                [
+                  "prospect-cross-tenant-worker",
+                  TENANT_A,
+                  "provider-account-b",
+                  "profile-cross-tenant-worker",
+                ]
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await worker.query("rollback to savepoint cross_tenant_parent");
+
+            const sameTenantProspect = await worker.query(
+              `insert into prospects
+                 (id, tenant_id, account_id, provider_profile_id, status)
+               values ($1, $2, $3, $4, 'ACTIVE')`,
+              [
+                "prospect-same-tenant-worker",
+                TENANT_A,
+                "provider-account-a",
+                "profile-same-tenant-worker",
+              ]
+            );
+            expect(sameTenantProspect.rowCount).toBe(1);
+
+            await worker.query("savepoint style_profile_insert");
+            await expect(
+              worker.query(
+                "insert into style_profiles (id, tenant_id) values ($1, $2)",
+                ["worker-style-profile", TENANT_A]
+              )
+            ).rejects.toMatchObject({ code: "42501" });
+            await worker.query("rollback to savepoint style_profile_insert");
+
             const lifecycleUpdate = await worker.query(
               "update actions set state = state where false"
             );

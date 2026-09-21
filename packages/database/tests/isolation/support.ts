@@ -151,6 +151,13 @@ export async function seedIsolationFixtures(
       [TENANT_A, TENANT_B]
     );
     await client.query(
+      `insert into provider_accounts
+         (id, tenant_id, provider_account_id, status, health_observed_at)
+       values ('provider-account-a', $1, 'provider-a', 'HEALTHY', now()),
+              ('provider-account-b', $2, 'provider-b', 'HEALTHY', now())`,
+      [TENANT_A, TENANT_B]
+    );
+    await client.query(
       `insert into login_account (id, account_id, provider_id, user_id, password, updated_at)
        values ('login-a', 'account-a', 'credential', $1, 'hashed-secret-a', now()),
               ('login-b', 'account-b', 'credential', $2, 'hashed-secret-b', now())`,

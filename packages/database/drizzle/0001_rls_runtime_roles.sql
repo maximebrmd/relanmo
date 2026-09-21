@@ -113,6 +113,256 @@ BEGIN
     );
   END LOOP;
 
+  CREATE POLICY campaign_versions_tenant_parent_insert
+    ON campaign_versions AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM campaigns
+         WHERE campaigns.id = campaign_versions.campaign_id
+           AND campaigns.tenant_id = campaign_versions.tenant_id
+      )
+    );
+
+  CREATE POLICY account_leases_tenant_parent_insert
+    ON account_leases AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = account_leases.account_id
+           AND provider_accounts.tenant_id = account_leases.tenant_id
+      )
+    );
+
+  CREATE POLICY action_events_tenant_parent_insert
+    ON action_events AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM actions
+         WHERE actions.id = action_events.action_id
+           AND actions.tenant_id = action_events.tenant_id
+      )
+    );
+
+  CREATE POLICY actions_tenant_parents_insert
+    ON actions AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = actions.account_id
+           AND provider_accounts.tenant_id = actions.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM prospects
+         WHERE prospects.id = actions.prospect_id
+           AND prospects.tenant_id = actions.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM campaigns
+         WHERE campaigns.id = actions.campaign_id
+           AND campaigns.tenant_id = actions.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM campaign_versions
+         WHERE campaign_versions.id = actions.campaign_version_id
+           AND campaign_versions.tenant_id = actions.tenant_id
+      )
+    );
+
+  CREATE POLICY quota_reservations_tenant_parents_insert
+    ON quota_reservations AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = quota_reservations.account_id
+           AND provider_accounts.tenant_id = quota_reservations.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM actions
+         WHERE actions.id = quota_reservations.action_id
+           AND actions.tenant_id = quota_reservations.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM campaigns
+         WHERE campaigns.id = quota_reservations.campaign_id
+           AND campaigns.tenant_id = quota_reservations.tenant_id
+      )
+    );
+
+  CREATE POLICY send_attempts_tenant_parents_insert
+    ON send_attempts AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM actions
+         WHERE actions.id = send_attempts.action_id
+           AND actions.tenant_id = send_attempts.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = send_attempts.account_id
+           AND provider_accounts.tenant_id = send_attempts.tenant_id
+      )
+    );
+
+  CREATE POLICY send_receipts_tenant_parents_insert
+    ON send_receipts AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM actions
+         WHERE actions.id = send_receipts.action_id
+           AND actions.tenant_id = send_receipts.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM send_attempts
+         WHERE send_attempts.id = send_receipts.attempt_id
+           AND send_attempts.tenant_id = send_receipts.tenant_id
+      )
+    );
+
+  CREATE POLICY conversations_tenant_parents_insert
+    ON conversations AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = conversations.account_id
+           AND provider_accounts.tenant_id = conversations.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM prospects
+         WHERE prospects.id = conversations.prospect_id
+           AND prospects.tenant_id = conversations.tenant_id
+      )
+    );
+
+  CREATE POLICY evidence_tenant_parents_insert
+    ON evidence AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      (
+        evidence.account_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM provider_accounts
+           WHERE provider_accounts.id = evidence.account_id
+             AND provider_accounts.tenant_id = evidence.tenant_id
+        )
+      )
+      AND EXISTS (
+        SELECT 1 FROM prospects
+         WHERE prospects.id = evidence.prospect_id
+           AND prospects.tenant_id = evidence.tenant_id
+      )
+    );
+
+  CREATE POLICY messages_tenant_parents_insert
+    ON messages AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = messages.account_id
+           AND provider_accounts.tenant_id = messages.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM prospects
+         WHERE prospects.id = messages.prospect_id
+           AND prospects.tenant_id = messages.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM conversations
+         WHERE conversations.id = messages.conversation_id
+           AND conversations.tenant_id = messages.tenant_id
+      )
+    );
+
+  CREATE POLICY prospects_tenant_parent_insert
+    ON prospects AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = prospects.account_id
+           AND provider_accounts.tenant_id = prospects.tenant_id
+      )
+    );
+
+  CREATE POLICY suppression_entries_tenant_parents_insert
+    ON suppression_entries AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM provider_accounts
+         WHERE provider_accounts.id = suppression_entries.account_id
+           AND provider_accounts.tenant_id = suppression_entries.tenant_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM prospects
+         WHERE prospects.id = suppression_entries.prospect_id
+           AND prospects.tenant_id = suppression_entries.tenant_id
+      )
+    );
+
+  CREATE POLICY prompt_override_versions_tenant_parent_insert
+    ON prompt_override_versions AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM prompt_overrides
+         WHERE prompt_overrides.id = prompt_override_versions.prompt_override_id
+           AND prompt_overrides.tenant_id = prompt_override_versions.tenant_id
+      )
+    );
+
+  CREATE POLICY prompt_overrides_tenant_parent_insert
+    ON prompt_overrides AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM campaigns
+         WHERE campaigns.id = prompt_overrides.campaign_id
+           AND campaigns.tenant_id = prompt_overrides.tenant_id
+      )
+    );
+
+  CREATE POLICY style_profile_versions_tenant_parent_insert
+    ON style_profile_versions AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM style_profiles
+         WHERE style_profiles.id = style_profile_versions.style_profile_id
+           AND style_profiles.tenant_id = style_profile_versions.tenant_id
+      )
+    );
+
+  CREATE POLICY usage_events_tenant_parents_insert
+    ON usage_events AS RESTRICTIVE
+    FOR INSERT TO relanmo_app, relanmo_worker
+    WITH CHECK (
+      (
+        usage_events.account_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM provider_accounts
+           WHERE provider_accounts.id = usage_events.account_id
+             AND provider_accounts.tenant_id = usage_events.tenant_id
+        )
+      )
+      AND (
+        usage_events.action_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM actions
+           WHERE actions.id = usage_events.action_id
+             AND actions.tenant_id = usage_events.tenant_id
+        )
+      )
+    );
+
   GRANT SELECT, INSERT ON TABLE tenants TO relanmo_app;
   ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenants_tenant_isolation ON tenants
@@ -320,7 +570,6 @@ BEGIN
   GRANT INSERT ON TABLE
     provider_accounts,
     prospects,
-    style_profiles,
     conversations,
     messages,
     suppression_entries,
