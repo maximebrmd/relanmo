@@ -98,6 +98,7 @@ function createRecordingGateway(
 function createPort(options?: {
   directory?: UnipileAccountDirectory;
   fixture?: UnipileAccountFixture;
+  hostedFlowTtlMs?: number;
   now?: string;
 }): PortHarness {
   const gateway = createRecordingGateway(
@@ -112,6 +113,7 @@ function createPort(options?: {
       clock: () => new Date(now),
       directory: options?.directory ?? authorizedDirectory,
       gateway,
+      hostedFlowTtlMs: options?.hostedFlowTtlMs,
     }),
   };
 }
@@ -125,12 +127,13 @@ describe("Unipile LinkedIn accounts adapter", () => {
 
     expect(flow.mode).toBe("CONNECT");
     expect(flow.authorizationUrl).toBe(unipileHostedAuthUrl);
-    expect(flow.expiresAt).toBe(providerOperationContextFixture.deadlineAt);
+    expect(flow.expiresAt).toBe("2026-09-17T10:15:00.000Z");
+    expect(flow.expiresAt).not.toBe(providerOperationContextFixture.deadlineAt);
     expect(flow.flowReference).toBe(linkedInConnectInputFixture.opaqueState);
     expect(gateway.hostedAuthCalls).toEqual([
       {
         api_url: unipileAccountsBaseUrl,
-        expiresOn: providerOperationContextFixture.deadlineAt,
+        expiresOn: "2026-09-17T10:15:00.000Z",
         failure_redirect_url: linkedInConnectInputFixture.callbackUrl,
         name: linkedInConnectInputFixture.opaqueState,
         providers: ["LINKEDIN"],
@@ -141,14 +144,16 @@ describe("Unipile LinkedIn accounts adapter", () => {
   });
 
   it("issues a reconnect link for the authorized provider account", async () => {
-    const { gateway, port } = createPort();
+    const { gateway, port } = createPort({ hostedFlowTtlMs: 20 * 60 * 1000 });
     const flow = writeValue(
       await port.createReconnectFlow(linkedInReconnectInputFixture)
     );
 
     expect(flow.mode).toBe("RECONNECT");
     expect(flow.authorizationUrl).toBe(unipileHostedAuthUrl);
+    expect(flow.expiresAt).toBe("2026-09-17T10:20:00.000Z");
     expect(gateway.hostedAuthCalls[0]).toMatchObject({
+      expiresOn: "2026-09-17T10:20:00.000Z",
       reconnect_account: linkedInAccountFixture.providerAccountId,
       type: "reconnect",
       name: linkedInReconnectInputFixture.opaqueState,

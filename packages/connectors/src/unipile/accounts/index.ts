@@ -53,6 +53,7 @@ export type { UnipileLinkedInAccountSnapshot } from "./parse";
 
 export const unipileAccountsSurface = "ENABLED" as const;
 export const UNIPILE_ACCOUNT_READ_ATTEMPTS = 3;
+export const DEFAULT_UNIPILE_HOSTED_FLOW_TTL_MS = 15 * 60 * 1000;
 
 export type UnipileAccountsConfig = Readonly<{
   apiKey: string;
@@ -60,6 +61,7 @@ export type UnipileAccountsConfig = Readonly<{
   clock?: () => Date;
   directory: UnipileAccountDirectory;
   gateway?: UnipileAccountsGateway;
+  hostedFlowTtlMs?: number;
   notifyUrl?: string;
 }>;
 
@@ -164,6 +166,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
   readonly #clock: () => Date;
   readonly #directory: UnipileAccountDirectory;
   #gateway: UnipileAccountsGateway | undefined;
+  readonly #hostedFlowTtlMs: number;
   readonly #notifyUrl: string | null;
 
   constructor(config: UnipileAccountsConfig) {
@@ -172,6 +175,14 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     this.#clock = config.clock ?? (() => new Date());
     this.#directory = config.directory;
     this.#gateway = config.gateway;
+    this.#hostedFlowTtlMs =
+      config.hostedFlowTtlMs ?? DEFAULT_UNIPILE_HOSTED_FLOW_TTL_MS;
+    if (
+      !Number.isSafeInteger(this.#hostedFlowTtlMs) ||
+      this.#hostedFlowTtlMs <= 0
+    ) {
+      throw new RangeError("hostedFlowTtlMs must be a positive integer");
+    }
     this.#notifyUrl = config.notifyUrl ?? null;
   }
 
@@ -190,14 +201,16 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     if (expired) {
       return expired;
     }
+    const expiresAt = this.#hostedFlowExpiresAt();
     return await this.#createFlow({
       context: input.context,
+      expiresAt,
       mode: "CONNECT",
       opaqueState: input.opaqueState,
       request: withNotifyUrl(
         {
           api_url: this.#baseUrl,
-          expiresOn: input.context.deadlineAt,
+          expiresOn: expiresAt,
           failure_redirect_url: input.callbackUrl,
           name: input.opaqueState,
           providers: ["LINKEDIN"],
@@ -236,14 +249,16 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
         "account authorization is temporarily unavailable"
       );
     }
+    const expiresAt = this.#hostedFlowExpiresAt();
     return await this.#createFlow({
       context: input.context,
+      expiresAt,
       mode: "RECONNECT",
       opaqueState: input.opaqueState,
       request: withNotifyUrl(
         {
           api_url: this.#baseUrl,
-          expiresOn: input.context.deadlineAt,
+          expiresOn: expiresAt,
           failure_redirect_url: input.callbackUrl,
           name: input.opaqueState,
           reconnect_account: input.account.providerAccountId,
@@ -342,6 +357,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
 
   async #createFlow(input: {
     context: ProviderOperationContext;
+    expiresAt: LinkedInHostedFlow["expiresAt"];
     mode: LinkedInHostedFlow["mode"];
     opaqueState: string;
     request: UnipileHostedAuthRequest;
@@ -360,7 +376,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
       }
       return providerSuccess(input.context, {
         authorizationUrl: response.url,
-        expiresAt: input.context.deadlineAt,
+        expiresAt: input.expiresAt,
         flowReference: input.opaqueState,
         mode: input.mode,
       });
@@ -428,6 +444,12 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
       return providerUnavailableCredentials(context, "LINKEDIN", "APPLICATION");
     }
     return null;
+  }
+
+  #hostedFlowExpiresAt(): LinkedInHostedFlow["expiresAt"] {
+    return parseUtcTimestamp(
+      new Date(this.#clock().getTime() + this.#hostedFlowTtlMs).toISOString()
+    );
   }
 
   #getGateway(): UnipileAccountsGateway {
