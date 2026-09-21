@@ -1,11 +1,7 @@
-import { parseTenantId, parseUserId } from "@relanmo/domain/contracts";
-import type {
-  PersistenceWorkerId,
-  TenantTransactionScope,
-} from "@relanmo/domain/ports/persistence";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { applyDatabaseMigrations } from "../../src/schema/apply-migrations";
+import {
+  createDatabaseRuntimeClient,
+  type DatabaseEnv,
+} from "@relanmo/database/client";
 import {
   applyTrustedSqlContext,
   AUTH_DATABASE_ROLE,
@@ -14,7 +10,16 @@ import {
   mintTrustedTenantAccess,
   mintTrustedWorkerAccess,
   RUNTIME_DATABASE_ROLES,
-} from "../../src/security";
+} from "@relanmo/database/security";
+import { createPersistenceTransactionRunner } from "@relanmo/database/transactions";
+import { parseTenantId, parseUserId } from "@relanmo/domain/contracts";
+import type {
+  PersistenceWorkerId,
+  TenantTransactionScope,
+} from "@relanmo/domain/ports/persistence";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { applyDatabaseMigrations } from "../../src/schema/apply-migrations";
 import { TENANT_CONTEXT_GUC } from "../../src/transactions";
 import { stopLocalPostgresAdmin } from "../support/local-postgres";
 import type { IsolatedTestDatabase } from "../support/test-database";
@@ -84,11 +89,7 @@ async function establishMemberAccess(
   userId = USER_A
 ) {
   return withClient(
-    runtimeRoleUrl(
-      target,
-      AUTH_DATABASE_ROLE,
-      ISOLATION_ROLE_PASSWORDS.auth
-    ),
+    runtimeRoleUrl(target, AUTH_DATABASE_ROLE, ISOLATION_ROLE_PASSWORDS.auth),
     async (auth) => {
       await auth.query("begin");
       try {
@@ -120,11 +121,13 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
              from pg_roles
             where rolname = any($1::text[])
             order by rolname`,
-          [[
-            RUNTIME_DATABASE_ROLES.app,
-            AUTH_DATABASE_ROLE,
-            RUNTIME_DATABASE_ROLES.worker,
-          ]]
+          [
+            [
+              RUNTIME_DATABASE_ROLES.app,
+              AUTH_DATABASE_ROLE,
+              RUNTIME_DATABASE_ROLES.worker,
+            ],
+          ]
         );
         expect(roles.rows).toEqual([
           {
@@ -215,6 +218,18 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
         ),
         async (app) => {
           const access = await establishMemberAccess(database, TENANT_A);
+          await expect(
+            app.query("update campaign_versions set name = name where false")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            app.query("update send_attempts set payload = payload where false")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            app.query("update actions set payload = payload where false")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            app.query("delete from audit_events where false")
+          ).rejects.toMatchObject({ code: "42501" });
           await app.query("begin");
           try {
             await applyTrustedSqlContext(app, access);
@@ -244,6 +259,51 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
       await expect(
         establishMemberAccess(database, TENANT_B, USER_A)
       ).rejects.toThrow("active membership is required");
+
+      const staleAccess = await establishMemberAccess(database, TENANT_A);
+      await withClient(database.migrationUrl, (owner) =>
+        owner.query(
+          "update memberships set status = 'REVOKED' where tenant_id = $1 and user_id = $2",
+          [TENANT_A, USER_A]
+        )
+      );
+      const runtimeEnv: DatabaseEnv = {
+        migrationUrl: database.migrationUrl,
+        poolConnectionTimeoutMs: 5000,
+        poolIdleTimeoutMs: 10_000,
+        poolMax: 1,
+        runtimeUrl: runtimeRoleUrl(
+          database,
+          RUNTIME_DATABASE_ROLES.app,
+          ISOLATION_ROLE_PASSWORDS.app
+        ),
+      };
+      const runtimeClient = createDatabaseRuntimeClient(runtimeEnv);
+      try {
+        let workCalled = false;
+        const result = await createPersistenceTransactionRunner(
+          runtimeClient.db
+        ).run({
+          access: staleAccess,
+          work: () => {
+            workCalled = true;
+            return Promise.resolve({ ok: true as const, value: null });
+          },
+        });
+        expect(result).toMatchObject({
+          error: { code: "FORBIDDEN", retryable: false },
+          ok: false,
+        });
+        expect(workCalled).toBe(false);
+      } finally {
+        await runtimeClient.close();
+        await withClient(database.migrationUrl, (owner) =>
+          owner.query(
+            "update memberships set status = 'ACTIVE' where tenant_id = $1 and user_id = $2",
+            [TENANT_A, USER_A]
+          )
+        );
+      }
     },
     TEST_TIMEOUT_MS
   );

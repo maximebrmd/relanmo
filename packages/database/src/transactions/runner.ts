@@ -8,13 +8,14 @@ import type {
   PersistenceTransactionWork,
   TenantTransactionScope,
 } from "@relanmo/domain/ports/persistence";
-import { TransactionRollbackError } from "drizzle-orm";
+import { sql, TransactionRollbackError } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
   requireTrustedTenantAccess,
   type TenantSqlAccess,
 } from "../security/context";
+import { UntrustedSqlAccessError } from "../security/errors";
 import { setTenantContext } from "./context";
 import { mapUnexpectedError } from "./errors";
 import { mapIsolationLevel } from "./isolation";
@@ -66,6 +67,21 @@ async function runTransaction<Value>(
       async (tx) => {
         registerExecutor(connectionId, tx);
         await setTenantContext(tx, scope);
+        if (scope.principal.kind === "MEMBER") {
+          const membership = await tx.execute(
+            sql`select 1
+                  from memberships
+                 where tenant_id = ${scope.tenantId}
+                   and user_id = ${scope.principal.userId}
+                   and status = 'ACTIVE'
+                   for update`
+          );
+          if (membership.rows.length !== 1) {
+            throw new UntrustedSqlAccessError(
+              "active membership is required for tenant SQL access"
+            );
+          }
+        }
         const result = await input.work(persistenceTx);
         settled = result;
         if (!result.ok) {

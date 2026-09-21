@@ -70,7 +70,7 @@ BEGIN
        AND column_name = 'tenant_id'
   LOOP
     EXECUTE format(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I TO relanmo_app',
+      'GRANT SELECT, INSERT ON TABLE %I TO relanmo_app',
       target.table_name
     );
     EXECUTE format(
@@ -113,7 +113,7 @@ BEGIN
     );
   END LOOP;
 
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE tenants TO relanmo_app;
+  GRANT SELECT, INSERT ON TABLE tenants TO relanmo_app;
   ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenants_tenant_isolation ON tenants
     FOR ALL
@@ -138,6 +138,130 @@ BEGIN
       id = current_setting('app.tenant_id', true)
       AND current_setting('app.tenant_id', true) <> ''
     );
+
+  GRANT UPDATE (display_name, status) ON TABLE tenants TO relanmo_app;
+
+  GRANT UPDATE (role, status, updated_at) ON TABLE memberships TO relanmo_app;
+
+  GRANT UPDATE (is_current) ON TABLE freelancer_profiles TO relanmo_app;
+
+  GRANT UPDATE (
+    status,
+    draft_version_id,
+    active_version_id,
+    outbound_paused,
+    pause_reason,
+    paused_at,
+    activated_at,
+    revision,
+    updated_at
+  ) ON TABLE campaigns TO relanmo_app;
+
+  GRANT UPDATE (
+    source,
+    explicit_version_id,
+    accepted_inferred_version_id,
+    suggested_inferred_version_id,
+    revision,
+    updated_at
+  ) ON TABLE style_profiles TO relanmo_app;
+
+  GRANT UPDATE (active_version_id, revision, updated_at)
+    ON TABLE prompt_overrides TO relanmo_app;
+
+  GRANT UPDATE (provider_customer_id, updated_at)
+    ON TABLE billing_customers TO relanmo_app;
+
+  GRANT UPDATE (
+    provider_customer_id,
+    state,
+    current_period_end,
+    updated_at
+  ) ON TABLE subscriptions TO relanmo_app;
+
+  GRANT UPDATE (
+    state,
+    active,
+    effective_at,
+    valid_until,
+    provider_subscription_id,
+    updated_at
+  ) ON TABLE billing_entitlements TO relanmo_app;
+
+  GRANT UPDATE (
+    provider_user_id,
+    status,
+    health_reason,
+    health_observed_at,
+    health_capabilities,
+    last_successful_reconciliation_at,
+    revision,
+    updated_at
+  ) ON TABLE provider_accounts TO relanmo_app;
+
+  GRANT UPDATE (
+    legacy_provider_member_ids,
+    public_identifier,
+    display_name,
+    headline,
+    company,
+    location,
+    profile_url,
+    status,
+    updated_at
+  ) ON TABLE prospects TO relanmo_app;
+
+  GRANT UPDATE (
+    status,
+    ownership_kind,
+    ownership_reason,
+    owner_user_id,
+    ownership_recorded_at,
+    ownership_revision,
+    human_owned_at,
+    last_incoming_at,
+    last_message_at,
+    updated_at
+  ) ON TABLE conversations TO relanmo_app;
+
+  GRANT UPDATE (owner, fence, acquired_at, expires_at)
+    ON TABLE account_leases TO relanmo_app;
+
+  GRANT UPDATE (state, updated_at)
+    ON TABLE quota_reservations TO relanmo_app;
+
+  GRANT UPDATE (
+    state,
+    attempt,
+    last_error,
+    lease_worker_id,
+    lease_fence,
+    lease_expires_at,
+    processed_at,
+    quarantined_at,
+    available_at
+  ) ON TABLE webhook_events TO relanmo_app;
+
+  GRANT UPDATE (
+    state,
+    attempt,
+    last_error,
+    lease_worker_id,
+    lease_fence,
+    lease_expires_at,
+    available_at
+  ) ON TABLE outbox_events TO relanmo_app;
+
+  GRANT UPDATE (
+    state,
+    state_at,
+    attempt_id,
+    lease_expires_at,
+    lease_fence,
+    provider_message_id,
+    failure_reason,
+    unknown_reason
+  ) ON TABLE actions TO relanmo_app;
 
   CREATE POLICY memberships_auth_pre_session_select ON memberships
     FOR SELECT
@@ -191,7 +315,7 @@ BEGIN
     audit_events
   TO relanmo_worker;
 
-  GRANT INSERT, UPDATE ON TABLE
+  GRANT INSERT ON TABLE
     provider_accounts,
     prospects,
     style_profiles,
@@ -203,6 +327,79 @@ BEGIN
     webhook_events,
     outbox_events
   TO relanmo_worker;
+
+  GRANT UPDATE (
+    provider_user_id,
+    status,
+    health_reason,
+    health_observed_at,
+    health_capabilities,
+    last_successful_reconciliation_at,
+    revision,
+    updated_at
+  ) ON TABLE provider_accounts TO relanmo_worker;
+
+  GRANT UPDATE (
+    legacy_provider_member_ids,
+    public_identifier,
+    display_name,
+    headline,
+    company,
+    location,
+    profile_url,
+    status,
+    updated_at
+  ) ON TABLE prospects TO relanmo_worker;
+
+  GRANT UPDATE (
+    source,
+    explicit_version_id,
+    accepted_inferred_version_id,
+    suggested_inferred_version_id,
+    revision,
+    updated_at
+  ) ON TABLE style_profiles TO relanmo_worker;
+
+  GRANT UPDATE (
+    status,
+    ownership_kind,
+    ownership_reason,
+    owner_user_id,
+    ownership_recorded_at,
+    ownership_revision,
+    human_owned_at,
+    last_incoming_at,
+    last_message_at,
+    updated_at
+  ) ON TABLE conversations TO relanmo_worker;
+
+  GRANT UPDATE (owner, fence, acquired_at, expires_at)
+    ON TABLE account_leases TO relanmo_worker;
+
+  GRANT UPDATE (state, updated_at)
+    ON TABLE quota_reservations TO relanmo_worker;
+
+  GRANT UPDATE (
+    state,
+    attempt,
+    last_error,
+    lease_worker_id,
+    lease_fence,
+    lease_expires_at,
+    processed_at,
+    quarantined_at,
+    available_at
+  ) ON TABLE webhook_events TO relanmo_worker;
+
+  GRANT UPDATE (
+    state,
+    attempt,
+    last_error,
+    lease_worker_id,
+    lease_fence,
+    lease_expires_at,
+    available_at
+  ) ON TABLE outbox_events TO relanmo_worker;
 
   GRANT INSERT ON TABLE
     evidence,

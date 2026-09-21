@@ -30,6 +30,11 @@
       "types": "./src/transactions/*.ts",
       "default": "./src/transactions/*.ts"
     },
+    "./security": {
+      "browser": "./src/next-client-reject.ts",
+      "types": "./src/security/index.ts",
+      "default": "./src/security/index.ts"
+    },
     "./schema": {
       "browser": "./src/next-client-reject.ts",
       "types": "./src/schema/index.ts",
