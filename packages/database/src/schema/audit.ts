@@ -34,7 +34,9 @@ export const usageEvents = pgTable(
     accountId: text("account_id"),
     actionId: text("action_id"),
     costMinorUnits: integer("cost_minor_units"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("usageEvents_tenantId_idx").on(table.tenantId),
@@ -64,7 +66,9 @@ export const auditEvents = pgTable(
     entityId: text("entity_id").notNull(),
     actor: jsonb("actor"),
     details: jsonb("details").notNull().default([]),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("auditEvents_tenantId_idx").on(table.tenantId),

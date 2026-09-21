@@ -27,6 +27,21 @@ function indexNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).indexes.map((index) => index.config.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("delivery ledger schema fragment", () => {
   it("names every table for the card's actions/attempts/leases/queues scope", () => {
     expect(getTableConfig(actions).name).toBe("actions");
@@ -37,6 +52,40 @@ describe("delivery ledger schema fragment", () => {
     expect(getTableConfig(webhookEvents).name).toBe("webhook_events");
     expect(getTableConfig(outboxEvents).name).toBe("outbox_events");
     expect(getTableConfig(actionEvents).name).toBe("action_events");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(actions, [
+      "created_at",
+      "state_at",
+      "lease_expires_at",
+    ]);
+    expectTimezoneAwareInstants(sendAttempts, [
+      "authorized_at",
+      "lease_expires_at",
+    ]);
+    expectTimezoneAwareInstants(sendReceipts, ["completed_at", "recorded_at"]);
+    expectTimezoneAwareInstants(accountLeases, ["acquired_at", "expires_at"]);
+    expectTimezoneAwareInstants(quotaReservations, [
+      "period_start",
+      "period_end",
+      "created_at",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(webhookEvents, [
+      "lease_expires_at",
+      "observed_at",
+      "received_at",
+      "available_at",
+      "processed_at",
+      "quarantined_at",
+    ]);
+    expectTimezoneAwareInstants(outboxEvents, [
+      "lease_expires_at",
+      "created_at",
+      "available_at",
+    ]);
+    expectTimezoneAwareInstants(actionEvents, ["recorded_at"]);
   });
 
   it("gives actions an immutable identity plus its current lifecycle projection", () => {

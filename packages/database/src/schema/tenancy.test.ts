@@ -7,11 +7,32 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("tenancy schema fragment", () => {
   it("names tables to match the C3 persistence contract", () => {
     expect(getTableConfig(tenants).name).toBe("tenants");
     expect(getTableConfig(memberships).name).toBe("memberships");
     expect(getTableConfig(freelancerProfiles).name).toBe("freelancer_profiles");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(tenants, ["created_at"]);
+    expectTimezoneAwareInstants(memberships, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(freelancerProfiles, ["created_at"]);
   });
 
   it("keeps the documented tenant columns and a status check", () => {

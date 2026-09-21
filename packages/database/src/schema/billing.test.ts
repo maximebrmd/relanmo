@@ -12,6 +12,21 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("billing schema fragment", () => {
   it("names tables explicitly", () => {
     expect(getTableConfig(billingCustomers).name).toBe("billing_customers");
@@ -20,6 +35,26 @@ describe("billing schema fragment", () => {
       "billing_entitlements"
     );
     expect(getTableConfig(billingEvents).name).toBe("billing_events");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(billingCustomers, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(subscriptions, [
+      "current_period_end",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(billingEntitlements, [
+      "effective_at",
+      "valid_until",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(billingEvents, [
+      "occurred_at",
+      "provider_event_created_at",
+      "applied_at",
+      "effective_at",
+      "valid_until",
+    ]);
   });
 
   it("uniquely maps a tenant to one provider customer", () => {

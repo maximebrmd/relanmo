@@ -67,8 +67,8 @@ describe("leads schema fragment", () => {
     ] as const;
 
     for (const { table, columns } of expectedInstants) {
-      const instants = getTableConfig(table).columns.filter(
-        (column) => column.dataType === "date"
+      const instants = getTableConfig(table).columns.filter((column) =>
+        column.getSQLType().startsWith("timestamp")
       );
       expect(new Set(instants.map((column) => column.name))).toEqual(
         new Set(columns)

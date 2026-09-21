@@ -31,7 +31,9 @@ export const tenants = pgTable(
     id: text("id").primaryKey(),
     displayName: text("display_name").notNull(),
     status: text("status").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     check(
@@ -56,8 +58,10 @@ export const memberships = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
     status: text("status").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -94,7 +98,9 @@ export const freelancerProfiles = pgTable(
       .references(() => tenants.id),
     revision: integer("revision").notNull(),
     isCurrent: boolean("is_current").notNull().default(false),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),

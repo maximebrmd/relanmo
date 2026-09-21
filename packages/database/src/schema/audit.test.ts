@@ -7,10 +7,30 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("audit schema fragment", () => {
   it("names tables explicitly", () => {
     expect(getTableConfig(usageEvents).name).toBe("usage_events");
     expect(getTableConfig(auditEvents).name).toBe("audit_events");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(usageEvents, ["created_at"]);
+    expectTimezoneAwareInstants(auditEvents, ["created_at"]);
   });
 
   it("distinguishes measured usage kinds, units and quantities", () => {

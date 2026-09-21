@@ -12,6 +12,21 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("styles schema fragment", () => {
   it("names tables distinctly", () => {
     expect(getTableConfig(styleProfiles).name).toBe("style_profiles");
@@ -22,6 +37,13 @@ describe("styles schema fragment", () => {
     expect(getTableConfig(promptOverrideVersions).name).toBe(
       "prompt_override_versions"
     );
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(styleProfiles, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(styleProfileVersions, ["created_at"]);
+    expectTimezoneAwareInstants(promptOverrides, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(promptOverrideVersions, ["created_at"]);
   });
 
   it("scopes every writable row to a tenant, so no row is cross-tenant shared", () => {

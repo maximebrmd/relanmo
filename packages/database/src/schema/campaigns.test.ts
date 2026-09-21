@@ -7,10 +7,35 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
+function expectTimezoneAwareInstants(
+  table: Parameters<typeof getTableConfig>[0],
+  columns: readonly string[]
+) {
+  const instants = getTableConfig(table).columns.filter((column) =>
+    column.getSQLType().startsWith("timestamp")
+  );
+  expect(new Set(instants.map((column) => column.name))).toEqual(
+    new Set(columns)
+  );
+  for (const column of instants) {
+    expect(column.getSQLType()).toBe("timestamp with time zone");
+  }
+}
+
 describe("campaigns schema fragment", () => {
   it("names tables distinctly", () => {
     expect(getTableConfig(campaigns).name).toBe("campaigns");
     expect(getTableConfig(campaignVersions).name).toBe("campaign_versions");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(campaigns, [
+      "paused_at",
+      "activated_at",
+      "created_at",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(campaignVersions, ["created_at"]);
   });
 
   it("scopes every writable row to a tenant, so no row is cross-tenant shared", () => {
