@@ -242,6 +242,12 @@ describe("French prompt defaults", () => {
         observedSignalText: null,
       }).audience
     ).toBe("RECRUITER_ESN");
+    expect(
+      qualifyIcp({
+        headline: "Talent Acquisition Partner @ Nordwave SaaS",
+        observedSignalText: null,
+      }).audience
+    ).toBe("RECRUITER_ESN");
   });
 
   it("requires identifiable company evidence for executive titles", () => {
@@ -416,6 +422,9 @@ describe("French prompt defaults", () => {
       for (const step of plan.steps.slice(1)) {
         expect(step.template.body).not.toContain("{{priorFact}}");
       }
+      expect(plan.steps[1]?.template.body).toContain("petit retour");
+      expect(plan.steps[2]?.template.body).toContain("petit up");
+      expect(plan.steps[3]?.template.body).toContain("avoir l'air lourd");
     }
   });
 

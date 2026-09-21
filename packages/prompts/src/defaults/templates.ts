@@ -198,7 +198,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM2",
   }),
   Object.freeze({
-    body: "Salut {{firstName}}, quelles sont vos priorités côté {{craft}} chez {{company}} en ce moment ?",
+    body: "Salut {{firstName}}, petit retour sur mon message. Toujours d'actualité chez {{company}} ?",
     hook: "DM2_NEUTRAL",
     id: "dm2-neutral",
     maxCharacters: 300,
@@ -222,7 +222,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM3",
   }),
   Object.freeze({
-    body: "Hello {{firstName}}, quels sujets vous occupent le plus côté {{craft}} chez {{company}} en ce moment ?",
+    body: "Hello {{firstName}}, petit up. Vous avez avancé de votre côté ?",
     hook: "DM3_NEUTRAL",
     id: "dm3-neutral",
     maxCharacters: 300,
@@ -230,7 +230,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM3",
   }),
   Object.freeze({
-    body: "Hello {{firstName}}, je remonte simplement mon message : le sujet {{craft}} est-il d'actualité chez {{company}} ?",
+    body: "Hello {{firstName}}, je vais finir par avoir l'air lourd ahah. C'est encore ouvert de votre côté ?",
     hook: "DM4_LIGHT_NUDGE",
     id: "dm4-light-nudge",
     maxCharacters: 250,

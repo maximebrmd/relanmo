@@ -70,12 +70,15 @@ const ON_MARKET_PATTERNS = [
   /\basap\b(?:\s+\S+){0,4}\s+\b(?:besoin|mission)\b/u,
 ] as const;
 
-const RECRUITER_ROLE_MARKERS = [
+const GENERIC_RECRUITER_ROLE_MARKERS = [
   "recruiter",
   "recruteur",
   "staffing",
-  "talent acquisition",
   "talent partner",
+] as const;
+
+const EXPLICIT_RECRUITER_ROLE_MARKERS = [
+  "talent acquisition",
   "talent sourcer",
 ] as const;
 
@@ -284,7 +287,8 @@ export function classifyIcpAudience(
     return "PEER_NOT_BUYER";
   }
   if (
-    (containsMarker(role, RECRUITER_ROLE_MARKERS) &&
+    containsMarker(role, EXPLICIT_RECRUITER_ROLE_MARKERS) ||
+    (containsMarker(role, GENERIC_RECRUITER_ROLE_MARKERS) &&
       (containsMarker(role, TECH_RECRUITING_ROLE_MARKERS) ||
         containsMarker(lower, RECRUITER_COMPANY_MARKERS))) ||
     (containsMarker(role, BUSINESS_DEVELOPMENT_ROLE_MARKERS) &&
