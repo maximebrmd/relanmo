@@ -450,7 +450,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
   );
 
   it(
-    "returns every active version pointer and conflicts when they drift",
+    "scopes profile snapshots across multiple campaigns and detects style drift",
     async (ctx) => {
       if (!database) {
         ctx.skip();
@@ -488,6 +488,29 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           `update campaigns
            set active_version_id = 'campaign-version-a-1'
            where id = 'campaign-a'`,
+          []
+        );
+        await client.query(
+          `insert into campaigns (id, tenant_id, status)
+           values ('campaign-a-2', $1, 'ACTIVE')`,
+          [TENANT_A]
+        );
+        await client.query(
+          `insert into campaign_versions (
+             id, campaign_id, tenant_id, revision, name, offer,
+             icp_description, daily_quota, daily_invitation_quota,
+             daily_message_quota, exclusions, targeting, sequence,
+             sequence_closure, business_window, created_by
+           ) values (
+             'campaign-version-a-2', 'campaign-a-2', $1, 1, 'Campagne A2',
+             'Offre A2', 'ICP A2', 10, 5, 5, '[]', '{}', '[]', '{}', '{}', $2
+           )`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update campaigns
+           set active_version_id = 'campaign-version-a-2'
+           where id = 'campaign-a-2'`,
           []
         );
         await client.query(
@@ -532,6 +555,25 @@ describe("membership and freelancer profile repositories (live local Postgres)",
            where id = 'prompt-override-a'`,
           []
         );
+        await client.query(
+          `insert into prompt_overrides (id, tenant_id, campaign_id)
+           values ('prompt-override-a-2', $1, 'campaign-a-2')`,
+          [TENANT_A]
+        );
+        await client.query(
+          `insert into prompt_override_versions (
+             id, prompt_override_id, tenant_id, revision, created_by
+           ) values (
+             'prompt-version-a-2', 'prompt-override-a-2', $1, 1, $2
+           )`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update prompt_overrides
+           set active_version_id = 'prompt-version-a-2'
+           where id = 'prompt-override-a-2'`,
+          []
+        );
       });
 
       const current = expectOk(
@@ -548,22 +590,14 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           kind: "STYLE_INFERRED",
           revision: 2,
         },
-        campaign: {
-          id: "campaign-version-a-1",
-          kind: "CAMPAIGN",
-          revision: 1,
-        },
-        defaultPrompt: {
-          id: "prompt-version-a-1",
-          kind: "PROMPT_DEFAULT",
-          revision: 1,
-        },
+        campaign: null,
+        defaultPrompt: null,
         explicitStyle: {
           id: "style-explicit-a-1",
           kind: "STYLE_EXPLICIT",
           revision: 1,
         },
-        model: "writer-a-1",
+        model: null,
       });
 
       const profile = expectOk(

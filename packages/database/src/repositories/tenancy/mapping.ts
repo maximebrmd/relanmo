@@ -1,25 +1,19 @@
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof -- This module is the boundary that maps untyped database rows onto C3 tenancy records. */
 
 import {
-  parseCampaignVersionId,
   parseExplicitStyleVersionId,
   parseInferredStyleVersionId,
-  parseModelVersion,
   isMember,
   parseProfileVersionId,
-  parsePromptVersionId,
   parseTenantId,
   parseUserId,
   parseUtcTimestamp,
 } from "@relanmo/domain/contracts";
 import type {
   CurrentVersionSet,
-  CampaignVersionRef,
   ExplicitStyleVersionRef,
   InferredStyleVersionRef,
-  ModelVersion,
   ProfileVersionRef,
-  PromptVersionRef,
   UtcTimestamp,
   VersionRef,
 } from "@relanmo/domain/contracts";
@@ -38,13 +32,7 @@ import type {
 } from "@relanmo/domain/ports/persistence";
 import type { InferSelectModel } from "drizzle-orm";
 
-import type {
-  campaignVersions,
-} from "../../schema/campaigns";
-import type {
-  promptOverrideVersions,
-  styleProfileVersions,
-} from "../../schema/styles";
+import type { styleProfileVersions } from "../../schema/styles";
 import type {
   freelancerProfiles,
   memberships,
@@ -54,9 +42,7 @@ import type {
 export type TenantRow = InferSelectModel<typeof tenants>;
 export type MembershipRow = InferSelectModel<typeof memberships>;
 export type ProfileRow = InferSelectModel<typeof freelancerProfiles>;
-export type CampaignVersionRow = InferSelectModel<typeof campaignVersions>;
 export type StyleVersionRow = InferSelectModel<typeof styleProfileVersions>;
-export type PromptVersionRow = InferSelectModel<typeof promptOverrideVersions>;
 
 export class TenancyMappingError extends Error {
   constructor(message: string) {
@@ -229,17 +215,6 @@ export function mapProfileVersion(row: ProfileRow): ProfileVersionRecord {
   };
 }
 
-export function mapCampaignVersionRef(
-  row: CampaignVersionRow
-): CampaignVersionRef {
-  return {
-    createdAt: utcFromColumn(row.createdAt),
-    id: parseCampaignVersionId(row.id),
-    kind: "CAMPAIGN",
-    revision: row.revision,
-  };
-}
-
 export function mapExplicitStyleVersionRef(
   row: StyleVersionRow
 ): ExplicitStyleVersionRef {
@@ -268,22 +243,4 @@ export function mapInferredStyleVersionRef(
     kind: "STYLE_INFERRED",
     revision: row.revision,
   };
-}
-
-export function mapPromptVersionRef(row: PromptVersionRow): PromptVersionRef {
-  return {
-    createdAt: utcFromColumn(row.createdAt),
-    id: parsePromptVersionId(row.id),
-    kind: "PROMPT_DEFAULT",
-    revision: row.revision,
-  };
-}
-
-export function mapModelVersion(value: string | null): ModelVersion {
-  if (value === null) {
-    throw new TenancyMappingError(
-      "accepted inferred style version is missing its model"
-    );
-  }
-  return parseModelVersion(value);
 }
