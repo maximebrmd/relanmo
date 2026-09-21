@@ -792,6 +792,7 @@ describe("campaign version persistence", () => {
                   explicitStyle: null,
                   model: parseModelVersion("claude-sonnet-4-6"),
                   profile: null,
+                  promptOverride: null,
                 },
                 state: "CONFIRMED",
                 stateAt: CREATED_AT,
