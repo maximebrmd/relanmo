@@ -1,10 +1,13 @@
+/* oxlint-disable no-use-before-define -- Drizzle resolves the intentional current-row/version-row circular foreign keys lazily. */
 import type { ModelVersion } from "@relanmo/domain/contracts";
 import { FRENCH_TONES, STYLE_SOURCES } from "@relanmo/domain/contracts/product";
 import type { StyleStepOverride } from "@relanmo/domain/contracts/product";
 import type { StyleOverrideSettings } from "@relanmo/domain/ports/persistence/campaigns";
 import { relations, sql } from "drizzle-orm";
+import type { AnyPgColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import {
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,16 +16,13 @@ import {
   real,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
+import { user } from "./auth";
 import { campaigns } from "./campaigns";
+import { tenants } from "./tenancy";
 
-// External foreign-key intent for P020 (packages/database/src/schema/index.ts integration):
-//   style_profiles.tenant_id -> tenancy.tenants.id (P015)
-//   style_profile_versions.created_by -> auth.user.id (required for STYLE_EXPLICIT rows)
-//   prompt_override_versions.created_by -> auth.user.id
-// This fragment compiles independently and does not import the unmerged tenancy schema.
-// campaigns is a same-task fragment (also owned by P016), not a sibling import.
 export const styleSource = pgEnum("style_source", [...STYLE_SOURCES]);
 export const frenchTone = pgEnum("french_tone", [...FRENCH_TONES]);
 
@@ -44,11 +44,11 @@ export const styleProfiles = pgTable(
   "style_profiles",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").notNull().unique(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .unique()
+      .references(() => tenants.id),
     source: styleSource("source").notNull().default("DEFAULT"),
-    // No DB-level FK on these three pointers: styleProfileVersions is declared below and
-    // the reference would be circular with styleProfileVersions.styleProfileId, which
-    // stays the enforced direction.
     explicitVersionId: text("explicit_version_id"),
     acceptedInferredVersionId: text("accepted_inferred_version_id"),
     // Set when a bounded inference produced a proposal the customer has not accepted yet.
@@ -62,7 +62,31 @@ export const styleProfiles = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
+    foreignKey({
+      columns: [table.explicitVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_explicitVersion_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.acceptedInferredVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_acceptedInferredVersion_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.suggestedInferredVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_suggestedInferredVersion_owner_fk",
+    }),
     index("styleProfiles_explicitVersionId_idx").on(table.explicitVersionId),
     index("styleProfiles_acceptedInferredVersionId_idx").on(
       table.acceptedInferredVersionId
@@ -78,8 +102,12 @@ export const styleProfileVersions = pgTable(
     id: text("id").primaryKey(),
     styleProfileId: text("style_profile_id")
       .notNull()
-      .references(() => styleProfiles.id, { onDelete: "cascade" }),
-    tenantId: text("tenant_id").notNull(),
+      .references((): AnyPgColumn => styleProfiles.id, {
+        onDelete: "cascade",
+      }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     kind: styleProfileVersionKind("kind").notNull(),
     revision: integer("revision").notNull(),
     tone: frenchTone("tone"),
@@ -106,9 +134,15 @@ export const styleProfileVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdBy: text("created_by"),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
+    unique("styleProfileVersions_id_styleProfileId_unique").on(
+      table.id,
+      table.styleProfileId
+    ),
     index("styleProfileVersions_styleProfileId_idx").on(table.styleProfileId),
     index("styleProfileVersions_tenantId_idx").on(table.tenantId),
     check(
@@ -128,13 +162,13 @@ export const promptOverrides = pgTable(
   "prompt_overrides",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     campaignId: text("campaign_id")
       .notNull()
       .unique()
       .references(() => campaigns.id, { onDelete: "cascade" }),
-    // No DB-level FK: promptOverrideVersions is declared below and the reference would
-    // be circular with its promptOverrideId, which stays the enforced direction.
     activeVersionId: text("active_version_id"),
     revision: integer("revision").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -145,7 +179,17 @@ export const promptOverrides = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("promptOverrides_tenantId_idx").on(table.tenantId)]
+  (table) => [
+    foreignKey({
+      columns: [table.activeVersionId, table.id],
+      foreignColumns: [
+        promptOverrideVersions.id,
+        promptOverrideVersions.promptOverrideId,
+      ],
+      name: "promptOverrides_activeVersion_owner_fk",
+    }),
+    index("promptOverrides_tenantId_idx").on(table.tenantId),
+  ]
 );
 
 // Immutable per-save snapshot of style settings and step overrides, reconstructing the
@@ -156,8 +200,12 @@ export const promptOverrideVersions = pgTable(
     id: text("id").primaryKey(),
     promptOverrideId: text("prompt_override_id")
       .notNull()
-      .references(() => promptOverrides.id, { onDelete: "cascade" }),
-    tenantId: text("tenant_id").notNull(),
+      .references((): AnyPgColumn => promptOverrides.id, {
+        onDelete: "cascade",
+      }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     revision: integer("revision").notNull(),
     settings: jsonb("settings")
       .notNull()
@@ -170,25 +218,82 @@ export const promptOverrideVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdBy: text("created_by").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
   },
   (table) => [
+    unique("promptOverrideVersions_id_promptOverrideId_unique").on(
+      table.id,
+      table.promptOverrideId
+    ),
     index("promptOverrideVersions_promptOverrideId_idx").on(
       table.promptOverrideId
     ),
   ]
 );
 
-export const styleProfilesRelations = relations(styleProfiles, ({ many }) => ({
-  versions: many(styleProfileVersions),
-}));
+export const styleProfilesRelations = relations(
+  styleProfiles,
+  ({ many, one }) => ({
+    acceptedInferredVersion: one(styleProfileVersions, {
+      fields: [styleProfiles.acceptedInferredVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      relationName: "styleProfileAcceptedInferredVersion",
+    }),
+    explicitVersion: one(styleProfileVersions, {
+      fields: [styleProfiles.explicitVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      relationName: "styleProfileExplicitVersion",
+    }),
+    suggestedInferredVersion: one(styleProfileVersions, {
+      fields: [styleProfiles.suggestedInferredVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      relationName: "styleProfileSuggestedInferredVersion",
+    }),
+    tenant: one(tenants, {
+      fields: [styleProfiles.tenantId],
+      references: [tenants.id],
+    }),
+    versions: many(styleProfileVersions, {
+      relationName: "styleProfileOwnedVersions",
+    }),
+  })
+);
 
 export const styleProfileVersionsRelations = relations(
   styleProfileVersions,
-  ({ one }) => ({
+  ({ many, one }) => ({
+    acceptedForProfiles: many(styleProfiles, {
+      relationName: "styleProfileAcceptedInferredVersion",
+    }),
+    createdByUser: one(user, {
+      fields: [styleProfileVersions.createdBy],
+      references: [user.id],
+    }),
+    explicitForProfiles: many(styleProfiles, {
+      relationName: "styleProfileExplicitVersion",
+    }),
     styleProfile: one(styleProfiles, {
       fields: [styleProfileVersions.styleProfileId],
       references: [styleProfiles.id],
+      relationName: "styleProfileOwnedVersions",
+    }),
+    suggestedForProfiles: many(styleProfiles, {
+      relationName: "styleProfileSuggestedInferredVersion",
+    }),
+    tenant: one(tenants, {
+      fields: [styleProfileVersions.tenantId],
+      references: [tenants.id],
     }),
   })
 );
@@ -196,20 +301,46 @@ export const styleProfileVersionsRelations = relations(
 export const promptOverridesRelations = relations(
   promptOverrides,
   ({ many, one }) => ({
+    activeVersion: one(promptOverrideVersions, {
+      fields: [promptOverrides.activeVersionId, promptOverrides.id],
+      references: [
+        promptOverrideVersions.id,
+        promptOverrideVersions.promptOverrideId,
+      ],
+      relationName: "promptOverrideActiveVersion",
+    }),
     campaign: one(campaigns, {
       fields: [promptOverrides.campaignId],
       references: [campaigns.id],
     }),
-    versions: many(promptOverrideVersions),
+    tenant: one(tenants, {
+      fields: [promptOverrides.tenantId],
+      references: [tenants.id],
+    }),
+    versions: many(promptOverrideVersions, {
+      relationName: "promptOverrideOwnedVersions",
+    }),
   })
 );
 
 export const promptOverrideVersionsRelations = relations(
   promptOverrideVersions,
-  ({ one }) => ({
+  ({ many, one }) => ({
+    activeForOverrides: many(promptOverrides, {
+      relationName: "promptOverrideActiveVersion",
+    }),
+    createdByUser: one(user, {
+      fields: [promptOverrideVersions.createdBy],
+      references: [user.id],
+    }),
     promptOverride: one(promptOverrides, {
       fields: [promptOverrideVersions.promptOverrideId],
       references: [promptOverrides.id],
+      relationName: "promptOverrideOwnedVersions",
+    }),
+    tenant: one(tenants, {
+      fields: [promptOverrideVersions.tenantId],
+      references: [tenants.id],
     }),
   })
 );

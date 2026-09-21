@@ -1,11 +1,16 @@
+import { createTableRelationsHelpers } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
   promptOverrides,
+  promptOverridesRelations,
   promptOverrideVersions,
+  promptOverrideVersionsRelations,
   styleProfiles,
+  styleProfilesRelations,
   styleProfileVersions,
+  styleProfileVersionsRelations,
 } from "./styles";
 import { expectTimezoneAwareInstants } from "./test-helpers";
 
@@ -158,12 +163,46 @@ describe("styles schema fragment", () => {
     ];
     for (const { childTable, parentName } of cases) {
       const config = getTableConfig(childTable);
-      expect(config.foreignKeys).toHaveLength(1);
-      const [foreignKey] = config.foreignKeys;
-      expect(foreignKey.onDelete).toBe("cascade");
-      expect(getTableConfig(foreignKey.reference().foreignTable).name).toBe(
-        parentName
+      const parentForeignKey = config.foreignKeys.find(
+        (foreignKey) =>
+          getTableConfig(foreignKey.reference().foreignTable).name ===
+          parentName
       );
+      expect(parentForeignKey?.onDelete).toBe("cascade");
     }
+  });
+
+  it("maps style and prompt version pointers to distinct relations", () => {
+    const profileRelations = styleProfilesRelations.config(
+      createTableRelationsHelpers(styleProfiles)
+    );
+    const styleVersionRelations = styleProfileVersionsRelations.config(
+      createTableRelationsHelpers(styleProfileVersions)
+    );
+    const overrideRelations = promptOverridesRelations.config(
+      createTableRelationsHelpers(promptOverrides)
+    );
+    const overrideVersionRelations = promptOverrideVersionsRelations.config(
+      createTableRelationsHelpers(promptOverrideVersions)
+    );
+
+    expect(profileRelations.explicitVersion.relationName).toBe(
+      styleVersionRelations.explicitForProfiles.relationName
+    );
+    expect(profileRelations.acceptedInferredVersion.relationName).toBe(
+      styleVersionRelations.acceptedForProfiles.relationName
+    );
+    expect(profileRelations.suggestedInferredVersion.relationName).toBe(
+      styleVersionRelations.suggestedForProfiles.relationName
+    );
+    expect(profileRelations.versions.relationName).toBe(
+      styleVersionRelations.styleProfile.relationName
+    );
+    expect(overrideRelations.activeVersion.relationName).toBe(
+      overrideVersionRelations.activeForOverrides.relationName
+    );
+    expect(overrideRelations.versions.relationName).toBe(
+      overrideVersionRelations.promptOverride.relationName
+    );
   });
 });

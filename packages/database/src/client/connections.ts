@@ -16,10 +16,7 @@ export function createRuntimePool(env: DatabaseEnv): Pool {
   });
 }
 
-/**
- * A single unpooled client on the direct migration URL. This module only
- * manages the connection; running migration SQL is a later task's job.
- */
+/** A single unpooled client on the validated direct migration URL. */
 export function createMigrationClient(env: DatabaseEnv): Client {
   return new Client({ connectionString: env.migrationUrl });
 }

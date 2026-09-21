@@ -32,6 +32,9 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { user } from "./auth";
+import { tenants } from "./tenancy";
+
 // Unipile-connected LinkedIn accounts (C3 provider_accounts). `providerAccountId` is
 // globally unique, not scoped by tenant, so one provider account cannot be silently
 // rebound to a second tenant.
@@ -39,7 +42,10 @@ export const providerAccounts = pgTable(
   "provider_accounts",
   {
     id: text("id").$type<AccountId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     providerAccountId: text("provider_account_id").notNull().unique(),
     providerUserId: text("provider_user_id"),
     status: text("status", { enum: PROVIDER_ACCOUNT_STATUSES }).notNull(),
@@ -73,7 +79,10 @@ export const prospects = pgTable(
   "prospects",
   {
     id: text("id").$type<ProspectId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     accountId: text("account_id")
       .$type<AccountId>()
       .notNull()
@@ -114,7 +123,10 @@ export const evidence = pgTable(
   "evidence",
   {
     id: text("id").$type<EvidenceId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     accountId: text("account_id")
       .$type<AccountId>()
       .references(() => providerAccounts.id, { onDelete: "set null" }),
@@ -149,7 +161,10 @@ export const conversations = pgTable(
   "conversations",
   {
     id: text("id").$type<ConversationId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     accountId: text("account_id")
       .$type<AccountId>()
       .notNull()
@@ -163,8 +178,9 @@ export const conversations = pgTable(
     ownershipReason: text("ownership_reason", {
       enum: OWNERSHIP_REASONS,
     }).notNull(),
-    // External FK intent for P020: -> auth `user`.id (packages/database/src/schema/auth.ts).
-    ownerUserId: text("owner_user_id").$type<UserId>(),
+    ownerUserId: text("owner_user_id")
+      .$type<UserId>()
+      .references(() => user.id, { onDelete: "set null" }),
     ownershipRecordedAt: timestamp("ownership_recorded_at", {
       withTimezone: true,
     }).notNull(),
@@ -198,7 +214,10 @@ export const messages = pgTable(
   "messages",
   {
     id: text("id").$type<MessageId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     accountId: text("account_id")
       .$type<AccountId>()
       .notNull()
@@ -252,7 +271,10 @@ export const suppressionEntries = pgTable(
   "suppression_entries",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     accountId: text("account_id")
       .$type<AccountId>()
       .notNull()
@@ -274,9 +296,13 @@ export const suppressionEntries = pgTable(
 
 export const providerAccountsRelations = relations(
   providerAccounts,
-  ({ many }) => ({
-    prospects: many(prospects),
+  ({ many, one }) => ({
     conversations: many(conversations),
+    prospects: many(prospects),
+    tenant: one(tenants, {
+      fields: [providerAccounts.tenantId],
+      references: [tenants.id],
+    }),
   })
 );
 
@@ -285,14 +311,26 @@ export const prospectsRelations = relations(prospects, ({ one, many }) => ({
     fields: [prospects.accountId],
     references: [providerAccounts.id],
   }),
-  evidence: many(evidence),
   conversations: many(conversations),
+  evidence: many(evidence),
+  tenant: one(tenants, {
+    fields: [prospects.tenantId],
+    references: [tenants.id],
+  }),
 }));
 
 export const evidenceRelations = relations(evidence, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [evidence.accountId],
+    references: [providerAccounts.id],
+  }),
   prospect: one(prospects, {
     fields: [evidence.prospectId],
     references: [prospects.id],
+  }),
+  tenant: one(tenants, {
+    fields: [evidence.tenantId],
+    references: [tenants.id],
   }),
 }));
 
@@ -303,27 +341,55 @@ export const conversationsRelations = relations(
       fields: [conversations.accountId],
       references: [providerAccounts.id],
     }),
+    messages: many(messages),
+    ownerUser: one(user, {
+      fields: [conversations.ownerUserId],
+      references: [user.id],
+    }),
     prospect: one(prospects, {
       fields: [conversations.prospectId],
       references: [prospects.id],
     }),
-    messages: many(messages),
+    tenant: one(tenants, {
+      fields: [conversations.tenantId],
+      references: [tenants.id],
+    }),
   })
 );
 
 export const messagesRelations = relations(messages, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [messages.accountId],
+    references: [providerAccounts.id],
+  }),
   conversation: one(conversations, {
     fields: [messages.conversationId],
     references: [conversations.id],
+  }),
+  prospect: one(prospects, {
+    fields: [messages.prospectId],
+    references: [prospects.id],
+  }),
+  tenant: one(tenants, {
+    fields: [messages.tenantId],
+    references: [tenants.id],
   }),
 }));
 
 export const suppressionEntriesRelations = relations(
   suppressionEntries,
   ({ one }) => ({
+    account: one(providerAccounts, {
+      fields: [suppressionEntries.accountId],
+      references: [providerAccounts.id],
+    }),
     prospect: one(prospects, {
       fields: [suppressionEntries.prospectId],
       references: [prospects.id],
+    }),
+    tenant: one(tenants, {
+      fields: [suppressionEntries.tenantId],
+      references: [tenants.id],
     }),
   })
 );
