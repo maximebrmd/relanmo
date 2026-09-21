@@ -206,7 +206,7 @@ describe("TypeSafe decision adapter", () => {
         tenantId: typeSafeDecisionInputFixture.tenantId,
       })
     );
-    const decisions = batch.decisions;
+    const { decisions } = batch;
 
     const questionIds = Object.keys(captured?.questions ?? {});
     expect(questionIds).toHaveLength(2);
@@ -278,11 +278,15 @@ describe("TypeSafe decision adapter", () => {
     });
     expect(longLabel.ok).toBe(false);
 
+    const [fixtureEvidence] = typeSafeDecisionInputFixture.evidence;
+    if (!fixtureEvidence) {
+      throw new Error("TypeSafe fixture must include evidence");
+    }
     const longClaim = await port.decideIndependent({
       ...base,
       evidence: [
         {
-          ...typeSafeDecisionInputFixture.evidence[0]!,
+          ...fixtureEvidence,
           claim: "x".repeat(
             TYPESAFE_ADAPTER_LIMITS.maxEvidenceClaimCharacters + 1
           ),
@@ -308,33 +312,35 @@ describe("TypeSafe decision adapter", () => {
   });
 
   it("fails closed on malformed model and usage metadata", async () => {
-    for (const response of [
-      {
-        answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
-        model: "",
-        usage: { input_tokens: 80, output_tokens: 12 },
-      },
-      {
-        answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
-        model: "jev-1.13.0",
-        usage: { input_tokens: -1, output_tokens: 12 },
-      },
-      {
-        answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
-        model: "jev-1.13.0",
-        usage: { input_tokens: 1.5, output_tokens: 12 },
-      },
-    ]) {
-      const port = createTypeSafeDecisionPort({
-        client: { systemOne: () => Promise.resolve(response) },
-        now: () => NOW,
-      });
-      const result = await port.decide(typeSafeDecisionInputFixture);
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.kind).toBe("RETRYABLE_READ_FAILURE");
-      }
-    }
+    await Promise.all(
+      [
+        {
+          answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
+          model: "",
+          usage: { input_tokens: 80, output_tokens: 12 },
+        },
+        {
+          answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
+          model: "jev-1.13.0",
+          usage: { input_tokens: -1, output_tokens: 12 },
+        },
+        {
+          answers: { "icp-fit": choiceAnswer("SUITABLE", 0.9) },
+          model: "jev-1.13.0",
+          usage: { input_tokens: 1.5, output_tokens: 12 },
+        },
+      ].map(async (response) => {
+        const port = createTypeSafeDecisionPort({
+          client: { systemOne: () => Promise.resolve(response) },
+          now: () => NOW,
+        });
+        const result = await port.decide(typeSafeDecisionInputFixture);
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.kind).toBe("RETRYABLE_READ_FAILURE");
+        }
+      })
+    );
   });
 
   it("skips dependent offer selection when a prior independent decision is a hold", async () => {

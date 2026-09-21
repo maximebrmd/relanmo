@@ -53,7 +53,7 @@ import {
 
 export const TYPESAFE_ADAPTER_LIMITS = {
   maxChoiceLabelCharacters: 500,
-  maxEvidenceClaimCharacters: 4_000,
+  maxEvidenceClaimCharacters: 4000,
   maxIndependentQuestions: 16,
   maxPayloadCharacters: 32_000,
   maxPriorDecisions: 64,
@@ -275,8 +275,7 @@ function validateQuestionInput(
   if (
     question.choices.some(
       (option) =>
-        option.label.length >
-        TYPESAFE_ADAPTER_LIMITS.maxChoiceLabelCharacters
+        option.label.length > TYPESAFE_ADAPTER_LIMITS.maxChoiceLabelCharacters
     )
   ) {
     return providerInvalidInput(
@@ -305,8 +304,7 @@ function validateQuestionInput(
   if (
     evidence.some(
       (item) =>
-        item.claim.length >
-        TYPESAFE_ADAPTER_LIMITS.maxEvidenceClaimCharacters
+        item.claim.length > TYPESAFE_ADAPTER_LIMITS.maxEvidenceClaimCharacters
     )
   ) {
     return providerInvalidInput(
@@ -324,15 +322,15 @@ function requestCharacterCount(
   priorDecisions: readonly TypeSafeDecision[]
 ): number {
   let count =
-    input.modelVersion.length +
-    input.prospectId.length +
-    input.tenantId.length;
+    input.modelVersion.length + input.prospectId.length + input.tenantId.length;
   for (const item of input.evidence) {
     count += item.evidenceId.length + item.claim.length;
   }
   for (const question of input.questions) {
     count +=
-      question.id.length + question.prompt.length + question.schemaVersion.length;
+      question.id.length +
+      question.prompt.length +
+      question.schemaVersion.length;
     for (const option of question.choices) {
       count += option.id.length + option.label.length;
     }

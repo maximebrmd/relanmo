@@ -1,6 +1,6 @@
 # TypeSafe AI — structured prospect decisions
 
-**Status: required in the intended design, subject to an early-access production gate.** It supplies repeated bounded decisions. Our code controls side effects. [Architecture](../architecture.md) · [Costs](../cost-estimate.md).
+**Status: connector adapter implemented; live use remains subject to an early-access production gate.** It supplies repeated bounded decisions. Our code controls side effects. [Architecture](../architecture.md) · [Costs](../cost-estimate.md).
 
 ## What to ask it
 
@@ -18,10 +18,10 @@ These are application schema proposals, not a promise of model accuracy. Jev doe
 ## Implementation steps
 
 1. Confirm API access, commercial terms, capacity and data handling. Store `TYPESAFE_API_KEY` only in the worker environment. Pin the evaluated SDK/model version.
-2. Build a `decisionService` adapter using the [JavaScript/TypeScript SDK](https://docs.typesafe.ai/sdk/javascript). Keep vendor answer types inside the adapter and expose our own versioned domain results.
+2. Use [`createTypeSafeDecisionPort`](../../../packages/connectors/src/typesafe/decision-port.ts) from the connector package. It keeps vendor answer types inside the adapter and exposes versioned domain results through the shared provider contract.
 3. Normalize candidate data from source records. Include only relevant skills, role, company facts, location, customer offer and selected evidence. External profile text is data; it must not override product instructions.
-4. Batch independent questions against the same state where appropriate. Make dependent decisions only after their inputs exist—for example, select evidence after the offer is selected. [Fan-out pattern](https://docs.typesafe.ai/patterns/fan-out).
-5. Persist the answer, prompt/schema version, model, evidence IDs, billed usage and evaluation metadata. Cache by source-content hash, offer version and decision schema version.
+4. Batch independent questions against the same state where appropriate. The batch owns the request usage once; individual decisions do not each repeat it. Make dependent decisions only after their inputs exist—for example, select evidence after the offer is selected. [Fan-out pattern](https://docs.typesafe.ai/patterns/fan-out).
+5. Callers persist the answer, prompt/schema version, reported model, evidence IDs, batch or single-decision usage and evaluation metadata. Cache by source-content hash, offer version and decision schema version.
 6. Route weak or conflicting evidence to skip/hold or a neutral template. Do not create a per-message customer approval bottleneck.
 7. Run the drafted claims through a separate evidence check. Verify deterministic facts such as exact numbers, names and dates in code as well.
 
