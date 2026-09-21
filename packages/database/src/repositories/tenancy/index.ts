@@ -1,9 +1,9 @@
-import type {
-  CurrentVersionRepository,
-  ProfileRepository,
-  TenantRepository,
-} from "@relanmo/domain/ports/persistence";
+import type { TenantRepository } from "@relanmo/domain/ports/persistence";
 
+import type {
+  CampaignScopedCurrentVersionRepository,
+  CampaignScopedProfileRepository,
+} from "./contracts";
 import {
   createCurrentVersionRepository,
   createProfileRepository,
@@ -17,10 +17,15 @@ export {
   createProfileRepository,
 } from "./profile-repository";
 export { createTenantRepository } from "./tenant-repository";
+export type {
+  CampaignScopedCurrentVersionRepository,
+  CampaignScopedProfileRepository,
+  CampaignScopedSaveProfileRevisionInput,
+} from "./contracts";
 
 export type TenancyRepositories = Readonly<{
-  currentVersions: CurrentVersionRepository;
-  profiles: ProfileRepository;
+  currentVersions: CampaignScopedCurrentVersionRepository;
+  profiles: CampaignScopedProfileRepository;
   tenants: TenantRepository;
 }>;
 

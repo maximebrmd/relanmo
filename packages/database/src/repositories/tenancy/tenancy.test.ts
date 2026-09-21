@@ -8,6 +8,7 @@ import {
 } from "@relanmo/database/security";
 import { createPersistenceTransactionRunner } from "@relanmo/database/transactions";
 import {
+  parseCampaignId,
   parseProfileVersionId,
   parseTenantId,
   parseUserId,
@@ -17,7 +18,6 @@ import type {
   PersistenceResult,
   PersistenceTransactionWork,
   PersistenceWorkerId,
-  SaveProfileRevisionInput,
   TenantTransactionScope,
 } from "@relanmo/domain/ports/persistence";
 import {
@@ -42,6 +42,7 @@ import type { IsolatedTestDatabase } from "../../../tests/support/test-database"
 import { createIsolatedTestDatabase } from "../../../tests/support/test-database";
 import { applyDatabaseMigrations } from "../../schema/apply-migrations";
 import { createTenancyRepositories } from "./index";
+import type { CampaignScopedSaveProfileRevisionInput } from "./index";
 
 const SETUP_TIMEOUT_MS = 60_000;
 const TEST_TIMEOUT_MS = 30_000;
@@ -202,9 +203,11 @@ function saveInput(
   tenant: string,
   userId: string,
   profileVersionId: string,
-  expected = emptyCurrentVersionSetFixture
-): SaveProfileRevisionInput {
+  expected = emptyCurrentVersionSetFixture,
+  campaignId: string | null = null
+): CampaignScopedSaveProfileRevisionInput {
   return {
+    campaignId: campaignId === null ? null : parseCampaignId(campaignId),
     createdAt: CREATED_AT,
     createdBy: parseUserId(userId),
     expectedCurrent: { expected },
@@ -363,12 +366,18 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const profileA = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+          repos.profiles.get(
+            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
+            tx
+          )
         )
       );
       const profileB = expectOk(
         await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.get({ tenantId: parseTenantId(TENANT_B) }, tx)
+          repos.profiles.get(
+            { campaignId: null, tenantId: parseTenantId(TENANT_B) },
+            tx
+          )
         )
       );
       expect(profileA.profile?.facts).toEqual(profileFactsFixture);
@@ -395,7 +404,10 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const unchanged = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+          repos.profiles.get(
+            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
+            tx
+          )
         )
       );
       expect(unchanged.profile?.version.id).toBe("profile-a-1");
@@ -428,7 +440,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       const current = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
           repos.currentVersions.getCurrent(
-            { tenantId: parseTenantId(TENANT_A) },
+            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
             tx
           )
         )
@@ -438,7 +450,10 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const otherTenantUnchanged = expectOk(
         await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.get({ tenantId: parseTenantId(TENANT_B) }, tx)
+          repos.profiles.get(
+            { campaignId: null, tenantId: parseTenantId(TENANT_B) },
+            tx
+          )
         )
       );
       expect(otherTenantUnchanged.profile?.version.id).toBe("profile-b-1");
@@ -450,21 +465,12 @@ describe("membership and freelancer profile repositories (live local Postgres)",
   );
 
   it(
-    "scopes profile snapshots across multiple campaigns and detects style drift",
+    "scopes profile guards across multiple campaigns and detects campaign drift",
     async (ctx) => {
       if (!database) {
         ctx.skip();
         return;
       }
-
-      const before = expectOk(
-        await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.currentVersions.getCurrent(
-            { tenantId: parseTenantId(TENANT_A) },
-            tx
-          )
-        )
-      );
 
       await withClient(database.migrationUrl, async (client) => {
         await client.query(
@@ -579,7 +585,10 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       const current = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
           repos.currentVersions.getCurrent(
-            { tenantId: parseTenantId(TENANT_A) },
+            {
+              campaignId: parseCampaignId("campaign-a"),
+              tenantId: parseTenantId(TENANT_A),
+            },
             tx
           )
         )
@@ -590,7 +599,11 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           kind: "STYLE_INFERRED",
           revision: 2,
         },
-        campaign: null,
+        campaign: {
+          id: "campaign-version-a-1",
+          kind: "CAMPAIGN",
+          revision: 1,
+        },
         defaultPrompt: null,
         explicitStyle: {
           id: "style-explicit-a-1",
@@ -600,9 +613,30 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         model: null,
       });
 
+      const secondCampaign = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.currentVersions.getCurrent(
+            {
+              campaignId: parseCampaignId("campaign-a-2"),
+              tenantId: parseTenantId(TENANT_A),
+            },
+            tx
+          )
+        )
+      );
+      expect(secondCampaign.versions.campaign?.id).toBe(
+        "campaign-version-a-2"
+      );
+
       const profile = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+          repos.profiles.get(
+            {
+              campaignId: parseCampaignId("campaign-a"),
+              tenantId: parseTenantId(TENANT_A),
+            },
+            tx
+          )
         )
       );
       expect(profile.current).toEqual(current.versions);
@@ -612,7 +646,32 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           repos.tenants.get({ tenantId: parseTenantId(TENANT_A) }, tx)
         )
       );
-      expect(tenant.tenant?.currentVersions).toEqual(current.versions);
+      expect(tenant.tenant?.currentVersions).toEqual({
+        ...current.versions,
+        campaign: null,
+      });
+
+      await withClient(database.migrationUrl, async (client) => {
+        await client.query(
+          `insert into campaign_versions (
+             id, campaign_id, tenant_id, revision, name, offer,
+             icp_description, daily_quota, daily_invitation_quota,
+             daily_message_quota, exclusions, targeting, sequence,
+             sequence_closure, business_window, created_by
+           ) values (
+             'campaign-version-a-1-revised', 'campaign-a', $1, 2,
+             'Campagne A révisée', 'Offre A', 'ICP A', 10, 5, 5,
+             '[]', '{}', '[]', '{}', '{}', $2
+           )`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update campaigns
+           set active_version_id = 'campaign-version-a-1-revised'
+           where id = 'campaign-a'`,
+          []
+        );
+      });
 
       const stale = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
@@ -621,7 +680,8 @@ describe("membership and freelancer profile repositories (live local Postgres)",
               TENANT_A,
               USER_A,
               "profile-version-drift",
-              before.versions
+              current.versions,
+              "campaign-a"
             ),
             tx
           )
@@ -631,8 +691,8 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       if (stale.outcome !== "REVISION_CONFLICT") {
         throw new Error("expected active-version drift to conflict");
       }
-      expect(stale.actual).toEqual(current.versions);
-      expect(stale.expected).toEqual(before.versions);
+      expect(stale.actual.campaign?.id).toBe("campaign-version-a-1-revised");
+      expect(stale.expected).toEqual(current.versions);
     },
     TEST_TIMEOUT_MS
   );

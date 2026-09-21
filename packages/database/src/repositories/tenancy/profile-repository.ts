@@ -1,13 +1,13 @@
 import { parseUtcTimestamp } from "@relanmo/domain/contracts";
-import type {
-  CurrentVersionRepository,
-  PersistenceTransaction,
-  ProfileRepository,
-} from "@relanmo/domain/ports/persistence";
+import type { PersistenceTransaction } from "@relanmo/domain/ports/persistence";
 import { and, eq } from "drizzle-orm";
 
 import { freelancerProfiles, tenants } from "../../schema/tenancy";
 import { resolveTransactionExecutor } from "../../transactions/registry";
+import type {
+  CampaignScopedCurrentVersionRepository,
+  CampaignScopedProfileRepository,
+} from "./contracts";
 import {
   catchMappingError,
   currentVersionsEqual,
@@ -18,11 +18,22 @@ import {
 import { loadCurrentVersions } from "./current-version-rows";
 import { memberPrincipalOrForbidden, tenantScopeMismatch } from "./scope";
 
-async function observedVersions(tx: PersistenceTransaction, lock: boolean) {
-  return loadCurrentVersions(tx, tx.scope.tenantId, lock);
+async function observedVersions(
+  tx: PersistenceTransaction,
+  campaignId: Parameters<typeof loadCurrentVersions>[2],
+  lock: boolean,
+  requireCampaignScope = false
+) {
+  return loadCurrentVersions(
+    tx,
+    tx.scope.tenantId,
+    campaignId,
+    lock,
+    requireCampaignScope
+  );
 }
 
-export function createProfileRepository(): ProfileRepository {
+export function createProfileRepository(): CampaignScopedProfileRepository {
   return {
     get: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -30,7 +41,7 @@ export function createProfileRepository(): ProfileRepository {
         return mismatch;
       }
       try {
-        const observed = await observedVersions(tx, false);
+        const observed = await observedVersions(tx, input.campaignId, false);
         return {
           ok: true,
           value: { current: observed.current, profile: observed.profile },
@@ -78,7 +89,12 @@ export function createProfileRepository(): ProfileRepository {
           };
         }
 
-        const observed = await observedVersions(tx, true);
+        const observed = await observedVersions(
+          tx,
+          input.campaignId,
+          true,
+          true
+        );
         const currentProfile = observed.profile;
         const actual = observed.current;
         if (!currentVersionsEqual(input.expectedCurrent.expected, actual)) {
@@ -153,7 +169,7 @@ export function createProfileRepository(): ProfileRepository {
   };
 }
 
-export function createCurrentVersionRepository(): CurrentVersionRepository {
+export function createCurrentVersionRepository(): CampaignScopedCurrentVersionRepository {
   return {
     getCurrent: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -161,7 +177,7 @@ export function createCurrentVersionRepository(): CurrentVersionRepository {
         return mismatch;
       }
       try {
-        const observed = await observedVersions(tx, false);
+        const observed = await observedVersions(tx, input.campaignId, false);
         return {
           ok: true,
           value: {

@@ -1,6 +1,7 @@
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof -- This module is the boundary that maps untyped database rows onto C3 tenancy records. */
 
 import {
+  parseCampaignVersionId,
   parseExplicitStyleVersionId,
   parseInferredStyleVersionId,
   isMember,
@@ -10,6 +11,7 @@ import {
   parseUtcTimestamp,
 } from "@relanmo/domain/contracts";
 import type {
+  CampaignVersionRef,
   CurrentVersionSet,
   ExplicitStyleVersionRef,
   InferredStyleVersionRef,
@@ -32,6 +34,7 @@ import type {
 } from "@relanmo/domain/ports/persistence";
 import type { InferSelectModel } from "drizzle-orm";
 
+import type { campaignVersions } from "../../schema/campaigns";
 import type { styleProfileVersions } from "../../schema/styles";
 import type {
   freelancerProfiles,
@@ -42,6 +45,7 @@ import type {
 export type TenantRow = InferSelectModel<typeof tenants>;
 export type MembershipRow = InferSelectModel<typeof memberships>;
 export type ProfileRow = InferSelectModel<typeof freelancerProfiles>;
+export type CampaignVersionRow = InferSelectModel<typeof campaignVersions>;
 export type StyleVersionRow = InferSelectModel<typeof styleProfileVersions>;
 
 export class TenancyMappingError extends Error {
@@ -212,6 +216,17 @@ export function mapProfileVersion(row: ProfileRow): ProfileVersionRecord {
       kind: "PROFILE",
       revision: row.revision,
     },
+  };
+}
+
+export function mapCampaignVersionRef(
+  row: CampaignVersionRow
+): CampaignVersionRef {
+  return {
+    createdAt: utcFromColumn(row.createdAt),
+    id: parseCampaignVersionId(row.id),
+    kind: "CAMPAIGN",
+    revision: row.revision,
   };
 }
 

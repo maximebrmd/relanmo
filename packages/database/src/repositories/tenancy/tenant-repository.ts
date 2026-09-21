@@ -15,7 +15,7 @@ import { loadCurrentVersions } from "./current-version-rows";
 import { tenantScopeMismatch } from "./scope";
 
 async function currentVersionsFor(tx: PersistenceTransaction, lock: boolean) {
-  return (await loadCurrentVersions(tx, tx.scope.tenantId, lock)).current;
+  return (await loadCurrentVersions(tx, tx.scope.tenantId, null, lock)).current;
 }
 
 export function createTenantRepository(): TenantRepository {
