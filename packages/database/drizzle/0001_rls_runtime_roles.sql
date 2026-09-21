@@ -81,7 +81,7 @@ BEGIN
       $policy$
         CREATE POLICY %I ON %I
           FOR ALL
-          TO relanmo_app, relanmo_worker
+          TO relanmo_app
           USING (
             tenant_id = current_setting('app.tenant_id', true)
             AND current_setting('app.tenant_id', true) <> ''
@@ -94,13 +94,42 @@ BEGIN
       target.table_name || '_tenant_isolation',
       target.table_name
     );
+    EXECUTE format(
+      $policy$
+        CREATE POLICY %I ON %I
+          FOR ALL
+          TO relanmo_worker
+          USING (
+            tenant_id = current_setting('app.tenant_id', true)
+            AND current_setting('app.tenant_id', true) <> ''
+          )
+          WITH CHECK (
+            tenant_id = current_setting('app.tenant_id', true)
+            AND current_setting('app.tenant_id', true) <> ''
+          )
+      $policy$,
+      target.table_name || '_worker_tenant_isolation',
+      target.table_name
+    );
   END LOOP;
 
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE tenants TO relanmo_app;
   ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenants_tenant_isolation ON tenants
     FOR ALL
-    TO relanmo_app, relanmo_worker
+    TO relanmo_app
+    USING (
+      id = current_setting('app.tenant_id', true)
+      AND current_setting('app.tenant_id', true) <> ''
+    )
+    WITH CHECK (
+      id = current_setting('app.tenant_id', true)
+      AND current_setting('app.tenant_id', true) <> ''
+    );
+
+  CREATE POLICY tenants_worker_tenant_isolation ON tenants
+    FOR ALL
+    TO relanmo_worker
     USING (
       id = current_setting('app.tenant_id', true)
       AND current_setting('app.tenant_id', true) <> ''
@@ -166,12 +195,9 @@ BEGIN
     provider_accounts,
     prospects,
     style_profiles,
-    style_profile_versions,
     conversations,
     messages,
     suppression_entries,
-    actions,
-    send_attempts,
     account_leases,
     quota_reservations,
     webhook_events,
@@ -180,11 +206,25 @@ BEGIN
 
   GRANT INSERT ON TABLE
     evidence,
+    style_profile_versions,
+    actions,
+    send_attempts,
     send_receipts,
     action_events,
     usage_events,
     audit_events
   TO relanmo_worker;
+
+  GRANT UPDATE (
+    state,
+    state_at,
+    attempt_id,
+    lease_expires_at,
+    lease_fence,
+    provider_message_id,
+    failure_reason,
+    unknown_reason
+  ) ON TABLE actions TO relanmo_worker;
 
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     "user",

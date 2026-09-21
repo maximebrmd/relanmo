@@ -6,6 +6,7 @@ export {
   applyTrustedSqlContext,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
+  mintTrustedWorkerAccess,
   requireTrustedTenantAccess,
 } from "./context";
 export type {

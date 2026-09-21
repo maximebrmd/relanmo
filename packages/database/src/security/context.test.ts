@@ -11,6 +11,7 @@ import {
   applyTrustedSqlContext,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
+  mintTrustedWorkerAccess,
   UntrustedSqlAccessError,
 } from "./index";
 import type {
@@ -43,9 +44,16 @@ const idleSession: TrustedSqlSession = {
   query: () => Promise.resolve({}),
 };
 
+const activeMembershipSession: TrustedSqlSession = {
+  query: () => Promise.resolve({ rowCount: 1 }),
+};
+
 describe("trusted SQL access minting", () => {
   it("rejects an enumerable tenant payload a browser could round-trip", async () => {
-    const minted = mintTrustedTenantAccess(memberScope("tenant-a"));
+    const minted = await mintTrustedTenantAccess(
+      activeMembershipSession,
+      memberScope("tenant-a")
+    );
     const roundTripped = {
       kind: minted.kind,
       scope: minted.scope,
@@ -91,12 +99,21 @@ describe("trusted SQL access minting", () => {
     ).rejects.toThrow(UntrustedSqlAccessError);
   });
 
-  it("mints tenant access for a member and a worker principal", () => {
-    expect(mintTrustedTenantAccess(memberScope("tenant-a")).kind).toBe(
+  it("requires active membership before minting member access", async () => {
+    await expect(
+      mintTrustedTenantAccess(idleSession, memberScope("tenant-a"))
+    ).rejects.toThrow(UntrustedSqlAccessError);
+    await expect(
+      mintTrustedTenantAccess(activeMembershipSession, memberScope("tenant-a"))
+    ).resolves.toMatchObject({ kind: "tenant" });
+  });
+
+  it("mints worker access only for a worker principal", () => {
+    expect(mintTrustedWorkerAccess(workerScope("tenant-b")).kind).toBe(
       "tenant"
     );
-    expect(mintTrustedTenantAccess(workerScope("tenant-b")).kind).toBe(
-      "tenant"
+    expect(() => mintTrustedWorkerAccess(memberScope("tenant-a"))).toThrow(
+      UntrustedSqlAccessError
     );
   });
 

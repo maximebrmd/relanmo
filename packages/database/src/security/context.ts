@@ -43,29 +43,71 @@ export type AuthPreSessionInput = Readonly<{
   userId: UserId | null;
 }>;
 
-function requirePrincipal(scope: TenantTransactionScope): void {
+function requireMemberPrincipal(scope: TenantTransactionScope): UserId {
   const { principal } = scope;
   if (principal.kind === "MEMBER") {
-    parseUserId(principal.userId);
-    return;
-  }
-  if (principal.kind === "WORKER") {
-    return;
+    return parseUserId(principal.userId);
   }
   throw new UntrustedSqlAccessError(
-    "tenant SQL access requires a member or worker principal"
+    "member tenant SQL access requires a member principal"
   );
 }
 
-export function mintTrustedTenantAccess(
+export async function mintTrustedTenantAccess(
+  session: TrustedSqlSession,
   scope: TenantTransactionScope
-): TenantSqlAccess {
-  requirePrincipal(scope);
-  parseTenantId(scope.tenantId);
+): Promise<TenantSqlAccess> {
+  const userId = requireMemberPrincipal(scope);
+  const tenantId = parseTenantId(scope.tenantId);
+  await setLocalConfig(session, TENANT_CONTEXT_GUC, "");
+  await setLocalConfig(session, ACCESS_MODE_GUC, ACCESS_MODE_AUTH_PRE_SESSION);
+  await setLocalConfig(session, AUTH_PRE_SESSION_USER_GUC, userId);
+  const membership = await session.query(
+    `select 1
+       from memberships
+      where tenant_id = $1
+        and user_id = $2
+        and status = 'ACTIVE'
+      limit 1`,
+    [tenantId, userId]
+  );
+  if (membership.rowCount !== 1) {
+    throw new UntrustedSqlAccessError(
+      "active membership is required for tenant SQL access"
+    );
+  }
+  const trustedScope: TenantTransactionScope = {
+    principal: { kind: "MEMBER", userId },
+    requestId: scope.requestId,
+    tenantId,
+  };
   return {
     [trustedSqlAccessBrand]: true,
     kind: "tenant",
-    scope,
+    scope: trustedScope,
+  };
+}
+
+export function mintTrustedWorkerAccess(
+  scope: TenantTransactionScope
+): TenantSqlAccess {
+  if (scope.principal.kind !== "WORKER") {
+    throw new UntrustedSqlAccessError(
+      "worker tenant SQL access requires a worker principal"
+    );
+  }
+  const trustedScope: TenantTransactionScope = {
+    principal: {
+      kind: "WORKER",
+      workerId: scope.principal.workerId,
+    },
+    requestId: scope.requestId,
+    tenantId: parseTenantId(scope.tenantId),
+  };
+  return {
+    [trustedSqlAccessBrand]: true,
+    kind: "tenant",
+    scope: trustedScope,
   };
 }
 
@@ -107,7 +149,13 @@ export async function applyTrustedSqlContext(
   if (access.kind === "tenant") {
     await setLocalConfig(session, TENANT_CONTEXT_GUC, access.scope.tenantId);
     await setLocalConfig(session, ACCESS_MODE_GUC, ACCESS_MODE_TENANT);
-    await setLocalConfig(session, AUTH_PRE_SESSION_USER_GUC, "");
+    await setLocalConfig(
+      session,
+      AUTH_PRE_SESSION_USER_GUC,
+      access.scope.principal.kind === "MEMBER"
+        ? access.scope.principal.userId
+        : ""
+    );
     return;
   }
   await setLocalConfig(session, TENANT_CONTEXT_GUC, "");

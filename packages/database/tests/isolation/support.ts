@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { Client } from "pg";
 
 import {
@@ -14,6 +16,10 @@ export const ISOLATION_ROLE_PASSWORDS = {
 
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+function sqlIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 export const TENANT_A = "isolation-tenant-a";
@@ -45,9 +51,22 @@ export function runtimeRoleUrl(
   return connectionUrl(
     target.migrationUrl,
     target.databaseName,
-    role,
+    runtimeLoginName(target, role),
     password
   );
+}
+
+export function runtimeLoginName(
+  target: IsolatedTestDatabase,
+  role:
+    | (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES]
+    | typeof AUTH_DATABASE_ROLE
+): string {
+  const databaseHash = createHash("sha256")
+    .update(target.databaseName)
+    .digest("hex")
+    .slice(0, 12);
+  return `${role}_test_${databaseHash}`;
 }
 
 export async function withClient<Value>(
@@ -63,19 +82,42 @@ export async function withClient<Value>(
   }
 }
 
-/** Enables LOGIN on the reviewed runtime roles so isolation tests can connect as non-owners. */
 export async function provisionRuntimeRoleLogins(
   target: IsolatedTestDatabase
 ): Promise<void> {
   await withClient(target.migrationUrl, async (client) => {
+    const principals = [
+      [RUNTIME_DATABASE_ROLES.app, ISOLATION_ROLE_PASSWORDS.app],
+      [AUTH_DATABASE_ROLE, ISOLATION_ROLE_PASSWORDS.auth],
+      [RUNTIME_DATABASE_ROLES.worker, ISOLATION_ROLE_PASSWORDS.worker],
+    ] as const;
+    const statements = principals.flatMap(([role, password]) => {
+      const login = sqlIdentifier(runtimeLoginName(target, role));
+      return [
+        `create role ${login} login nosuperuser nocreatedb nocreaterole inherit nobypassrls password ${sqlLiteral(password)}`,
+        `grant ${sqlIdentifier(role)} to ${login}`,
+      ];
+    });
+    await client.query(statements.join(";\n"));
+  });
+}
+
+export async function dropRuntimeRoleLogins(
+  target: IsolatedTestDatabase
+): Promise<void> {
+  await withClient(target.migrationUrl, async (client) => {
+    const roles = [
+      RUNTIME_DATABASE_ROLES.app,
+      AUTH_DATABASE_ROLE,
+      RUNTIME_DATABASE_ROLES.worker,
+    ] as const;
     await client.query(
-      `alter role ${RUNTIME_DATABASE_ROLES.app} with login password ${sqlLiteral(ISOLATION_ROLE_PASSWORDS.app)}`
-    );
-    await client.query(
-      `alter role ${RUNTIME_DATABASE_ROLES.worker} with login password ${sqlLiteral(ISOLATION_ROLE_PASSWORDS.worker)}`
-    );
-    await client.query(
-      `alter role ${AUTH_DATABASE_ROLE} with login password ${sqlLiteral(ISOLATION_ROLE_PASSWORDS.auth)}`
+      roles
+        .map(
+          (role) =>
+            `drop role if exists ${sqlIdentifier(runtimeLoginName(target, role))}`
+        )
+        .join(";\n")
     );
   });
 }

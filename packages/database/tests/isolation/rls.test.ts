@@ -12,6 +12,7 @@ import {
   AUTH_SECRET_TABLES,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
+  mintTrustedWorkerAccess,
   RUNTIME_DATABASE_ROLES,
 } from "../../src/security";
 import { TENANT_CONTEXT_GUC } from "../../src/transactions";
@@ -20,7 +21,9 @@ import type { IsolatedTestDatabase } from "../support/test-database";
 import { createIsolatedTestDatabase } from "../support/test-database";
 import {
   ISOLATION_ROLE_PASSWORDS,
+  dropRuntimeRoleLogins,
   provisionRuntimeRoleLogins,
+  runtimeLoginName,
   runtimeRoleUrl,
   seedIsolationFixtures,
   TENANT_A,
@@ -45,8 +48,14 @@ beforeAll(async () => {
 }, SETUP_TIMEOUT_MS);
 
 afterAll(async () => {
-  await database?.drop();
-  await stopLocalPostgresAdmin();
+  try {
+    if (database) {
+      await dropRuntimeRoleLogins(database);
+    }
+  } finally {
+    await database?.drop();
+    await stopLocalPostgresAdmin();
+  }
 });
 
 function memberScope(tenant: string, userId = USER_A): TenantTransactionScope {
@@ -69,6 +78,28 @@ function workerScope(tenant: string): TenantTransactionScope {
   };
 }
 
+async function establishMemberAccess(
+  target: IsolatedTestDatabase,
+  tenant: string,
+  userId = USER_A
+) {
+  return withClient(
+    runtimeRoleUrl(
+      target,
+      AUTH_DATABASE_ROLE,
+      ISOLATION_ROLE_PASSWORDS.auth
+    ),
+    async (auth) => {
+      await auth.query("begin");
+      try {
+        return await mintTrustedTenantAccess(auth, memberScope(tenant, userId));
+      } finally {
+        await auth.query("rollback");
+      }
+    }
+  );
+}
+
 describe("tenant isolation with runtime database roles (live local Postgres)", () => {
   it(
     "connects runtime roles as non-owners without BYPASSRLS",
@@ -81,10 +112,11 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
       await withClient(database.migrationUrl, async (owner) => {
         const roles = await owner.query<{
           rolbypassrls: boolean;
+          rolcanlogin: boolean;
           rolname: string;
           rolsuper: boolean;
         }>(
-          `select rolname, rolbypassrls, rolsuper
+          `select rolname, rolbypassrls, rolcanlogin, rolsuper
              from pg_roles
             where rolname = any($1::text[])
             order by rolname`,
@@ -97,16 +129,19 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
         expect(roles.rows).toEqual([
           {
             rolbypassrls: false,
+            rolcanlogin: false,
             rolname: RUNTIME_DATABASE_ROLES.app,
             rolsuper: false,
           },
           {
             rolbypassrls: false,
+            rolcanlogin: false,
             rolname: AUTH_DATABASE_ROLE,
             rolsuper: false,
           },
           {
             rolbypassrls: false,
+            rolcanlogin: false,
             rolname: RUNTIME_DATABASE_ROLES.worker,
             rolsuper: false,
           },
@@ -146,7 +181,10 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
                     (select rolbypassrls from pg_roles where rolname = current_user) as rolbypassrls`
           );
           expect(identity.rows[0]).toEqual({
-            current_user: RUNTIME_DATABASE_ROLES.app,
+            current_user: runtimeLoginName(
+              database,
+              RUNTIME_DATABASE_ROLES.app
+            ),
             rolbypassrls: false,
           });
           await expect(
@@ -176,12 +214,10 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ISOLATION_ROLE_PASSWORDS.app
         ),
         async (app) => {
+          const access = await establishMemberAccess(database, TENANT_A);
           await app.query("begin");
           try {
-            await applyTrustedSqlContext(
-              app,
-              mintTrustedTenantAccess(memberScope(TENANT_A))
-            );
+            await applyTrustedSqlContext(app, access);
             const visible = await app.query<{ id: string }>(
               "select id from campaigns order by id"
             );
@@ -204,6 +240,10 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           }
         }
       );
+
+      await expect(
+        establishMemberAccess(database, TENANT_B, USER_A)
+      ).rejects.toThrow("active membership is required");
     },
     TEST_TIMEOUT_MS
   );
@@ -348,17 +388,34 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
               ["worker-campaign", TENANT_A]
             )
           ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query(
+              "update style_profile_versions set tone = tone where false"
+            )
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query(
+              "update send_attempts set payload = payload where false"
+            )
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query("update actions set payload = payload where false")
+          ).rejects.toMatchObject({ code: "42501" });
 
           await worker.query("begin");
           try {
             await applyTrustedSqlContext(
               worker,
-              mintTrustedTenantAccess(workerScope(TENANT_A))
+              mintTrustedWorkerAccess(workerScope(TENANT_A))
             );
             const campaigns = await worker.query<{ id: string }>(
               "select id from campaigns order by id"
             );
             expect(campaigns.rows.map((row) => row.id)).toEqual(["campaign-a"]);
+            const lifecycleUpdate = await worker.query(
+              "update actions set state = state where false"
+            );
+            expect(lifecycleUpdate.rowCount).toBe(0);
           } finally {
             await worker.query("rollback");
           }
