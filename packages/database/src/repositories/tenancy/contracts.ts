@@ -5,10 +5,11 @@ import type {
   PersistenceTransaction,
   ProfileRepository,
   SaveProfileRevisionInput,
+  TenantRepository,
 } from "@relanmo/domain/ports/persistence";
 
 export type CampaignScope = Readonly<{
-  campaignId: CampaignId | null;
+  campaignId: CampaignId;
 }>;
 
 export type CampaignScopedCurrentVersionRepository = Readonly<{
@@ -24,10 +25,23 @@ export type CampaignScopedProfileRepository = Readonly<{
     input: GetProfileInput & CampaignScope,
     tx: PersistenceTransaction
   ) => ReturnType<ProfileRepository["get"]>;
+  initialize: (
+    input: SaveProfileRevisionInput,
+    tx: PersistenceTransaction
+  ) => ReturnType<ProfileRepository["saveRevision"]>;
   saveRevision: (
     input: SaveProfileRevisionInput & CampaignScope,
     tx: PersistenceTransaction
   ) => ReturnType<ProfileRepository["saveRevision"]>;
+}>;
+
+export type CampaignScopedTenantRepository = Readonly<{
+  get: (
+    input: Parameters<TenantRepository["get"]>[0] & CampaignScope,
+    tx: PersistenceTransaction
+  ) => ReturnType<TenantRepository["get"]>;
+  getMembership: TenantRepository["getMembership"];
+  listMemberships: TenantRepository["listMemberships"];
 }>;
 
 export type CampaignScopedSaveProfileRevisionInput = SaveProfileRevisionInput &

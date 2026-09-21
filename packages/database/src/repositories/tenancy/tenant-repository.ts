@@ -1,11 +1,9 @@
-import type {
-  PersistenceTransaction,
-  TenantRepository,
-} from "@relanmo/domain/ports/persistence";
+import type { PersistenceTransaction } from "@relanmo/domain/ports/persistence";
 import { and, asc, eq, ne } from "drizzle-orm";
 
 import { memberships, tenants } from "../../schema/tenancy";
 import { resolveTransactionExecutor } from "../../transactions/registry";
+import type { CampaignScopedTenantRepository } from "./contracts";
 import {
   catchMappingError,
   mapMembershipRecord,
@@ -14,11 +12,16 @@ import {
 import { loadCurrentVersions } from "./current-version-rows";
 import { tenantScopeMismatch } from "./scope";
 
-async function currentVersionsFor(tx: PersistenceTransaction, lock: boolean) {
-  return (await loadCurrentVersions(tx, tx.scope.tenantId, null, lock)).current;
+async function currentVersionsFor(
+  tx: PersistenceTransaction,
+  campaignId: Parameters<typeof loadCurrentVersions>[2],
+  lock: boolean
+) {
+  return (await loadCurrentVersions(tx, tx.scope.tenantId, campaignId, lock))
+    .current;
 }
 
-export function createTenantRepository(): TenantRepository {
+export function createTenantRepository(): CampaignScopedTenantRepository {
   return {
     get: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -38,7 +41,10 @@ export function createTenantRepository(): TenantRepository {
         return {
           ok: true,
           value: {
-            tenant: mapTenantRecord(row, await currentVersionsFor(tx, false)),
+            tenant: mapTenantRecord(
+              row,
+              await currentVersionsFor(tx, input.campaignId, false)
+            ),
           },
         };
       } catch (error) {

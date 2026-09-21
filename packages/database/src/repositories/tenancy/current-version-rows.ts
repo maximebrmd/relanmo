@@ -35,8 +35,7 @@ export async function loadCurrentVersions(
   tx: PersistenceTransaction,
   tenantId: TenantId,
   campaignId: CampaignId | null,
-  lock: boolean,
-  requireCampaignScope = false
+  lock: boolean
 ): Promise<{
   current: CurrentVersionSet;
   profile: ReturnType<typeof mapProfileVersion> | null;
@@ -61,27 +60,6 @@ export async function loadCurrentVersions(
   if (campaignId && !selectedCampaignPointer) {
     throw new TenancyMappingError("selected campaign is unavailable");
   }
-  if (requireCampaignScope && !campaignId) {
-    const activeCampaigns = await rowsWithOptionalLock(
-      db
-        .select({ id: campaigns.id })
-        .from(campaigns)
-        .where(
-          and(
-            eq(campaigns.tenantId, tenantId),
-            eq(campaigns.status, "ACTIVE")
-          )
-        )
-        .limit(1),
-      lock
-    );
-    if (activeCampaigns.length > 0) {
-      throw new TenancyMappingError(
-        "campaign scope is required for guarded profile saves"
-      );
-    }
-  }
-
   const stylePointers = await rowsWithOptionalLock(
     db
       .select({

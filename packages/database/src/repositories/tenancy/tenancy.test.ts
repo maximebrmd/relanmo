@@ -18,6 +18,7 @@ import type {
   PersistenceResult,
   PersistenceTransactionWork,
   PersistenceWorkerId,
+  SaveProfileRevisionInput,
   TenantTransactionScope,
 } from "@relanmo/domain/ports/persistence";
 import {
@@ -199,21 +200,32 @@ async function runAsWorker<Value>(
   }
 }
 
-function saveInput(
+function profileInput(
   tenant: string,
   userId: string,
   profileVersionId: string,
-  expected = emptyCurrentVersionSetFixture,
-  campaignId: string | null = null
-): CampaignScopedSaveProfileRevisionInput {
+  expected = emptyCurrentVersionSetFixture
+): SaveProfileRevisionInput {
   return {
-    campaignId: campaignId === null ? null : parseCampaignId(campaignId),
     createdAt: CREATED_AT,
     createdBy: parseUserId(userId),
     expectedCurrent: { expected },
     facts: profileFactsFixture,
     profileVersionId: parseProfileVersionId(profileVersionId),
     tenantId: parseTenantId(tenant),
+  };
+}
+
+function saveInput(
+  tenant: string,
+  userId: string,
+  profileVersionId: string,
+  expected: CampaignScopedSaveProfileRevisionInput["expectedCurrent"]["expected"],
+  campaignId: string
+): CampaignScopedSaveProfileRevisionInput {
+  return {
+    ...profileInput(tenant, userId, profileVersionId, expected),
+    campaignId: parseCampaignId(campaignId),
   };
 }
 
@@ -236,10 +248,6 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const seenByA = expectOk(
         await runAsMember(TENANT_A, USER_A, async (tx) => {
-          const tenant = await repos.tenants.get(
-            { tenantId: parseTenantId(TENANT_A) },
-            tx
-          );
           const memberships = await repos.tenants.listMemberships(
             { includeRevoked: false, tenantId: parseTenantId(TENANT_A) },
             tx
@@ -258,7 +266,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
             },
             tx
           );
-          if (!(tenant.ok && memberships.ok && self.ok && revoked.ok)) {
+          if (!(memberships.ok && self.ok && revoked.ok)) {
             return {
               error: {
                 code: "INTEGRITY" as const,
@@ -274,14 +282,11 @@ describe("membership and freelancer profile repositories (live local Postgres)",
               memberships: memberships.value.memberships,
               revoked: revoked.value.membership,
               self: self.value.membership,
-              tenant: tenant.value.tenant,
             },
           };
         })
       );
 
-      expect(seenByA.tenant?.displayName).toBe(SHARED_DISPLAY_NAME);
-      expect(seenByA.tenant?.tenantId).toBe(TENANT_A);
       expect(seenByA.self?.role).toBe("OWNER");
       expect(seenByA.self?.status).toBe("ACTIVE");
       expect(seenByA.memberships.map((row) => row.userId)).toEqual([USER_A]);
@@ -301,14 +306,25 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const seenByB = expectOk(
         await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.tenants.get({ tenantId: parseTenantId(TENANT_B) }, tx)
+          repos.tenants.getMembership(
+            {
+              tenantId: parseTenantId(TENANT_B),
+              userId: parseUserId(USER_B),
+            },
+            tx
+          )
         )
       );
-      expect(seenByB.tenant?.displayName).toBe(SHARED_DISPLAY_NAME);
-      expect(seenByB.tenant?.tenantId).toBe(TENANT_B);
+      expect(seenByB.membership?.tenantId).toBe(TENANT_B);
 
       const crossTenant = await runAsMember(TENANT_A, USER_A, (tx) =>
-        repos.tenants.get({ tenantId: parseTenantId(TENANT_B) }, tx)
+        repos.tenants.getMembership(
+          {
+            tenantId: parseTenantId(TENANT_B),
+            userId: parseUserId(USER_B),
+          },
+          tx
+        )
       );
       expect(crossTenant).toEqual({
         error: {
@@ -347,50 +363,36 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const savedA = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.saveRevision(
-            saveInput(TENANT_A, USER_A, "profile-a-1"),
+          repos.profiles.initialize(
+            profileInput(TENANT_A, USER_A, "profile-a-1"),
             tx
           )
         )
       );
       const savedB = expectOk(
         await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.saveRevision(
-            saveInput(TENANT_B, USER_B, "profile-b-1"),
+          repos.profiles.initialize(
+            profileInput(TENANT_B, USER_B, "profile-b-1"),
             tx
           )
         )
       );
       expect(savedA.outcome).toBe("UPDATED");
       expect(savedB.outcome).toBe("UPDATED");
-
-      const profileA = expectOk(
-        await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.get(
-            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
-            tx
-          )
-        )
-      );
-      const profileB = expectOk(
-        await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.get(
-            { campaignId: null, tenantId: parseTenantId(TENANT_B) },
-            tx
-          )
-        )
-      );
-      expect(profileA.profile?.facts).toEqual(profileFactsFixture);
-      expect(profileB.profile?.facts).toEqual(profileFactsFixture);
-      expect(profileA.profile?.tenantId).toBe(TENANT_A);
-      expect(profileB.profile?.tenantId).toBe(TENANT_B);
-      expect(profileA.profile?.version.id).toBe("profile-a-1");
-      expect(profileB.profile?.version.id).toBe("profile-b-1");
+      if (savedA.outcome !== "UPDATED" || savedB.outcome !== "UPDATED") {
+        throw new Error("expected initialized profiles");
+      }
+      expect(savedA.value.profile.facts).toEqual(profileFactsFixture);
+      expect(savedB.value.profile.facts).toEqual(profileFactsFixture);
+      expect(savedA.value.profile.tenantId).toBe(TENANT_A);
+      expect(savedB.value.profile.tenantId).toBe(TENANT_B);
+      expect(savedA.value.profile.version.id).toBe("profile-a-1");
+      expect(savedB.value.profile.version.id).toBe("profile-b-1");
 
       const stale = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.saveRevision(
-            saveInput(TENANT_A, USER_A, "profile-a-stale"),
+          repos.profiles.initialize(
+            profileInput(TENANT_A, USER_A, "profile-a-stale"),
             tx
           )
         )
@@ -401,65 +403,6 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       }
       expect(stale.actual.profile?.id).toBe("profile-a-1");
       expect(stale.expected.profile).toBeNull();
-
-      const unchanged = expectOk(
-        await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.get(
-            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
-            tx
-          )
-        )
-      );
-      expect(unchanged.profile?.version.id).toBe("profile-a-1");
-      expect(unchanged.profile?.facts.offer).toBe(profileFactsFixture.offer);
-
-      const updated = expectOk(
-        await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.saveRevision(
-            {
-              ...saveInput(TENANT_A, USER_A, "profile-a-2", stale.actual),
-              facts: {
-                ...profileFactsFixture,
-                offer: "J’accompagne les équipes produit sur la prospection.",
-              },
-            },
-            tx
-          )
-        )
-      );
-      expect(updated.outcome).toBe("UPDATED");
-      if (updated.outcome !== "UPDATED") {
-        throw new Error("expected an updated profile");
-      }
-      expect(updated.value.profile.version.id).toBe("profile-a-2");
-      expect(updated.value.profile.version.revision).toBe(2);
-      expect(updated.value.profile.facts.offer).toBe(
-        "J’accompagne les équipes produit sur la prospection."
-      );
-
-      const current = expectOk(
-        await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.currentVersions.getCurrent(
-            { campaignId: null, tenantId: parseTenantId(TENANT_A) },
-            tx
-          )
-        )
-      );
-      expect(current.versions.profile?.id).toBe("profile-a-2");
-      expect(current.tenantId).toBe(TENANT_A);
-
-      const otherTenantUnchanged = expectOk(
-        await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.get(
-            { campaignId: null, tenantId: parseTenantId(TENANT_B) },
-            tx
-          )
-        )
-      );
-      expect(otherTenantUnchanged.profile?.version.id).toBe("profile-b-1");
-      expect(otherTenantUnchanged.profile?.facts.offer).toBe(
-        profileFactsFixture.offer
-      );
     },
     TEST_TIMEOUT_MS
   );
@@ -582,6 +525,24 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         );
       });
 
+      const lateInitialization = await runAsMember(
+        TENANT_A,
+        USER_A,
+        (tx) =>
+          repos.profiles.initialize(
+            profileInput(TENANT_A, USER_A, "profile-late-initialization"),
+            tx
+          )
+      );
+      expect(lateInitialization).toEqual({
+        error: {
+          code: "VALIDATION",
+          detail: "profile initialization requires a tenant without campaigns",
+          retryable: false,
+        },
+        ok: false,
+      });
+
       const current = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
           repos.currentVersions.getCurrent(
@@ -643,13 +604,16 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const tenant = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.tenants.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+          repos.tenants.get(
+            {
+              campaignId: parseCampaignId("campaign-a"),
+              tenantId: parseTenantId(TENANT_A),
+            },
+            tx
+          )
         )
       );
-      expect(tenant.tenant?.currentVersions).toEqual({
-        ...current.versions,
-        campaign: null,
-      });
+      expect(tenant.tenant?.currentVersions).toEqual(current.versions);
 
       await withClient(database.migrationUrl, async (client) => {
         await client.query(
@@ -693,6 +657,33 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       }
       expect(stale.actual.campaign?.id).toBe("campaign-version-a-1-revised");
       expect(stale.expected).toEqual(current.versions);
+
+      const updated = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.saveRevision(
+            {
+              ...saveInput(
+                TENANT_A,
+                USER_A,
+                "profile-a-2",
+                stale.actual,
+                "campaign-a"
+              ),
+              facts: {
+                ...profileFactsFixture,
+                offer: "J’accompagne les équipes produit sur la prospection.",
+              },
+            },
+            tx
+          )
+        )
+      );
+      expect(updated.outcome).toBe("UPDATED");
+      if (updated.outcome !== "UPDATED") {
+        throw new Error("expected an updated profile");
+      }
+      expect(updated.value.profile.version.id).toBe("profile-a-2");
+      expect(updated.value.profile.version.revision).toBe(2);
     },
     TEST_TIMEOUT_MS
   );
@@ -707,7 +698,13 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const result = await runAsWorker(TENANT_A, (tx) =>
         repos.profiles.saveRevision(
-          saveInput(TENANT_A, USER_A, "profile-worker-1"),
+          saveInput(
+            TENANT_A,
+            USER_A,
+            "profile-worker-1",
+            emptyCurrentVersionSetFixture,
+            "campaign-a"
+          ),
           tx
         )
       );
