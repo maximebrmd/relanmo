@@ -15,7 +15,6 @@ export const ALLOWED_TEMPLATE_VARIABLES = [
   "dm3Fact",
   "firstName",
   "hiringRole",
-  "priorFact",
   "sharedConnection",
   "signalDetail",
   "signalFact",
@@ -175,7 +174,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM1",
   }),
   Object.freeze({
-    body: "Salut {{firstName}}, j'ai vu la nouvelle offre {{dm2Fact}} chez {{company}}. C'est lié au chantier {{priorFact}} ?",
+    body: "Salut {{firstName}}, j'ai vu la nouvelle offre {{dm2Fact}} chez {{company}}. C'est un recrutement prioritaire en ce moment ?",
     hook: "DM2_OFFER",
     id: "dm2-offer",
     maxCharacters: 300,
@@ -199,7 +198,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM2",
   }),
   Object.freeze({
-    body: "Salut {{firstName}}, je repensais à {{priorFact}}. C'est toujours d'actualité chez {{company}} ?",
+    body: "Salut {{firstName}}, quelles sont vos priorités côté {{craft}} chez {{company}} en ce moment ?",
     hook: "DM2_NEUTRAL",
     id: "dm2-neutral",
     maxCharacters: 300,
@@ -223,7 +222,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM3",
   }),
   Object.freeze({
-    body: "Hello {{firstName}}, petite relance sur {{priorFact}}. Vous avez trouvé une solution ou c'est encore ouvert ?",
+    body: "Hello {{firstName}}, quels sujets vous occupent le plus côté {{craft}} chez {{company}} en ce moment ?",
     hook: "DM3_NEUTRAL",
     id: "dm3-neutral",
     maxCharacters: 300,
@@ -231,7 +230,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM3",
   }),
   Object.freeze({
-    body: "Hello {{firstName}}, je vais finir par insister sur {{priorFact}} ! C'est encore ouvert de votre côté ?",
+    body: "Hello {{firstName}}, je remonte simplement mon message : le sujet {{craft}} est-il d'actualité chez {{company}} ?",
     hook: "DM4_LIGHT_NUDGE",
     id: "dm4-light-nudge",
     maxCharacters: 250,
@@ -239,7 +238,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM4",
   }),
   Object.freeze({
-    body: "Salut {{firstName}}, je te laisse tranquille après ce message. Si {{priorFact}} redevient d'actualité, on pourra reprendre la discussion.",
+    body: "Salut {{firstName}}, je te laisse tranquille après ce message. Au plaisir d'échanger si un sujet {{craft}} se présente chez {{company}}.",
     hook: "DM5_CLOSE",
     id: "dm5-close",
     maxCharacters: 250,

@@ -230,6 +230,18 @@ describe("French prompt defaults", () => {
         observedSignalText: null,
       }).audience
     ).toBe("DECISION_MAKER");
+    expect(
+      qualifyIcp({
+        headline: "Healthcare Recruiter @ City Hospital",
+        observedSignalText: null,
+      }).eligible
+    ).toBe(false);
+    expect(
+      qualifyIcp({
+        headline: "Talent Acquisition @ Nova ESN",
+        observedSignalText: null,
+      }).audience
+    ).toBe("RECRUITER_ESN");
   });
 
   it("requires identifiable company evidence for executive titles", () => {
@@ -270,6 +282,12 @@ describe("French prompt defaults", () => {
     expect(
       qualifyIcp({
         headline: "VP Eng @ Lumenor Studio",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
+    expect(
+      qualifyIcp({
+        headline: "Founding Engineer @ Lumenor Studio",
         observedSignalText: null,
       }).audience
     ).toBe("DECISION_MAKER");
@@ -380,6 +398,25 @@ describe("French prompt defaults", () => {
     expect(plan.kind === "SEQUENCE" && plan.steps[2]?.template.hook).toBe(
       "DM3_NEUTRAL"
     );
+  });
+
+  it("keeps the no-signal follow-up sequence fact-free", () => {
+    const plan = planFrenchSequence({
+      audience: "DECISION_MAKER",
+      dm2Fact: null,
+      dm3Fact: null,
+      incomingReplyPresent: false,
+      signalKind: "NONE",
+      signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
+    });
+
+    expect(plan.kind).toBe("SEQUENCE");
+    if (plan.kind === "SEQUENCE") {
+      for (const step of plan.steps.slice(1)) {
+        expect(step.template.body).not.toContain("{{priorFact}}");
+      }
+    }
   });
 
   it("exposes every approved reusable message variant", () => {

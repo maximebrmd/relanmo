@@ -71,13 +71,19 @@ const ON_MARKET_PATTERNS = [
 ] as const;
 
 const RECRUITER_ROLE_MARKERS = [
-  "it recruiter",
   "recruiter",
   "recruteur",
   "staffing",
   "talent acquisition",
   "talent partner",
   "talent sourcer",
+] as const;
+
+const TECH_RECRUITING_ROLE_MARKERS = [
+  "informatique",
+  "it",
+  "tech",
+  "technical",
 ] as const;
 
 const RECRUITER_COMPANY_MARKERS = ["esn", "portage"] as const;
@@ -125,7 +131,11 @@ const FUNCTIONAL_LEADERSHIP_MARKERS = [
   "vp",
 ] as const;
 
-const APPROVED_FUNCTIONAL_ROLE_MARKERS = ["eng manager", "vp eng"] as const;
+const APPROVED_FUNCTIONAL_ROLE_MARKERS = [
+  "eng manager",
+  "founding engineer",
+  "vp eng",
+] as const;
 
 const TARGET_FUNCTION_MARKERS = [
   "data",
@@ -274,7 +284,9 @@ export function classifyIcpAudience(
     return "PEER_NOT_BUYER";
   }
   if (
-    containsMarker(role, RECRUITER_ROLE_MARKERS) ||
+    (containsMarker(role, RECRUITER_ROLE_MARKERS) &&
+      (containsMarker(role, TECH_RECRUITING_ROLE_MARKERS) ||
+        containsMarker(lower, RECRUITER_COMPANY_MARKERS))) ||
     (containsMarker(role, BUSINESS_DEVELOPMENT_ROLE_MARKERS) &&
       containsMarker(lower, RECRUITER_COMPANY_MARKERS))
   ) {
