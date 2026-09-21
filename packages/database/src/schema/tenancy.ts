@@ -79,10 +79,6 @@ export const memberships = pgTable(
 );
 
 // Offer/target-market/geography facts mirror the C3 `ProfileFacts` shape.
-// `targetMarket` has no counterpart in that persistence contract today even
-// though the C4 product contract (contracts/product/profile.ts) carries it;
-// stored here anyway so P049's onboarding command has a durable column to
-// write to, and flagged in the P015 handoff for contract reconciliation.
 // No LinkedIn/Unipile credential or account field belongs on this table:
 // those stay in `provider_accounts`, owned by a different fragment.
 export const freelancerProfiles = pgTable(

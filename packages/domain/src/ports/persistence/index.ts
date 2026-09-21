@@ -5,5 +5,6 @@ export * from "./campaigns";
 export * from "./common";
 export * from "./conversations";
 export * from "./events";
+export * from "./fixtures";
 export * from "./prospects";
 export * from "./tenancy";
