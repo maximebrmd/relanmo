@@ -1,1 +1,3 @@
-export const stylesRepositorySurface = "DISABLED" as const;
+export { createStyleRepository } from "./repository";
+
+export const stylesRepositorySurface = "node-portable-server" as const;
