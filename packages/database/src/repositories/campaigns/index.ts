@@ -310,18 +310,40 @@ async function createCampaign(
     return authorMismatch;
   }
   const db = resolveTransactionExecutor(tx);
-  const existing = await db
-    .select()
-    .from(campaigns)
-    .where(
-      and(
-        eq(campaigns.id, input.campaignId),
-        eq(campaigns.tenantId, input.tenantId)
+  const [insertedCampaignRow] = await db
+    .insert(campaigns)
+    .values({
+      createdAt: toDate(input.createdAt),
+      id: input.campaignId,
+      revision: 1,
+      status: "DRAFT",
+      tenantId: input.tenantId,
+      updatedAt: toDate(input.createdAt),
+    })
+    .onConflictDoNothing({ target: campaigns.id })
+    .returning();
+  if (!insertedCampaignRow) {
+    const existing = await db
+      .select()
+      .from(campaigns)
+      .where(
+        and(
+          eq(campaigns.id, input.campaignId),
+          eq(campaigns.tenantId, input.tenantId)
+        )
       )
-    )
-    .limit(1);
-  const [existingRow] = existing;
-  if (existingRow) {
+      .limit(1);
+    const [existingRow] = existing;
+    if (!existingRow) {
+      return {
+        error: {
+          code: "INTEGRITY",
+          detail: "campaign id conflicts with another tenant",
+          retryable: false,
+        },
+        ok: false,
+      };
+    }
     const version = await loadVersion(
       db,
       currentVersionId(existingRow),
@@ -336,15 +358,6 @@ async function createCampaign(
       },
     };
   }
-
-  await db.insert(campaigns).values({
-    createdAt: toDate(input.createdAt),
-    id: input.campaignId,
-    revision: 1,
-    status: "DRAFT",
-    tenantId: input.tenantId,
-    updatedAt: toDate(input.createdAt),
-  });
   const [versionRow] = await db
     .insert(campaignVersions)
     .values(versionValues(input, input.initialVersionId, 1))

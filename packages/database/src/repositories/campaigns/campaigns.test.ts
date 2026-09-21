@@ -133,7 +133,8 @@ async function seedUsersAndTenants(
     await client.pool.query(
       `insert into memberships (id, tenant_id, user_id, role, status)
        values ('membership-p023-a', $1, $2, 'OWNER', 'ACTIVE'),
-              ('membership-p023-b', $3, $4, 'OWNER', 'ACTIVE')`,
+              ('membership-p023-b', $3, $4, 'OWNER', 'ACTIVE'),
+              ('membership-p023-a-b', $1, $4, 'MEMBER', 'ACTIVE')`,
       [TENANT_A, USER_A, TENANT_B, USER_B]
     );
   } finally {
@@ -243,6 +244,57 @@ describe("campaign version persistence", () => {
         expect(loaded.value.campaign?.currentVersion?.version.id).toBe(
           input.initialVersionId
         );
+      } finally {
+        await client.close();
+      }
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
+    "returns the committed campaign when concurrent creates conflict",
+    async (ctx) => {
+      if (!database) {
+        ctx.skip();
+        return;
+      }
+      const client = makeClient(database);
+      const campaigns = createCampaignRepository();
+      const runner = createPersistenceTransactionRunner(client.db);
+      const suffix = randomUUID().slice(0, 8);
+      const inputA = createInput(TENANT_A, `concurrent_${suffix}`);
+      const inputB = {
+        ...inputA,
+        createdBy: parseUserId(USER_B),
+      };
+      try {
+        const accessA = await establishMemberAccess(database, TENANT_A, USER_A);
+        const accessB = await establishMemberAccess(database, TENANT_A, USER_B);
+        const [resultA, resultB] = await Promise.all([
+          runner.run({
+            access: accessA,
+            work: (tx) => campaigns.create(inputA, tx),
+          }),
+          runner.run({
+            access: accessB,
+            work: (tx) => campaigns.create(inputB, tx),
+          }),
+        ]);
+        expect(resultA.ok).toBe(true);
+        expect(resultB.ok).toBe(true);
+        if (!resultA.ok || !resultB.ok) {
+          throw new Error("expected both concurrent creates to succeed");
+        }
+        expect([resultA.value.outcome, resultB.value.outcome].sort()).toEqual([
+          "ALREADY_EXISTS",
+          "CREATED",
+        ]);
+
+        const persisted = await client.pool.query<{ count: string }>(
+          "select count(*)::text as count from campaign_versions where campaign_id = $1",
+          [inputA.campaignId]
+        );
+        expect(persisted.rows[0]?.count).toBe("1");
       } finally {
         await client.close();
       }
