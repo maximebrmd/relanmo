@@ -15,6 +15,7 @@ import {
   pgTable,
   text,
   timestamp,
+  type AnyPgColumn,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -34,11 +35,13 @@ export const campaigns = pgTable(
       .references(() => tenants.id),
     status: campaignStatus("status").notNull().default("DRAFT"),
     // Head of unactivated edits; diffed against activeVersionId for draft comparison.
-    // No DB-level FK: campaignVersions is declared below and the reference would be
-    // circular with campaignVersions.campaignId, which stays the enforced direction.
-    draftVersionId: text("draft_version_id"),
+    draftVersionId: text("draft_version_id").references(
+      (): AnyPgColumn => campaignVersions.id
+    ),
     // The version currently authorizing the bounded automated sequence.
-    activeVersionId: text("active_version_id"),
+    activeVersionId: text("active_version_id").references(
+      (): AnyPgColumn => campaignVersions.id
+    ),
     outboundPaused: boolean("outbound_paused").notNull().default(false),
     pauseReason: text("pause_reason"),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -107,23 +110,42 @@ export const campaignVersions = pgTable(
 );
 
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
+  activeVersion: one(campaignVersions, {
+    fields: [campaigns.activeVersionId],
+    references: [campaignVersions.id],
+    relationName: "campaignActiveVersion",
+  }),
+  draftVersion: one(campaignVersions, {
+    fields: [campaigns.draftVersionId],
+    references: [campaignVersions.id],
+    relationName: "campaignDraftVersion",
+  }),
   tenant: one(tenants, {
     fields: [campaigns.tenantId],
     references: [tenants.id],
   }),
-  versions: many(campaignVersions),
+  versions: many(campaignVersions, {
+    relationName: "campaignOwnedVersions",
+  }),
 }));
 
 export const campaignVersionsRelations = relations(
   campaignVersions,
-  ({ one }) => ({
+  ({ many, one }) => ({
+    activeForCampaigns: many(campaigns, {
+      relationName: "campaignActiveVersion",
+    }),
     campaign: one(campaigns, {
       fields: [campaignVersions.campaignId],
       references: [campaigns.id],
+      relationName: "campaignOwnedVersions",
     }),
     createdByUser: one(user, {
       fields: [campaignVersions.createdBy],
       references: [user.id],
+    }),
+    draftForCampaigns: many(campaigns, {
+      relationName: "campaignDraftVersion",
     }),
     tenant: one(tenants, {
       fields: [campaignVersions.tenantId],

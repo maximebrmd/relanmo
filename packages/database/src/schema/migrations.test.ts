@@ -138,6 +138,36 @@ async function appliedMigrationCount(env: DatabaseEnv): Promise<number> {
   }
 }
 
+async function executeSql(
+  env: DatabaseEnv,
+  statement: string,
+  values: readonly string[] = []
+): Promise<void> {
+  const client = createMigrationClient(env);
+  await client.connect();
+  try {
+    await client.query(statement, [...values]);
+  } finally {
+    await client.end();
+  }
+}
+
+async function expectForeignKeyViolation(
+  env: DatabaseEnv,
+  statement: string,
+  values: readonly string[]
+): Promise<void> {
+  const client = createMigrationClient(env);
+  await client.connect();
+  try {
+    await expect(client.query(statement, [...values])).rejects.toMatchObject({
+      code: "23503",
+    });
+  } finally {
+    await client.end();
+  }
+}
+
 describe("initial Drizzle migration lineage (live local Postgres)", () => {
   it(
     "creates the agreed schema on a fresh database and is idempotent on re-run",
@@ -169,6 +199,72 @@ describe("initial Drizzle migration lineage (live local Postgres)", () => {
         foreignColumn: "id",
         foreignTable: "user",
       });
+      for (const [tableName, columnName, foreignTable] of [
+        ["campaigns", "draft_version_id", "campaign_versions"],
+        ["campaigns", "active_version_id", "campaign_versions"],
+        ["style_profiles", "explicit_version_id", "style_profile_versions"],
+        [
+          "style_profiles",
+          "accepted_inferred_version_id",
+          "style_profile_versions",
+        ],
+        [
+          "style_profiles",
+          "suggested_inferred_version_id",
+          "style_profile_versions",
+        ],
+        ["prompt_overrides", "active_version_id", "prompt_override_versions"],
+      ] as const) {
+        expect(await foreignKey(env, tableName, columnName)).toEqual({
+          foreignColumn: "id",
+          foreignTable,
+        });
+      }
+      await executeSql(
+        env,
+        `insert into tenants (id, display_name, status)
+         values ($1, 'Migration test tenant', 'ACTIVE')`,
+        ["migration-test-tenant"]
+      );
+      for (const [columnName, rowId] of [
+        ["draft_version_id", "campaign-dangling-draft"],
+        ["active_version_id", "campaign-dangling-active"],
+      ] as const) {
+        await expectForeignKeyViolation(
+          env,
+          `insert into campaigns (id, tenant_id, ${columnName}) values ($1, $2, $3)`,
+          [rowId, "migration-test-tenant", "missing-campaign-version"]
+        );
+      }
+      for (const [columnName, rowId] of [
+        ["explicit_version_id", "style-dangling-explicit"],
+        ["accepted_inferred_version_id", "style-dangling-accepted"],
+        ["suggested_inferred_version_id", "style-dangling-suggested"],
+      ] as const) {
+        await expectForeignKeyViolation(
+          env,
+          `insert into style_profiles (id, tenant_id, ${columnName}) values ($1, $2, $3)`,
+          [rowId, "migration-test-tenant", "missing-style-version"]
+        );
+      }
+      await executeSql(
+        env,
+        `insert into campaigns (id, tenant_id)
+         values ($1, $2)`,
+        ["migration-test-campaign", "migration-test-tenant"]
+      );
+      await expectForeignKeyViolation(
+        env,
+        `insert into prompt_overrides
+           (id, tenant_id, campaign_id, active_version_id)
+         values ($1, $2, $3, $4)`,
+        [
+          "prompt-override-dangling-active",
+          "migration-test-tenant",
+          "migration-test-campaign",
+          "missing-prompt-version",
+        ]
+      );
       const appliedAfterFirst = await appliedMigrationCount(env);
       expect(appliedAfterFirst).toBeGreaterThan(0);
 

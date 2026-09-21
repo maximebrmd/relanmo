@@ -1,7 +1,13 @@
+import { createTableRelationsHelpers } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { campaigns, campaignVersions } from "./campaigns";
+import {
+  campaigns,
+  campaignsRelations,
+  campaignVersions,
+  campaignVersionsRelations,
+} from "./campaigns";
 import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
@@ -120,5 +126,24 @@ describe("campaigns schema fragment", () => {
     const indexNames = config.indexes.map((index) => index.config.name);
     expect(indexNames).toContain("campaigns_draftVersionId_idx");
     expect(indexNames).toContain("campaigns_activeVersionId_idx");
+  });
+
+  it("maps campaign version pointers and ownership as distinct relations", () => {
+    const campaignRelations = campaignsRelations.config(
+      createTableRelationsHelpers(campaigns)
+    );
+    const versionRelations = campaignVersionsRelations.config(
+      createTableRelationsHelpers(campaignVersions)
+    );
+
+    expect(campaignRelations.activeVersion.relationName).toBe(
+      versionRelations.activeForCampaigns.relationName
+    );
+    expect(campaignRelations.draftVersion.relationName).toBe(
+      versionRelations.draftForCampaigns.relationName
+    );
+    expect(campaignRelations.versions.relationName).toBe(
+      versionRelations.campaign.relationName
+    );
   });
 });
