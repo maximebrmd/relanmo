@@ -30,6 +30,7 @@ try {
       "run",
       "packages/database",
       "packages/auth",
+      "--maxWorkers=1",
       "--reporter=default",
       "--reporter=json",
       "--outputFile",
