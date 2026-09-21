@@ -396,28 +396,29 @@ describe("evaluateEligibility: draft and version currency", () => {
     expect(reasonCodes(result)).toContain("STALE_VERSION");
   });
 
-  it("denies a draft composed with a superseded campaign prompt override", () => {
-    const promptOverride = {
+  it("denies when the campaign prompt override version is stale", () => {
+    const currentOverride = {
       createdAt: FIXTURE_TIME,
-      id: "prompt_override_1",
+      id: "prompt_override_version_2",
       kind: "PROMPT_OVERRIDE",
-      revision: 1,
+      revision: 2,
     };
     const result = evaluateEligibility(
       buildCheck(DM1_RAW_CHECK, {
         versions: {
-          candidate: { ...VERSIONS, promptOverride },
-          current: {
+          candidate: {
             ...VERSIONS,
             promptOverride: {
-              ...promptOverride,
-              id: "prompt_override_2",
-              revision: 2,
+              ...currentOverride,
+              id: "prompt_override_version_1",
+              revision: 1,
             },
           },
+          current: { ...VERSIONS, promptOverride: currentOverride },
         },
       })
     );
+
     expect(result.outcome).toBe("DENY");
     expect(reasonCodes(result)).toContain("STALE_VERSION");
   });

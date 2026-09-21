@@ -10,7 +10,10 @@ import { evaluationFixtureById } from "@relanmo/prompts/fixtures";
 import { describe, expect, it } from "vitest";
 
 import type { SequenceDraftingContext } from "../defaults";
-import { FRENCH_WRITING_DEFAULTS } from "../defaults";
+import {
+  FRENCH_WRITING_DEFAULTS,
+  frenchDefaultPromptVersion,
+} from "../defaults";
 import { composeGroundedPrompt, promptCompositionSurface } from "./index";
 import type {
   ComposePromptInput,
@@ -54,6 +57,19 @@ const foreignEvidence: Evidence = parseEvidence({
   sourceId: "source_foreign_1",
   sourceUrl: null,
   tenantId: OTHER_TENANT,
+});
+
+const negatedHiringEvidence: Evidence = parseEvidence({
+  accountId: null,
+  capturedAt: FIXTURE_TIME,
+  contentHash: null,
+  evidenceId: "evidence_negated_hiring_1",
+  normalizedClaim: "L’entreprise ne recrute pas de CEO.",
+  prospectId: PROSPECT,
+  provenance: "PROVIDER_POST",
+  sourceId: "source_negated_hiring_1",
+  sourceUrl: null,
+  tenantId: TENANT,
 });
 
 const hiringDrafting: SequenceDraftingContext = Object.freeze({
@@ -130,6 +146,12 @@ const VERSION_REFS = parseDraftSourceVersions({
     kind: "PROFILE",
     revision: 4,
   },
+  promptOverride: {
+    createdAt: FIXTURE_TIME,
+    id: "prompt_override_campaign_1",
+    kind: "PROMPT_OVERRIDE",
+    revision: 3,
+  },
 });
 
 function requiredVersion<Version>(version: Version | null): Version {
@@ -143,11 +165,11 @@ const EXPLICIT_STYLE_VERSION = requiredVersion(VERSION_REFS.explicitStyle);
 const INFERRED_STYLE_VERSION = requiredVersion(
   VERSION_REFS.acceptedInferredStyle
 );
+const PROMPT_OVERRIDE_VERSION = requiredVersion(VERSION_REFS.promptOverride);
 
 function sourceVersions() {
   return Object.freeze({
     campaign: VERSION_REFS.campaign,
-    defaultPrompt: VERSION_REFS.defaultPrompt,
     model: VERSION_REFS.model,
     profile: VERSION_REFS.profile,
   });
@@ -158,12 +180,7 @@ function campaignLayer(
 ): VersionedCampaignStyleOverride {
   return Object.freeze({
     style: Object.freeze(style),
-    version: Object.freeze({
-      createdAt: VERSION_REFS.campaign.createdAt,
-      id: "prompt_override_campaign_1",
-      kind: "PROMPT_OVERRIDE",
-      revision: 3,
-    }),
+    version: PROMPT_OVERRIDE_VERSION,
   });
 }
 
@@ -390,6 +407,29 @@ describe("composeGroundedPrompt", () => {
     expect(result.targetText).not.toContain("CEO");
   });
 
+  it("does not reverse a negated hiring claim into recruitment outreach", () => {
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: Object.freeze([negatedHiringEvidence]),
+        prospect: Object.freeze({
+          ...hiringProspect,
+          hiringRole: Object.freeze({
+            evidenceId: negatedHiringEvidence.evidenceId,
+            text: "CEO",
+          }),
+        }),
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind !== "COMPOSED") {
+      return;
+    }
+    expect(result.hook).toBe("NEUTRAL");
+    expect(result.targetText).not.toContain("CEO");
+    expect(result.usedNeutralFallback).toBe(true);
+  });
+
   it("fails when even the neutral template cannot be filled", () => {
     const result = composeGroundedPrompt(
       composeInput({
@@ -497,10 +537,14 @@ describe("composeGroundedPrompt", () => {
     expect(result.sourceVersions).toEqual({
       ...versions,
       acceptedInferredStyle: INFERRED_STYLE_VERSION,
-      campaignOverride: campaignOverride.version,
+      defaultPrompt: frenchDefaultPromptVersion(),
       explicitStyle: EXPLICIT_STYLE_VERSION,
+      promptOverride: campaignOverride.version,
     });
-    expect(result.composedInput).toContain(versions.defaultPrompt.id);
+    expect(parseDraftSourceVersions(result.sourceVersions)).toEqual(
+      result.sourceVersions
+    );
+    expect(result.composedInput).toContain(frenchDefaultPromptVersion().id);
     expect(result.composedInput).toContain(versions.campaign.id);
     expect(result.composedInput).toContain(campaignOverride.version.id);
     expect(result.composedInput).toContain(EXPLICIT_STYLE_VERSION.id);
@@ -509,6 +553,26 @@ describe("composeGroundedPrompt", () => {
     expect(result.allowedEvidenceIds).toEqual([HIRING_EVIDENCE_ID]);
     expect(result.composedInput).toContain(String(HIRING_EVIDENCE_ID));
     expect(result.composedInput).not.toContain("evidence_foreign_1");
+  });
+
+  it("records the actual built-in prompt version when a caller supplies another", () => {
+    const spoofedVersions = {
+      ...sourceVersions(),
+      defaultPrompt: {
+        ...frenchDefaultPromptVersion(),
+        id: "prompt_default_spoofed",
+        revision: 99,
+      },
+    };
+    const result = composeGroundedPrompt(
+      composeInput({
+        sourceVersions: spoofedVersions,
+      })
+    );
+
+    expect(result.sourceVersions.defaultPrompt).toEqual(
+      frenchDefaultPromptVersion()
+    );
   });
 
   it("composes an invitation without a note from the French defaults", () => {

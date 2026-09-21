@@ -1,8 +1,13 @@
-import type { Evidence, SequenceStep } from "@relanmo/domain/contracts";
+import type {
+  DraftSourceVersions,
+  Evidence,
+  SequenceStep,
+} from "@relanmo/domain/contracts";
 
 import {
   ALLOWED_TEMPLATE_VARIABLES,
   FRENCH_WRITING_DEFAULTS,
+  frenchDefaultPromptVersion,
   planFrenchSequence,
   templateByHook,
 } from "../defaults";
@@ -18,7 +23,6 @@ import type {
   ComposePromptInput,
   ComposePromptResult,
   ComposedPrompt,
-  CompositionSourceVersions,
   ExplicitStyleLayer,
   FormalityLevel,
   GroundedFact,
@@ -33,6 +37,15 @@ const DEFAULT_TONE = "CONCISE";
 const DEFAULT_FORMALITY: FormalityLevel = "NEUTRAL";
 const PLACEHOLDER_PATTERN = /\{\{\s*(?<name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/gu;
 const ALLOWED_VARIABLE_NAMES = new Set<string>(ALLOWED_TEMPLATE_VARIABLES);
+const AFFIRMATIVE_HIRING_TERMS = [
+  "embauche",
+  "offre publiee",
+  "poste ouvert",
+  "recherche",
+  "recrut",
+] as const;
+const NEGATED_CLAIM_PATTERN =
+  /\b(?:aucun|aucune|sans)\b|\bpas de\b|\b(?:n|ne)\b.*\b(?:jamais|pas|plus)\b/u;
 
 function optionalText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) {
@@ -59,7 +72,11 @@ function groundedText(
   if (fact === null) {
     return null;
   }
-  return evidenceSupportedText(fact.text, evidenceById.get(fact.evidenceId));
+  return evidenceSupportedText(
+    fact.text,
+    evidenceById.get(fact.evidenceId),
+    "AFFIRMATIVE_HIRING"
+  );
 }
 
 function followUpValue(
@@ -88,7 +105,8 @@ function canonicalEvidenceText(value: string): string {
 
 function evidenceSupportedText(
   value: string | null,
-  evidence: Evidence | undefined
+  evidence: Evidence | undefined,
+  assertion: "AFFIRMATIVE_HIRING" | "MENTION" = "MENTION"
 ): string | null {
   const text = optionalText(value);
   if (text === null || evidence === undefined) {
@@ -96,7 +114,13 @@ function evidenceSupportedText(
   }
   const claim = canonicalEvidenceText(evidence.normalizedClaim);
   const candidate = canonicalEvidenceText(text);
-  if (candidate.length === 0 || !` ${claim} `.includes(` ${candidate} `)) {
+  if (
+    candidate.length === 0 ||
+    !` ${claim} `.includes(` ${candidate} `) ||
+    NEGATED_CLAIM_PATTERN.test(claim) ||
+    (assertion === "AFFIRMATIVE_HIRING" &&
+      !AFFIRMATIVE_HIRING_TERMS.some((term) => claim.includes(term)))
+  ) {
     return null;
   }
   return text;
@@ -383,12 +407,13 @@ function failed(
 
 function sourceVersionsFor(
   input: ComposePromptInput
-): CompositionSourceVersions {
+): DraftSourceVersions {
   return Object.freeze({
     ...input.sourceVersions,
     acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
-    campaignOverride: input.campaignOverride?.version ?? null,
+    defaultPrompt: frenchDefaultPromptVersion(),
     explicitStyle: input.explicitStyle?.version ?? null,
+    promptOverride: input.campaignOverride?.version ?? null,
   });
 }
 
@@ -559,7 +584,7 @@ function buildComposedInput(
     "# Versions",
     `prompt: ${versions.defaultPrompt.id} rev ${String(versions.defaultPrompt.revision)}`,
     `campaign: ${versions.campaign.id} rev ${String(versions.campaign.revision)}`,
-    `campaignOverride: ${versions.campaignOverride?.id ?? "none"}`,
+    `campaignOverride: ${versions.promptOverride?.id ?? "none"}`,
     `explicitStyle: ${versions.explicitStyle?.id ?? "none"}`,
     `inferredStyle: ${versions.acceptedInferredStyle?.id ?? "none"}`,
     `profile: ${versions.profile?.id ?? "none"}`,

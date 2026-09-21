@@ -23,6 +23,7 @@ export type CampaignVersionId = Brand<string, "CampaignVersionId">;
 export type ExplicitStyleVersionId = Brand<string, "ExplicitStyleVersionId">;
 export type InferredStyleVersionId = Brand<string, "InferredStyleVersionId">;
 export type PromptVersionId = Brand<string, "PromptVersionId">;
+export type PromptOverrideVersionId = Brand<string, "PromptOverrideVersionId">;
 export type ActionId = Brand<string, "ActionId">;
 export type SendAttemptId = Brand<string, "SendAttemptId">;
 export type MessageId = Brand<string, "MessageId">;
@@ -91,6 +92,12 @@ export function parseInferredStyleVersionId(
 
 export function parsePromptVersionId(value: unknown): PromptVersionId {
   return parseId<PromptVersionId>(value, "promptVersionId");
+}
+
+export function parsePromptOverrideVersionId(
+  value: unknown
+): PromptOverrideVersionId {
+  return parseId<PromptOverrideVersionId>(value, "promptOverrideVersionId");
 }
 
 export function parseActionId(value: unknown): ActionId {

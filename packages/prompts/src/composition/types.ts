@@ -9,10 +9,9 @@ import type {
   ModelVersion,
   ProspectId,
   ProfileVersionRef,
-  PromptVersionRef,
+  PromptOverrideVersionRef,
   SequenceStep,
   TenantId,
-  UtcTimestamp,
 } from "@relanmo/domain/contracts";
 import type { WritingOutputBudget } from "@relanmo/domain/ports/providers";
 
@@ -61,12 +60,7 @@ export type CampaignStyleOverride = Readonly<{
   tone?: string | null;
 }>;
 
-export type PromptOverrideVersionRef = Readonly<{
-  createdAt: UtcTimestamp;
-  id: string;
-  kind: "PROMPT_OVERRIDE";
-  revision: number;
-}>;
+export type { PromptOverrideVersionRef };
 
 export type ExplicitStyleLayer = Readonly<{
   closing: string | null;
@@ -102,16 +96,9 @@ export type VersionedAcceptedInferredStyleLayer = Readonly<{
 
 export type ComposeBaseSourceVersions = Readonly<{
   campaign: CampaignVersionRef;
-  defaultPrompt: PromptVersionRef;
   model: ModelVersion;
   profile: ProfileVersionRef | null;
 }>;
-
-export type CompositionSourceVersions = Readonly<
-  DraftSourceVersions & {
-    campaignOverride: PromptOverrideVersionRef | null;
-  }
->;
 
 export type FreelancerProfileFacts = Readonly<{
   availability: string | null;
@@ -174,7 +161,7 @@ export type ComposeFailureReason = Readonly<{
 
 type ComposeResultBase = Readonly<{
   sendControls: ComposeSendControls;
-  sourceVersions: CompositionSourceVersions;
+  sourceVersions: DraftSourceVersions;
 }>;
 
 export type ComposedPrompt = Readonly<

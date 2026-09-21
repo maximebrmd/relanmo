@@ -51,6 +51,7 @@ import {
   parseProfileVersionId,
   parseProspectId,
   parsePromptVersionId,
+  parsePromptOverrideVersionId,
   parseSendAttemptId,
   parseTenantId,
   parseUserId,
@@ -221,7 +222,7 @@ function parseVersionRef(value: unknown, path: string): VersionRef {
     case "PROMPT_OVERRIDE": {
       return Object.freeze({
         ...common,
-        id: parsePromptVersionId(readRequired(record, "id")),
+        id: parsePromptOverrideVersionId(readRequired(record, "id")),
         kind,
       });
     }
@@ -273,8 +274,14 @@ export function parseDraftSourceVersions(value: unknown): DraftSourceVersions {
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "sourceVersions.profile", "PROFILE")
     ),
-    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
-      versionOfKind(input, "sourceVersions.promptOverride", "PROMPT_OVERRIDE")
+    promptOverride: nullable(
+      readRequired(record, "promptOverride"),
+      (input) =>
+        versionOfKind(
+          input,
+          "sourceVersions.promptOverride",
+          "PROMPT_OVERRIDE"
+        )
     ),
   });
 }
@@ -304,8 +311,14 @@ export function parseCurrentVersionSet(value: unknown): CurrentVersionSet {
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "currentVersions.profile", "PROFILE")
     ),
-    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
-      versionOfKind(input, "currentVersions.promptOverride", "PROMPT_OVERRIDE")
+    promptOverride: nullable(
+      readRequired(record, "promptOverride"),
+      (input) =>
+        versionOfKind(
+          input,
+          "currentVersions.promptOverride",
+          "PROMPT_OVERRIDE"
+        )
     ),
   });
 }

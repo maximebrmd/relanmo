@@ -15,7 +15,6 @@ export type {
   ComposePromptInput,
   ComposePromptResult,
   ComposeSendControls,
-  CompositionSourceVersions,
   ComposedPrompt,
   ExplicitStyleLayer,
   FailedPrompt,
