@@ -124,10 +124,8 @@ function prospectContextSnapshot(
 
 function canonicalEvidenceText(value: string): string {
   return value
-    .normalize("NFKD")
-    .replaceAll(/\p{Diacritic}/gu, "")
+    .normalize("NFKC")
     .toLocaleLowerCase("fr")
-    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .replaceAll(/\s+/gu, " ");
 }
@@ -557,6 +555,34 @@ function listExceeds(
   );
 }
 
+function overrideGroundingExceedsLimits(
+  override: StyleStepOverride
+): boolean {
+  const grounding = (override as { grounding?: unknown }).grounding;
+  if (
+    typeof grounding !== "object" ||
+    grounding === null ||
+    !("assertions" in grounding) ||
+    !Array.isArray(grounding.assertions)
+  ) {
+    return false;
+  }
+  return (
+    grounding.assertions.length > EVIDENCE_LIMITS.claims ||
+    grounding.assertions.some(
+      (assertion) =>
+        typeof assertion === "object" &&
+        assertion !== null &&
+        (("value" in assertion &&
+          typeof assertion.value === "string" &&
+          assertion.value.length > EVIDENCE_LIMITS.claimCharacters) ||
+          ("detail" in assertion &&
+            typeof assertion.detail === "string" &&
+            assertion.detail.length > EVIDENCE_LIMITS.claimCharacters))
+    )
+  );
+}
+
 // oxlint-disable-next-line complexity -- Every persisted customer-controlled style field has an explicit bound.
 function invalidStyleReason(
   input: ComposePromptInput
@@ -574,8 +600,10 @@ function invalidStyleReason(
     ) ||
     (campaign?.stepOverrides !== undefined &&
       (campaign.stepOverrides.length > STYLE_LIMITS.stepOverrides ||
-        campaign.stepOverrides.some((item) =>
-          exceeds(item.text, STYLE_LIMITS.stepOverrideCharacters)
+        campaign.stepOverrides.some(
+          (item) =>
+            exceeds(item.text, STYLE_LIMITS.stepOverrideCharacters) ||
+            overrideGroundingExceedsLimits(item)
         )));
   const explicitInvalid =
     explicit !== undefined &&

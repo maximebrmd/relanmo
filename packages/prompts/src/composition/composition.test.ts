@@ -491,6 +491,38 @@ describe("composeGroundedPrompt", () => {
     expect(result.usedNeutralFallback).toBe(true);
   });
 
+  it("preserves semantic symbols when grounding facts", () => {
+    const evidence = compositionEvidence({
+      accountId: null,
+      assertions: [{ detail: null, kind: "HIRING_ROLE", value: "C" }],
+      capturedAt: FIXTURE_TIME,
+      contentHash: null,
+      evidenceId: "evidence_hiring_c_1",
+      normalizedClaim: "L’entreprise recrute un développeur C.",
+      prospectId: PROSPECT,
+      provenance: "PROVIDER_POST",
+      sourceId: "source_hiring_c_1",
+      sourceUrl: null,
+      tenantId: TENANT,
+    });
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [evidence],
+        prospect: {
+          ...hiringProspect,
+          hiringRole: { evidenceId: evidence.evidenceId, text: "C++" },
+        },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("NEUTRAL");
+      expect(result.targetText).not.toContain("C++");
+      expect(result.usedNeutralFallback).toBe(true);
+    }
+  });
+
   it("uses the typed hiring assertion rather than a matching subject token", () => {
     const evidence = compositionEvidence({
       accountId: null,
@@ -924,6 +956,11 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("rejects customer style fields beyond persisted product limits", () => {
+    const excessiveAssertions = Array.from({ length: 21 }, () => ({
+      detail: null,
+      kind: "HIRING_ROLE" as const,
+      value: "frontend",
+    }));
     const results = [
       composeGroundedPrompt(
         composeInput({
@@ -934,6 +971,44 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           campaignOverride: campaignLayer({
             stepOverrides: [assertionOverride("DM1", "x".repeat(2001))],
+          }),
+        })
+      ),
+      composeGroundedPrompt(
+        composeInput({
+          campaignOverride: campaignLayer({
+            stepOverrides: [
+              {
+                grounding: {
+                  assertions: excessiveAssertions,
+                  kind: "ASSERTIONS",
+                },
+                step: "DM1",
+                text: "Bonjour {{firstName}}",
+              } as unknown as StyleStepOverride,
+            ],
+          }),
+        })
+      ),
+      composeGroundedPrompt(
+        composeInput({
+          campaignOverride: campaignLayer({
+            stepOverrides: [
+              {
+                grounding: {
+                  assertions: [
+                    {
+                      detail: "x".repeat(1001),
+                      kind: "HIRING_ROLE",
+                      value: "x".repeat(1001),
+                    },
+                  ],
+                  kind: "ASSERTIONS",
+                },
+                step: "DM1",
+                text: "Bonjour {{firstName}}",
+              },
+            ],
           }),
         })
       ),
