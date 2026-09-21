@@ -394,8 +394,22 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         throw new Error("expected inferred style to be accepted");
       }
       expect(accepted.value.style.version.id).toBe(inferredId);
-      expect(accepted.value.current.acceptedInferredStyle?.id).toBe(inferredId);
+      expect(accepted.value.current.acceptedInferredStyle).toBeNull();
+      expect(accepted.value.current.explicitStyle).toEqual(
+        afterSuggestion.current.explicitStyle
+      );
       expect(accepted.value.current.model).toBeNull();
+
+      const effective = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          styles.get({ tenantId }, tx)
+        )
+      );
+      expect(effective.acceptedInferred?.version.id).toBe(inferredId);
+      expect(effective.current.acceptedInferredStyle).toBeNull();
+      expect(effective.current.explicitStyle).toEqual(
+        afterSuggestion.current.explicitStyle
+      );
 
       const hidden = await runAsMember(TENANT_B, USER_B, (tx) =>
         styles.acceptInferred(
@@ -708,6 +722,33 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         expect(
           inferenceValues.every((result) => result.outcome === "CREATED")
         ).toBe(true);
+
+        const tenantBId = parseTenantId(TENANT_B);
+        const beforeAcceptance = expectOk(
+          await runAsMember(TENANT_B, USER_B, (tx) =>
+            styles.get({ tenantId: tenantBId }, tx)
+          )
+        );
+        const acceptedInference = expectOk(
+          await runAsMember(TENANT_B, USER_B, (tx) =>
+            styles.acceptInferred(
+              {
+                expectedCurrent: { expected: beforeAcceptance.current },
+                tenantId: tenantBId,
+                versionId: parseInferredStyleVersionId("worker-inferred-a"),
+              },
+              tx
+            )
+          )
+        );
+        expect(acceptedInference.outcome).toBe("UPDATED");
+        if (acceptedInference.outcome !== "UPDATED") {
+          throw new Error("expected inferred style to become effective");
+        }
+        expect(acceptedInference.value.current.explicitStyle).toBeNull();
+        expect(acceptedInference.value.current.acceptedInferredStyle?.id).toBe(
+          "worker-inferred-a"
+        );
 
         const tenantId = parseTenantId(TENANT_A);
         const current = expectOk(

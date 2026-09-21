@@ -305,17 +305,20 @@ function toOverrideRecord(
 
 async function lockReadyDrafts(
   db: TransactionExecutor,
-  tenantId: StyleProfileRow["tenantId"]
+  tenantId: StyleProfileRow["tenantId"],
+  campaignId?: string
 ): Promise<void> {
+  const scope = [
+    eq(actions.tenantId, parseTenantId(tenantId)),
+    eq(actions.state, "READY"),
+  ];
+  if (campaignId !== undefined) {
+    scope.push(eq(actions.campaignId, parseCampaignId(campaignId)));
+  }
   await db
     .select({ id: actions.id })
     .from(actions)
-    .where(
-      and(
-        eq(actions.tenantId, parseTenantId(tenantId)),
-        eq(actions.state, "READY")
-      )
-    )
+    .where(and(...scope))
     .for("update");
 }
 
@@ -402,12 +405,14 @@ async function assembleCurrent(
   if (!profile) {
     return { ok: true, value: EMPTY_CURRENT_VERSION_SET };
   }
-  const explicitRow = versions.find(
-    (row) => row.id === profile.explicitVersionId
-  );
-  const inferredRow = versions.find(
-    (row) => row.id === profile.acceptedInferredVersionId
-  );
+  const explicitRow =
+    profile.source === "EXPLICIT"
+      ? versions.find((row) => row.id === profile.explicitVersionId)
+      : undefined;
+  const inferredRow =
+    profile.source === "INFERRED_ACCEPTED"
+      ? versions.find((row) => row.id === profile.acceptedInferredVersionId)
+      : undefined;
   let explicit: ExplicitStyleVersionRef | null = null;
   let acceptedInferred: InferredStyleVersionRef | null = null;
   if (explicitRow) {
@@ -885,13 +890,14 @@ async function acceptInferred(
     return failure("NOT_FOUND", "inferred style version does not exist");
   }
   const nextRevision = profile.revision + 1;
+  const explicitRemainsEffective = profile.explicitVersionId !== null;
   const updated = await takeFirst(
     db
       .update(styleProfiles)
       .set({
         acceptedInferredVersionId: input.versionId,
         revision: nextRevision,
-        source: "INFERRED_ACCEPTED",
+        source: explicitRemainsEffective ? "EXPLICIT" : "INFERRED_ACCEPTED",
         updatedAt: new Date(),
       })
       .where(
@@ -905,7 +911,9 @@ async function acceptInferred(
   if (!updated) {
     return failure("INTEGRITY", "style profile was not updated");
   }
-  await lockReadyDrafts(db, input.tenantId);
+  if (!explicitRemainsEffective) {
+    await lockReadyDrafts(db, input.tenantId);
+  }
   const snapshot = await loadStyleState(db, input.tenantId, updated);
   if (!snapshot.ok) {
     return snapshot;
@@ -1015,7 +1023,7 @@ async function saveOverride(
   if (!updatedOverride) {
     return failure("INTEGRITY", "prompt override was not updated");
   }
-  await lockReadyDrafts(db, input.tenantId);
+  await lockReadyDrafts(db, input.tenantId, input.campaignId);
   const version = await takeFirst(
     db
       .select()
