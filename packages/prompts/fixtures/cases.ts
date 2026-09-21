@@ -39,12 +39,21 @@ export type FixtureExpectedOutcome = Readonly<{
   sequenceSteps: readonly SequenceStep[];
 }>;
 
+export type FixtureRuleSources = Readonly<{
+  dm1Hook: LeadAgentRuleSource | null;
+  hiringSignalPolicy: LeadAgentRuleSource;
+  invitation: LeadAgentRuleSource;
+  qualification: LeadAgentRuleSource;
+  replyStop: LeadAgentRuleSource | null;
+  sequence: LeadAgentRuleSource;
+}>;
+
 export type EvaluationFixture = Readonly<{
   drafting: FixtureDrafting;
   expected: FixtureExpectedOutcome;
   id: string;
   prospect: FixtureProspect;
-  source: LeadAgentRuleSource;
+  ruleSources: FixtureRuleSources;
   summary: string;
 }>;
 
@@ -58,6 +67,21 @@ const FULL_SEQUENCE = Object.freeze([
 ] as const satisfies readonly SequenceStep[]);
 
 const NO_SEQUENCE_STEPS: readonly SequenceStep[] = Object.freeze([]);
+
+const HUNT_RULES = ruleSource("hunt", "skills/hunt/SKILL.md");
+const HUNT_PEOPLE_RULES = ruleSource(
+  "hunt",
+  "skills/hunt/references/phase-people.md"
+);
+const HUNT_SCORING_RULES = ruleSource(
+  "hunt",
+  "skills/hunt/references/scoring-detail.md"
+);
+const DM_RULES = ruleSource("dm", "skills/dm/SKILL.md");
+const PROFILE_MESSAGE_RULES = ruleSource(
+  "setup",
+  "templates/lead-profile.example.md"
+);
 
 export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
@@ -88,7 +112,14 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
       observedSignalText:
         "Offre publiée: Senior Frontend React/Next.js — CDI, équipe produit.",
     }),
-    source: ruleSource("hunt", "skills/hunt/SKILL.md"),
+    ruleSources: Object.freeze({
+      dm1Hook: PROFILE_MESSAGE_RULES,
+      hiringSignalPolicy: HUNT_RULES,
+      invitation: HUNT_RULES,
+      qualification: HUNT_PEOPLE_RULES,
+      replyStop: null,
+      sequence: DM_RULES,
+    }),
     summary:
       "Decision-maker ICP with an in-domain hiring signal: invite without a note, DM1 recruitment hook, full sequence.",
   }),
@@ -120,7 +151,14 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
       observedSignalText:
         "Staffing d'un profil Senior Frontend React pour un client produit.",
     }),
-    source: ruleSource("dm", "skills/dm/SKILL.md"),
+    ruleSources: Object.freeze({
+      dm1Hook: PROFILE_MESSAGE_RULES,
+      hiringSignalPolicy: HUNT_RULES,
+      invitation: HUNT_RULES,
+      qualification: HUNT_RULES,
+      replyStop: null,
+      sequence: DM_RULES,
+    }),
     summary:
       "Recruiter/ESN ICP staffing an in-domain profile: same sequence, recruitment hook used as a staffing angle.",
   }),
@@ -151,7 +189,14 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
       incomingReply: null,
       observedSignalText: null,
     }),
-    source: ruleSource("hunt", "skills/hunt/references/scoring-detail.md"),
+    ruleSources: Object.freeze({
+      dm1Hook: PROFILE_MESSAGE_RULES,
+      hiringSignalPolicy: HUNT_SCORING_RULES,
+      invitation: HUNT_RULES,
+      qualification: HUNT_PEOPLE_RULES,
+      replyStop: null,
+      sequence: DM_RULES,
+    }),
     summary:
       "ICP match with no buying signal or verified mutual: invitation still allowed, DM1 uses a fact-safe neutral opener.",
   }),
@@ -184,7 +229,14 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
       observedSignalText:
         "Offre Senior Frontend React publiée sur la page entreprise.",
     }),
-    source: ruleSource("dm", "skills/dm/SKILL.md"),
+    ruleSources: Object.freeze({
+      dm1Hook: null,
+      hiringSignalPolicy: HUNT_RULES,
+      invitation: HUNT_RULES,
+      qualification: HUNT_PEOPLE_RULES,
+      replyStop: DM_RULES,
+      sequence: DM_RULES,
+    }),
     summary:
       "A stored inbound reply stops automated DM1–DM5 drafting; humans own the conversation.",
   }),

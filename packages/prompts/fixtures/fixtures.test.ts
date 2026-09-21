@@ -20,8 +20,19 @@ describe("French message evaluation fixtures", () => {
     expect(ids).toEqual([...REQUIRED_IDS]);
 
     for (const fixture of EVALUATION_FIXTURES) {
-      expect(fixture.source.revision).toBe(LEAD_AGENT_SKILLS_SOURCE.revision);
-      expect(fixture.source.path.length).toBeGreaterThan(0);
+      for (const source of Object.values(fixture.ruleSources)) {
+        if (source === null) {
+          continue;
+        }
+        expect(source.revision).toBe(LEAD_AGENT_SKILLS_SOURCE.revision);
+        expect(source.path.length).toBeGreaterThan(0);
+      }
+      expect(fixture.ruleSources.dm1Hook === null).toBe(
+        fixture.expected.dm1Hook === null
+      );
+      expect(fixture.ruleSources.replyStop === null).toBe(
+        fixture.expected.ownership !== "HUMAN_OWNED"
+      );
       expect(fixture.prospect.fullName.length).toBeGreaterThan(0);
       expect(fixture.prospect.company.includes("Inc")).toBe(false);
       expect(fixture.expected.hiringSignalRequired).toBe(false);
