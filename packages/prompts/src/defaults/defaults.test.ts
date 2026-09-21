@@ -151,7 +151,10 @@ describe("French prompt defaults", () => {
 
   it("keeps broad commercial titles outside the scoped ICP", () => {
     expect(
-      qualifyIcp({ headline: "Head of Sales", observedSignalText: null }).eligible
+      qualifyIcp({
+        headline: "Head of Sales @ Product SaaS",
+        observedSignalText: null,
+      }).eligible
     ).toBe(false);
     expect(
       qualifyIcp({
@@ -165,6 +168,17 @@ describe("French prompt defaults", () => {
         observedSignalText: null,
       }).audience
     ).toBe("RECRUITER_ESN");
+  });
+
+  it("does not combine unrelated signal words into on-market intent", () => {
+    const qualification = qualifyIcp({
+      headline: "CTO @ Nordwave SaaS",
+      observedSignalText:
+        "Notre mission est d'aider les freelances à mieux recruter.",
+    });
+
+    expect(qualification.eligible).toBe(true);
+    expect(qualification.exclusion).toBe(null);
   });
 
   it("requires a distinct step-specific fact for the DM3 angle", () => {

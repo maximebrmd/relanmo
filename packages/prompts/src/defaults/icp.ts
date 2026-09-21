@@ -55,6 +55,12 @@ const ON_MARKET_PHRASES = [
   "qui connaît un freelance",
 ] as const;
 
+const ON_MARKET_PATTERNS = [
+  /\brecrut\w*\b(?:\s+\S+){0,3}\s+\bfreelance\b/u,
+  /\b(?:besoin|mission)\b(?:\s+\S+){0,4}\s+\basap\b/u,
+  /\basap\b(?:\s+\S+){0,4}\s+\b(?:besoin|mission)\b/u,
+] as const;
+
 const RECRUITER_ROLE_MARKERS = [
   "it recruiter",
   "recruiter",
@@ -144,22 +150,14 @@ export function detectOnMarketIntent(signalText: string | null): boolean {
     return true;
   }
 
-  const freelanceDemand =
-    lower.includes("freelance") &&
-    (lower.includes("recrute") ||
-      lower.includes("cherche") ||
-      lower.includes("mission") ||
-      lower.includes("besoin"));
-  const asapMission =
-    lower.includes("asap") &&
-    (lower.includes("mission") || lower.includes("besoin"));
-  return freelanceDemand || asapMission;
+  return ON_MARKET_PATTERNS.some((pattern) => pattern.test(lower));
 }
 
 export function classifyIcpAudience(
   headline: string
 ): IcpAudience | "PEER_NOT_BUYER" | null {
   const lower = folded(headline);
+  const role = lower.split(/\s+(?:@|\||·|—)\s+/u, 1)[0] ?? lower;
   if (containsMarker(lower, PEER_MARKERS)) {
     return "PEER_NOT_BUYER";
   }
@@ -172,8 +170,8 @@ export function classifyIcpAudience(
   }
   if (
     containsMarker(lower, EXECUTIVE_DECISION_MAKER_MARKERS) ||
-    (containsMarker(lower, FUNCTIONAL_LEADERSHIP_MARKERS) &&
-      containsMarker(lower, TARGET_FUNCTION_MARKERS))
+    (containsMarker(role, FUNCTIONAL_LEADERSHIP_MARKERS) &&
+      containsMarker(role, TARGET_FUNCTION_MARKERS))
   ) {
     return "DECISION_MAKER";
   }
