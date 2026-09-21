@@ -1,4 +1,5 @@
 import type {
+  CampaignId,
   CampaignVersionRef,
   DraftSourceVersions,
   Evidence,
@@ -67,17 +68,21 @@ export type InferredStyleLayer = Readonly<{
 }>;
 
 export type VersionedCampaignStyleOverride = Readonly<{
+  campaignId: CampaignId;
   style: CampaignStyleOverride;
+  tenantId: TenantId;
   version: PromptOverrideVersionRef;
 }>;
 
 export type VersionedExplicitStyleLayer = Readonly<{
   style: ExplicitStyleLayer;
+  tenantId: TenantId;
   version: ExplicitStyleVersionRef;
 }>;
 
 export type VersionedAcceptedInferredStyleLayer = Readonly<{
   style: InferredStyleLayer;
+  tenantId: TenantId;
   version: InferredStyleVersionRef;
 }>;
 
@@ -97,6 +102,7 @@ export type FreelancerProfileFacts = Readonly<{
 
 export type VersionedFreelancerProfile = Readonly<{
   facts: FreelancerProfileFacts;
+  tenantId: TenantId;
   version: ProfileVersionRef;
 }>;
 
@@ -137,6 +143,7 @@ export type CompositionProvenance = Readonly<{
 export type ComposePromptInput = Readonly<{
   acceptedInferredStyle: VersionedAcceptedInferredStyleLayer | null;
   allowedEvidence: readonly Evidence[];
+  campaignId: CampaignId;
   campaignOverride: VersionedCampaignStyleOverride | null;
   drafting: SequenceDraftingContext;
   explicitStyle: VersionedExplicitStyleLayer | null;

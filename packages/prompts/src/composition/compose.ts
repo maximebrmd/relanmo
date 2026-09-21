@@ -689,13 +689,42 @@ function invalidContextReason(
 }
 
 function sourceVersionsFor(input: ComposePromptInput): DraftSourceVersions {
+  const style = resolveStyle(input);
+  const inferredStyleContributes =
+    style.formality.source === "INFERRED_ACCEPTED" ||
+    style.tone.source === "INFERRED_ACCEPTED";
   return Object.freeze({
     ...input.sourceVersions,
-    acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
+    acceptedInferredStyle: inferredStyleContributes
+      ? (input.acceptedInferredStyle?.version ?? null)
+      : null,
     defaultPrompt: frenchDefaultPromptVersion(),
     explicitStyle: input.explicitStyle?.version ?? null,
     profile: input.profile?.version ?? null,
     promptOverride: input.campaignOverride?.version ?? null,
+  });
+}
+
+function invalidOwnershipReason(
+  input: ComposePromptInput
+): ComposeFailureReason | null {
+  const tenantMismatch =
+    (input.profile !== null && input.profile.tenantId !== input.tenantId) ||
+    (input.explicitStyle !== null &&
+      input.explicitStyle.tenantId !== input.tenantId) ||
+    (input.acceptedInferredStyle !== null &&
+      input.acceptedInferredStyle.tenantId !== input.tenantId) ||
+    (input.campaignOverride !== null &&
+      input.campaignOverride.tenantId !== input.tenantId);
+  const campaignMismatch =
+    input.campaignOverride !== null &&
+    input.campaignOverride.campaignId !== input.campaignId;
+  if (!tenantMismatch && !campaignMismatch) {
+    return null;
+  }
+  return Object.freeze({
+    code: "INVALID_CONTEXT_INPUT",
+    detail: "composition input ownership does not match tenant or campaign",
   });
 }
 
@@ -1104,6 +1133,11 @@ function outputBudgetFor(maxCharacters: number): {
 export function composeGroundedPrompt(
   input: ComposePromptInput
 ): ComposePromptResult {
+  const ownershipFailure = invalidOwnershipReason(input);
+  if (ownershipFailure !== null) {
+    return failed(input, [ownershipFailure]);
+  }
+
   if (input.drafting.incomingReplyPresent) {
     const stopped = plannedTemplate(
       input,

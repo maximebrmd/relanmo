@@ -1,5 +1,6 @@
 import type { Evidence } from "@relanmo/domain/contracts";
 import {
+  parseCampaignId,
   parseDraftSourceVersions,
   parseEvidence,
   parseEvidenceId,
@@ -31,6 +32,8 @@ import type {
 const TENANT = parseTenantId("tenant_demo");
 const PROSPECT = parseProspectId("prospect_demo");
 const OTHER_TENANT = parseTenantId("tenant_other");
+const CAMPAIGN = parseCampaignId("campaign_demo");
+const OTHER_CAMPAIGN = parseCampaignId("campaign_other");
 const FIXTURE_TIME = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const HIRING_EVIDENCE_ID = parseEvidenceId("evidence_hiring_post_1");
 
@@ -185,7 +188,9 @@ function campaignLayer(
   style: VersionedCampaignStyleOverride["style"]
 ): VersionedCampaignStyleOverride {
   return Object.freeze({
+    campaignId: CAMPAIGN,
     style: Object.freeze(style),
+    tenantId: TENANT,
     version: PROMPT_OVERRIDE_VERSION,
   });
 }
@@ -227,6 +232,7 @@ function explicitLayer(
       tone: "DIRECT",
       ...overrides,
     }),
+    tenantId: TENANT,
     version: EXPLICIT_STYLE_VERSION,
   });
 }
@@ -240,6 +246,7 @@ function inferredLayer(
       tone: "WARM",
       ...overrides,
     }),
+    tenantId: TENANT,
     version: INFERRED_STYLE_VERSION,
   });
 }
@@ -250,10 +257,15 @@ function composeInput(
   return {
     acceptedInferredStyle: null,
     allowedEvidence: Object.freeze([hiringEvidence]),
+    campaignId: CAMPAIGN,
     campaignOverride: null,
     drafting: hiringDrafting,
     explicitStyle: null,
-    profile: Object.freeze({ facts: defaultProfile, version: PROFILE_VERSION }),
+    profile: Object.freeze({
+      facts: defaultProfile,
+      tenantId: TENANT,
+      version: PROFILE_VERSION,
+    }),
     prospect: hiringProspect,
     sourceVersions: sourceVersions(),
     step: "DM1",
@@ -313,6 +325,7 @@ describe("composeGroundedPrompt", () => {
       source: "EXPLICIT",
       value: "DIRECT",
     });
+    expect(explicit.sourceVersions.acceptedInferredStyle).toBeNull();
     expect(resetToInferred.resolvedStyle.tone).toEqual({
       source: "INFERRED_ACCEPTED",
       value: "WARM",
@@ -931,7 +944,7 @@ describe("composeGroundedPrompt", () => {
     }
     expect(result.sourceVersions).toEqual({
       ...versions,
-      acceptedInferredStyle: INFERRED_STYLE_VERSION,
+      acceptedInferredStyle: null,
       defaultPrompt: frenchDefaultPromptVersion(),
       explicitStyle: EXPLICIT_STYLE_VERSION,
       profile: PROFILE_VERSION,
@@ -944,7 +957,7 @@ describe("composeGroundedPrompt", () => {
     expect(result.composedInput).toContain(versions.campaign.id);
     expect(result.composedInput).toContain(campaignOverride.version.id);
     expect(result.composedInput).toContain(EXPLICIT_STYLE_VERSION.id);
-    expect(result.composedInput).toContain(INFERRED_STYLE_VERSION.id);
+    expect(result.composedInput).not.toContain(INFERRED_STYLE_VERSION.id);
     expect(result.composedInput).toContain(PROFILE_VERSION.id);
     expect(result.composedInput).toContain(versions.model);
     expect(result.allowedEvidenceIds).toEqual([HIRING_EVIDENCE_ID]);
@@ -1029,6 +1042,7 @@ describe("composeGroundedPrompt", () => {
       composeInput({
         profile: {
           facts: { ...defaultProfile, offer: "x".repeat(501) },
+          tenantId: TENANT,
           version: PROFILE_VERSION,
         },
       }),
@@ -1051,6 +1065,7 @@ describe("composeGroundedPrompt", () => {
             skills: oversizedLists,
             targetMarket: "x".repeat(500),
           },
+          tenantId: TENANT,
           version: PROFILE_VERSION,
         },
       }),
@@ -1061,6 +1076,54 @@ describe("composeGroundedPrompt", () => {
       expect(result.kind).toBe("FAILED");
       if (result.kind === "FAILED") {
         expect(result.reasons[0].code).toBe("INVALID_CONTEXT_INPUT");
+      }
+    }
+  });
+
+  it("rejects profile and style inputs owned by another tenant or campaign", () => {
+    const cases: ComposePromptInput[] = [
+      composeInput({
+        profile: {
+          facts: defaultProfile,
+          tenantId: OTHER_TENANT,
+          version: PROFILE_VERSION,
+        },
+      }),
+      composeInput({
+        explicitStyle: {
+          ...explicitLayer(),
+          tenantId: OTHER_TENANT,
+        },
+      }),
+      composeInput({
+        acceptedInferredStyle: {
+          ...inferredLayer(),
+          tenantId: OTHER_TENANT,
+        },
+      }),
+      composeInput({
+        campaignOverride: {
+          ...campaignLayer({ tone: "WARM" }),
+          tenantId: OTHER_TENANT,
+        },
+      }),
+      composeInput({
+        campaignOverride: {
+          ...campaignLayer({ tone: "WARM" }),
+          campaignId: OTHER_CAMPAIGN,
+        },
+      }),
+    ];
+
+    for (const input of cases) {
+      const result = composeGroundedPrompt(input);
+      expect(result.kind).toBe("FAILED");
+      if (result.kind === "FAILED") {
+        expect(result.reasons[0]).toEqual({
+          code: "INVALID_CONTEXT_INPUT",
+          detail:
+            "composition input ownership does not match tenant or campaign",
+        });
       }
     }
   });
