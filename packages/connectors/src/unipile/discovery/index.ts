@@ -51,6 +51,7 @@ export type {
 
 export const unipileDiscoverySurface = "ENABLED" as const;
 export const UNIPILE_DISCOVERY_READ_ATTEMPTS = 3;
+export const UNIPILE_DISCOVERY_READ_BACKOFF_MS = 100;
 export const UNIPILE_CLASSIC_PEOPLE_PAGE_LIMIT = 10;
 export const UNIPILE_DISCOVERY_MAX_PAGE_LIMIT = 100;
 
@@ -60,6 +61,7 @@ export type UnipileDiscoveryConfig = Readonly<{
   clock?: () => Date;
   directory: UnipileAccountDirectory;
   gateway?: UnipileDiscoveryGateway;
+  sleep?: (milliseconds: number) => Promise<void>;
 }>;
 
 export type LocationFilters = Readonly<{
@@ -217,11 +219,20 @@ function rejectAfterDeadline(milliseconds: number): DeadlineTimer {
 }
 /* oxlint-enable promise/avoid-new */
 
+/* oxlint-disable promise/avoid-new -- The retry policy needs an awaitable timer between provider reads. */
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+/* oxlint-enable promise/avoid-new */
+
 class UnipileLinkedInDiscovery implements LinkedInDiscoveryPort {
   readonly #apiKey: string;
   readonly #baseUrl: string;
   readonly #clock: () => Date;
   readonly #directory: UnipileAccountDirectory;
+  readonly #sleep: (milliseconds: number) => Promise<void>;
   #gateway: UnipileDiscoveryGateway | undefined;
 
   constructor(config: UnipileDiscoveryConfig) {
@@ -230,6 +241,7 @@ class UnipileLinkedInDiscovery implements LinkedInDiscoveryPort {
     this.#clock = config.clock ?? (() => new Date());
     this.#directory = config.directory;
     this.#gateway = config.gateway;
+    this.#sleep = config.sleep ?? sleep;
   }
 
   async searchCandidates(
@@ -388,6 +400,12 @@ class UnipileLinkedInDiscovery implements LinkedInDiscoveryPort {
         if (attempt === UNIPILE_DISCOVERY_READ_ATTEMPTS) {
           throw lastError;
         }
+        await this.#withDeadline(
+          this.#sleep(
+            UNIPILE_DISCOVERY_READ_BACKOFF_MS * 2 ** (attempt - 1)
+          ),
+          context.deadlineAt
+        );
       }
     }
     /* oxlint-enable no-await-in-loop */

@@ -26,6 +26,7 @@ import {
 } from "./fixtures";
 import { createUnipileLinkedInDiscoveryPort } from "./index";
 import type {
+  UnipileDiscoveryConfig,
   UnipileDiscoveryGateway,
   UnipilePeopleSearchRequest,
 } from "./index";
@@ -129,14 +130,17 @@ function createPort(options?: {
 
 function createPortWithGateway(
   gateway: UnipileDiscoveryGateway,
-  directory: UnipileAccountDirectory = authorizedDirectory
+  directory: UnipileAccountDirectory = authorizedDirectory,
+  options: Pick<UnipileDiscoveryConfig, "clock" | "sleep"> = {}
 ) {
   return createUnipileLinkedInDiscoveryPort({
     apiKey: unipileDiscoveryApiKey,
     baseUrl: unipileDiscoveryBaseUrl,
-    clock: () => new Date("2026-09-17T10:00:00.000Z"),
+    clock:
+      options.clock ?? (() => new Date("2026-09-17T10:00:00.000Z")),
     directory,
     gateway,
+    ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
   });
 }
 
@@ -312,6 +316,71 @@ describe("Unipile LinkedIn discovery adapter", () => {
     }
     expect(result.kind).toBe("RETRYABLE_READ_FAILURE");
     expect(result.code).toBe("RATE_LIMITED");
+  });
+
+  it("backs off between retryable Unipile read attempts", async () => {
+    const delays: number[] = [];
+    let attempts = 0;
+    const gateway: UnipileDiscoveryGateway = {
+      getProfile() {
+        return Promise.reject(new Error("profile must not be called"));
+      },
+      searchPeople() {
+        attempts += 1;
+        if (attempts < 3) {
+          return Promise.reject(new Error("temporary upstream failure"));
+        }
+        return Promise.resolve(
+          parsedSearchPage(unipilePeopleSearchPageFixture)
+        );
+      },
+    };
+    const port = createPortWithGateway(gateway, authorizedDirectory, {
+      sleep(milliseconds) {
+        delays.push(milliseconds);
+        return Promise.resolve();
+      },
+    });
+
+    const result = await port.searchCandidates(
+      linkedInSearchCandidatesInputFixture
+    );
+
+    expect(result.ok).toBe(true);
+    expect(attempts).toBe(3);
+    expect(delays).toEqual([100, 200]);
+  });
+
+  it("does not outlive the operation deadline while backing off", async () => {
+    let attempts = 0;
+    const gateway: UnipileDiscoveryGateway = {
+      getProfile() {
+        return Promise.reject(new Error("profile must not be called"));
+      },
+      searchPeople() {
+        attempts += 1;
+        return Promise.reject(new Error("temporary upstream failure"));
+      },
+    };
+    const port = createPortWithGateway(gateway, authorizedDirectory, {
+      sleep: () => Promise.race<void>([]),
+    });
+
+    const result = await port.searchCandidates({
+      ...linkedInSearchCandidatesInputFixture,
+      context: {
+        ...providerOperationContextFixture,
+        deadlineAt: parseUtcTimestamp("2026-09-17T10:00:00.001Z"),
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected retry backoff deadline failure");
+    }
+    expect(result.kind).toBe("RETRYABLE_READ_FAILURE");
+    expect(result.code).toBe("DEADLINE_EXCEEDED");
+    expect(attempts).toBe(1);
   });
 
   it("refuses paid-only Unipile search capabilities instead of switching APIs", async () => {
