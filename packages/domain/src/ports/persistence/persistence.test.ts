@@ -97,7 +97,6 @@ import type {
 } from "./events";
 import {
   accountIdsToHoldForInboxEvent,
-  inboxEventDedupeIdentitiesEqual,
   inboxEventDedupeIdentityFromProvider,
   validateInboxEventScope,
 } from "./events";
@@ -885,28 +884,6 @@ describe("atomic reply-stop and delivery safety contracts", () => {
       provider: "LINKEDIN",
       tenantId: providerIdentity.scope.tenantId,
     });
-    expect(
-      inboxEventDedupeIdentitiesEqual(persistenceIdentity, persistenceIdentity)
-    ).toBe(true);
-    expect(
-      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
-        ...persistenceIdentity,
-        provider: "BILLING",
-      })
-    ).toBe(false);
-    expect(
-      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
-        ...persistenceIdentity,
-        tenantId: otherTenantId,
-      })
-    ).toBe(false);
-    expect(
-      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
-        ...persistenceIdentity,
-        dedupeKey: "other-provider-event",
-      })
-    ).toBe(false);
-
     const recorder = consumerInboxRecorder();
     const tx = testTransaction();
     const linkedInInput: RecordInboxEventInput = {

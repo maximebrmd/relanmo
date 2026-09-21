@@ -188,17 +188,6 @@ export function inboxEventDedupeIdentityFromProvider(identity: {
   };
 }
 
-export function inboxEventDedupeIdentitiesEqual(
-  left: InboxEventDedupeIdentity,
-  right: InboxEventDedupeIdentity
-): boolean {
-  return (
-    left.tenantId === right.tenantId &&
-    left.provider === right.provider &&
-    left.dedupeKey === right.dedupeKey
-  );
-}
-
 export type InboxEventRecord = Readonly<{
   availableAt: UtcTimestamp;
   dedupeKey: string;
