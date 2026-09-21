@@ -125,7 +125,7 @@ const FUNCTIONAL_LEADERSHIP_MARKERS = [
   "vp",
 ] as const;
 
-const APPROVED_FUNCTIONAL_ROLE_MARKERS = ["eng manager"] as const;
+const APPROVED_FUNCTIONAL_ROLE_MARKERS = ["eng manager", "vp eng"] as const;
 
 const TARGET_FUNCTION_MARKERS = [
   "data",

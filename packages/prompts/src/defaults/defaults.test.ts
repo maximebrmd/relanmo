@@ -262,6 +262,12 @@ describe("French prompt defaults", () => {
         observedSignalText: null,
       }).audience
     ).toBe("DECISION_MAKER");
+    expect(
+      qualifyIcp({
+        headline: "VP Eng @ Lumenor Studio",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
   });
 
   it("does not combine unrelated signal words into on-market intent", () => {
