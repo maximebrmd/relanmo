@@ -285,10 +285,9 @@ describe("campaign version persistence", () => {
         if (!resultA.ok || !resultB.ok) {
           throw new Error("expected both concurrent creates to succeed");
         }
-        expect([resultA.value.outcome, resultB.value.outcome].sort()).toEqual([
-          "ALREADY_EXISTS",
-          "CREATED",
-        ]);
+        expect(new Set([resultA.value.outcome, resultB.value.outcome])).toEqual(
+          new Set(["ALREADY_EXISTS", "CREATED"])
+        );
 
         const persisted = await client.pool.query<{ count: string }>(
           "select count(*)::text as count from campaign_versions where campaign_id = $1",
@@ -340,6 +339,7 @@ describe("campaign version persistence", () => {
         if (!created.ok || created.value.outcome !== "CREATED") {
           throw new Error("expected CREATED campaign");
         }
+        const createdCampaign = created.value.campaign;
 
         const rejectedSave = await runner.run({
           access,
@@ -350,7 +350,7 @@ describe("campaign version persistence", () => {
                 createdAt: EDITED_AT,
                 createdBy: parseUserId(USER_B),
                 definition,
-                expectedCurrent: guardFor(created.value.campaign),
+                expectedCurrent: guardFor(createdCampaign),
                 tenantId: input.tenantId,
                 versionId: parseCampaignVersionId(
                   `campaign_version_author_${suffix}_2`
@@ -377,7 +377,7 @@ describe("campaign version persistence", () => {
                 createdAt: EDITED_AT,
                 createdBy: parseUserId(USER_A),
                 definition,
-                expectedCurrent: guardFor(created.value.campaign),
+                expectedCurrent: guardFor(createdCampaign),
                 tenantId: input.tenantId,
                 versionId: parseCampaignVersionId(
                   `campaign_version_worker_${suffix}_2`
@@ -431,13 +431,14 @@ describe("campaign version persistence", () => {
         if (!created.ok || created.value.outcome !== "CREATED") {
           throw new Error("expected CREATED campaign");
         }
+        const createdCampaign = created.value.campaign;
         const firstActivation = await runner.run({
           access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
           work: (tx) =>
             campaigns.activate(
               {
                 campaignId: input.campaignId,
-                expectedCurrent: guardFor(created.value.campaign),
+                expectedCurrent: guardFor(createdCampaign),
                 requestedAt: ACTIVATED_AT,
                 tenantId: input.tenantId,
                 versionId: input.initialVersionId,
@@ -451,6 +452,7 @@ describe("campaign version persistence", () => {
         ) {
           throw new Error("expected first activation");
         }
+        const firstActivationCurrent = firstActivation.value.value.current;
 
         const saved = await runner.run({
           access,
@@ -465,7 +467,7 @@ describe("campaign version persistence", () => {
                   name: "Campagne SaaS France v2",
                 },
                 expectedCurrent: {
-                  expected: firstActivation.value.value.current,
+                  expected: firstActivationCurrent,
                 },
                 tenantId: input.tenantId,
                 versionId: secondVersionId,
@@ -476,6 +478,7 @@ describe("campaign version persistence", () => {
         if (!saved.ok || saved.value.outcome !== "UPDATED") {
           throw new Error("expected saved second version");
         }
+        const savedCurrent = saved.value.value.current;
 
         const secondActivation = await runner.run({
           access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
@@ -483,7 +486,7 @@ describe("campaign version persistence", () => {
             campaigns.activate(
               {
                 campaignId: input.campaignId,
-                expectedCurrent: { expected: saved.value.value.current },
+                expectedCurrent: { expected: savedCurrent },
                 requestedAt: REACTIVATED_AT,
                 tenantId: input.tenantId,
                 versionId: secondVersionId,
