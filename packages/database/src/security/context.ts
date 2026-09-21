@@ -39,6 +39,15 @@ export type TrustedSqlSession = Readonly<{
   ) => Promise<{ readonly rowCount?: number | null }>;
 }>;
 
+export type TrustedSqlClient = TrustedSqlSession &
+  Readonly<{
+    release: () => void;
+  }>;
+
+export type TrustedSqlPool = Readonly<{
+  connect: () => Promise<TrustedSqlClient>;
+}>;
+
 export type AuthPreSessionInput = Readonly<{
   userId: UserId | null;
 }>;
@@ -54,38 +63,55 @@ function requireMemberPrincipal(scope: TenantTransactionScope): UserId {
 }
 
 export async function mintTrustedTenantAccess(
-  session: TrustedSqlSession,
+  pool: TrustedSqlPool,
   scope: TenantTransactionScope
 ): Promise<TenantSqlAccess> {
   const userId = requireMemberPrincipal(scope);
   const tenantId = parseTenantId(scope.tenantId);
-  await setLocalConfig(session, TENANT_CONTEXT_GUC, "");
-  await setLocalConfig(session, ACCESS_MODE_GUC, ACCESS_MODE_AUTH_PRE_SESSION);
-  await setLocalConfig(session, AUTH_PRE_SESSION_USER_GUC, userId);
-  const membership = await session.query(
-    `select 1
-       from memberships
-      where tenant_id = $1
-        and user_id = $2
-        and status = 'ACTIVE'
-      limit 1`,
-    [tenantId, userId]
-  );
-  if (membership.rowCount !== 1) {
-    throw new UntrustedSqlAccessError(
-      "active membership is required for tenant SQL access"
-    );
+  const session = await pool.connect();
+  try {
+    await session.query("begin");
+    try {
+      await setLocalConfig(session, TENANT_CONTEXT_GUC, "");
+      await setLocalConfig(
+        session,
+        ACCESS_MODE_GUC,
+        ACCESS_MODE_AUTH_PRE_SESSION
+      );
+      await setLocalConfig(session, AUTH_PRE_SESSION_USER_GUC, userId);
+      const membership = await session.query(
+        `select 1
+           from memberships
+          where tenant_id = $1
+            and user_id = $2
+            and status = 'ACTIVE'
+          limit 1`,
+        [tenantId, userId]
+      );
+      if (membership.rowCount !== 1) {
+        throw new UntrustedSqlAccessError(
+          "active membership is required for tenant SQL access"
+        );
+      }
+      const trustedScope: TenantTransactionScope = {
+        principal: { kind: "MEMBER", userId },
+        requestId: scope.requestId,
+        tenantId,
+      };
+      const access: TenantSqlAccess = {
+        [trustedSqlAccessBrand]: true,
+        kind: "tenant",
+        scope: trustedScope,
+      };
+      await session.query("commit");
+      return access;
+    } catch (error) {
+      await session.query("rollback");
+      throw error;
+    }
+  } finally {
+    session.release();
   }
-  const trustedScope: TenantTransactionScope = {
-    principal: { kind: "MEMBER", userId },
-    requestId: scope.requestId,
-    tenantId,
-  };
-  return {
-    [trustedSqlAccessBrand]: true,
-    kind: "tenant",
-    scope: trustedScope,
-  };
 }
 
 export function mintTrustedWorkerAccess(

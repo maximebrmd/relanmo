@@ -270,6 +270,7 @@ BEGIN
       current_setting('app.access_mode', true) = 'auth_pre_session'
       AND user_id = current_setting('app.user_id', true)
       AND current_setting('app.user_id', true) <> ''
+      AND status = 'ACTIVE'
     );
 
   CREATE POLICY tenants_auth_pre_session_select ON tenants
@@ -283,6 +284,7 @@ BEGIN
          WHERE memberships.tenant_id = tenants.id
            AND memberships.user_id = current_setting('app.user_id', true)
            AND current_setting('app.user_id', true) <> ''
+           AND memberships.status = 'ACTIVE'
       )
     );
 
@@ -352,9 +354,6 @@ BEGIN
   ) ON TABLE prospects TO relanmo_worker;
 
   GRANT UPDATE (
-    source,
-    explicit_version_id,
-    accepted_inferred_version_id,
     suggested_inferred_version_id,
     revision,
     updated_at

@@ -88,17 +88,26 @@ async function establishMemberAccess(
   tenant: string,
   userId = USER_A
 ) {
-  return withClient(
-    runtimeRoleUrl(target, AUTH_DATABASE_ROLE, ISOLATION_ROLE_PASSWORDS.auth),
-    async (auth) => {
-      await auth.query("begin");
-      try {
-        return await mintTrustedTenantAccess(auth, memberScope(tenant, userId));
-      } finally {
-        await auth.query("rollback");
-      }
-    }
-  );
+  const authEnv: DatabaseEnv = {
+    migrationUrl: target.migrationUrl,
+    poolConnectionTimeoutMs: 5000,
+    poolIdleTimeoutMs: 10_000,
+    poolMax: 1,
+    runtimeUrl: runtimeRoleUrl(
+      target,
+      AUTH_DATABASE_ROLE,
+      ISOLATION_ROLE_PASSWORDS.auth
+    ),
+  };
+  const authClient = createDatabaseRuntimeClient(authEnv);
+  try {
+    return await mintTrustedTenantAccess(
+      authClient.pool,
+      memberScope(tenant, userId)
+    );
+  } finally {
+    await authClient.close();
+  }
 }
 
 describe("tenant isolation with runtime database roles (live local Postgres)", () => {
@@ -198,6 +207,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ).rejects.toMatchObject({ code: "42501" });
         }
       );
+
     },
     TEST_TIMEOUT_MS
   );
@@ -404,6 +414,46 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ).rejects.toMatchObject({ code: "42501" });
         }
       );
+
+      await withClient(database.migrationUrl, (owner) =>
+        owner.query(
+          "update memberships set status = 'REVOKED' where tenant_id = $1 and user_id = $2",
+          [TENANT_A, USER_A]
+        )
+      );
+      try {
+        await withClient(
+          runtimeRoleUrl(
+            database,
+            AUTH_DATABASE_ROLE,
+            ISOLATION_ROLE_PASSWORDS.auth
+          ),
+          async (auth) => {
+            await auth.query("begin");
+            try {
+              await applyTrustedSqlContext(
+                auth,
+                mintAuthPreSessionAccess({ userId: parseUserId(USER_A) })
+              );
+              const memberships = await auth.query(
+                "select tenant_id from memberships"
+              );
+              expect(memberships.rows).toEqual([]);
+              const tenants = await auth.query("select id from tenants");
+              expect(tenants.rows).toEqual([]);
+            } finally {
+              await auth.query("rollback");
+            }
+          }
+        );
+      } finally {
+        await withClient(database.migrationUrl, (owner) =>
+          owner.query(
+            "update memberships set status = 'ACTIVE' where tenant_id = $1 and user_id = $2",
+            [TENANT_A, USER_A]
+          )
+        );
+      }
     },
     TEST_TIMEOUT_MS
   );
@@ -455,6 +505,11 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ).rejects.toMatchObject({ code: "42501" });
           await expect(
             worker.query(
+              "update style_profiles set source = source, explicit_version_id = explicit_version_id, accepted_inferred_version_id = accepted_inferred_version_id where false"
+            )
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query(
               "update send_attempts set payload = payload where false"
             )
           ).rejects.toMatchObject({ code: "42501" });
@@ -476,6 +531,10 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
               "update actions set state = state where false"
             );
             expect(lifecycleUpdate.rowCount).toBe(0);
+            const suggestionUpdate = await worker.query(
+              "update style_profiles set suggested_inferred_version_id = suggested_inferred_version_id, revision = revision where false"
+            );
+            expect(suggestionUpdate.rowCount).toBe(0);
           } finally {
             await worker.query("rollback");
           }

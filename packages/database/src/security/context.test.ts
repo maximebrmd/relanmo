@@ -17,6 +17,7 @@ import {
 import type {
   TenantSqlAccess,
   TrustedSqlAccess,
+  TrustedSqlPool,
   TrustedSqlSession,
 } from "./index";
 
@@ -44,14 +45,23 @@ const idleSession: TrustedSqlSession = {
   query: () => Promise.resolve({}),
 };
 
-const activeMembershipSession: TrustedSqlSession = {
-  query: () => Promise.resolve({ rowCount: 1 }),
-};
+function membershipPool(rowCount?: number): TrustedSqlPool {
+  return {
+    connect: () =>
+      Promise.resolve({
+        query: () => Promise.resolve({ rowCount }),
+        release: () => undefined,
+      }),
+  };
+}
+
+const activeMembershipPool = membershipPool(1);
+const inactiveMembershipPool = membershipPool();
 
 describe("trusted SQL access minting", () => {
   it("rejects an enumerable tenant payload a browser could round-trip", async () => {
     const minted = await mintTrustedTenantAccess(
-      activeMembershipSession,
+      activeMembershipPool,
       memberScope("tenant-a")
     );
     const roundTripped = {
@@ -101,10 +111,10 @@ describe("trusted SQL access minting", () => {
 
   it("requires active membership before minting member access", async () => {
     await expect(
-      mintTrustedTenantAccess(idleSession, memberScope("tenant-a"))
+      mintTrustedTenantAccess(inactiveMembershipPool, memberScope("tenant-a"))
     ).rejects.toThrow(UntrustedSqlAccessError);
     await expect(
-      mintTrustedTenantAccess(activeMembershipSession, memberScope("tenant-a"))
+      mintTrustedTenantAccess(activeMembershipPool, memberScope("tenant-a"))
     ).resolves.toMatchObject({ kind: "tenant" });
   });
 

@@ -14,6 +14,8 @@ export type {
   AuthPreSessionSqlAccess,
   TenantSqlAccess,
   TrustedSqlAccess,
+  TrustedSqlClient,
+  TrustedSqlPool,
   TrustedSqlSession,
 } from "./context";
 export { UntrustedSqlAccessError } from "./errors";
