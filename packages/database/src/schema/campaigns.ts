@@ -18,10 +18,9 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// External foreign-key intent for P020 (packages/database/src/schema/index.ts integration):
-//   campaigns.tenant_id -> tenancy.tenants.id (P015)
-//   campaign_versions.created_by -> auth.user.id
-// This fragment compiles independently and does not import the unmerged tenancy schema.
+import { user } from "./auth";
+import { tenants } from "./tenancy";
+
 export const campaignStatus = pgEnum("campaign_status", [...CAMPAIGN_STATUSES]);
 
 // Mutable current-state row: identity, activation status and the two version pointers
@@ -30,7 +29,9 @@ export const campaigns = pgTable(
   "campaigns",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     status: campaignStatus("status").notNull().default("DRAFT"),
     // Head of unactivated edits; diffed against activeVersionId for draft comparison.
     // No DB-level FK: campaignVersions is declared below and the reference would be
@@ -68,7 +69,9 @@ export const campaignVersions = pgTable(
     campaignId: text("campaign_id")
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     revision: integer("revision").notNull(),
     name: text("name").notNull(),
     offer: text("offer").notNull(),
@@ -90,7 +93,9 @@ export const campaignVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdBy: text("created_by").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
   },
   (table) => [
     uniqueIndex("campaignVersions_campaignId_revision_idx").on(
@@ -101,7 +106,11 @@ export const campaignVersions = pgTable(
   ]
 );
 
-export const campaignsRelations = relations(campaigns, ({ many }) => ({
+export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
+  tenant: one(tenants, {
+    fields: [campaigns.tenantId],
+    references: [tenants.id],
+  }),
   versions: many(campaignVersions),
 }));
 
@@ -111,6 +120,14 @@ export const campaignVersionsRelations = relations(
     campaign: one(campaigns, {
       fields: [campaignVersions.campaignId],
       references: [campaigns.id],
+    }),
+    createdByUser: one(user, {
+      fields: [campaignVersions.createdBy],
+      references: [user.id],
+    }),
+    tenant: one(tenants, {
+      fields: [campaignVersions.tenantId],
+      references: [tenants.id],
     }),
   })
 );

@@ -15,14 +15,10 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
+import { user } from "./auth";
 import { campaigns } from "./campaigns";
+import { tenants } from "./tenancy";
 
-// External foreign-key intent for P020 (packages/database/src/schema/index.ts integration):
-//   style_profiles.tenant_id -> tenancy.tenants.id (P015)
-//   style_profile_versions.created_by -> auth.user.id (required for STYLE_EXPLICIT rows)
-//   prompt_override_versions.created_by -> auth.user.id
-// This fragment compiles independently and does not import the unmerged tenancy schema.
-// campaigns is a same-task fragment (also owned by P016), not a sibling import.
 export const styleSource = pgEnum("style_source", [...STYLE_SOURCES]);
 export const frenchTone = pgEnum("french_tone", [...FRENCH_TONES]);
 
@@ -44,7 +40,10 @@ export const styleProfiles = pgTable(
   "style_profiles",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").notNull().unique(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .unique()
+      .references(() => tenants.id),
     source: styleSource("source").notNull().default("DEFAULT"),
     // No DB-level FK on these three pointers: styleProfileVersions is declared below and
     // the reference would be circular with styleProfileVersions.styleProfileId, which
@@ -79,7 +78,9 @@ export const styleProfileVersions = pgTable(
     styleProfileId: text("style_profile_id")
       .notNull()
       .references(() => styleProfiles.id, { onDelete: "cascade" }),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     kind: styleProfileVersionKind("kind").notNull(),
     revision: integer("revision").notNull(),
     tone: frenchTone("tone"),
@@ -106,7 +107,9 @@ export const styleProfileVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdBy: text("created_by"),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("styleProfileVersions_styleProfileId_idx").on(table.styleProfileId),
@@ -128,7 +131,9 @@ export const promptOverrides = pgTable(
   "prompt_overrides",
   {
     id: text("id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     campaignId: text("campaign_id")
       .notNull()
       .unique()
@@ -157,7 +162,9 @@ export const promptOverrideVersions = pgTable(
     promptOverrideId: text("prompt_override_id")
       .notNull()
       .references(() => promptOverrides.id, { onDelete: "cascade" }),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     revision: integer("revision").notNull(),
     settings: jsonb("settings")
       .notNull()
@@ -170,7 +177,9 @@ export const promptOverrideVersions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdBy: text("created_by").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
   },
   (table) => [
     index("promptOverrideVersions_promptOverrideId_idx").on(
@@ -179,16 +188,31 @@ export const promptOverrideVersions = pgTable(
   ]
 );
 
-export const styleProfilesRelations = relations(styleProfiles, ({ many }) => ({
-  versions: many(styleProfileVersions),
-}));
+export const styleProfilesRelations = relations(
+  styleProfiles,
+  ({ many, one }) => ({
+    tenant: one(tenants, {
+      fields: [styleProfiles.tenantId],
+      references: [tenants.id],
+    }),
+    versions: many(styleProfileVersions),
+  })
+);
 
 export const styleProfileVersionsRelations = relations(
   styleProfileVersions,
   ({ one }) => ({
+    createdByUser: one(user, {
+      fields: [styleProfileVersions.createdBy],
+      references: [user.id],
+    }),
     styleProfile: one(styleProfiles, {
       fields: [styleProfileVersions.styleProfileId],
       references: [styleProfiles.id],
+    }),
+    tenant: one(tenants, {
+      fields: [styleProfileVersions.tenantId],
+      references: [tenants.id],
     }),
   })
 );
@@ -200,6 +224,10 @@ export const promptOverridesRelations = relations(
       fields: [promptOverrides.campaignId],
       references: [campaigns.id],
     }),
+    tenant: one(tenants, {
+      fields: [promptOverrides.tenantId],
+      references: [tenants.id],
+    }),
     versions: many(promptOverrideVersions),
   })
 );
@@ -207,9 +235,17 @@ export const promptOverridesRelations = relations(
 export const promptOverrideVersionsRelations = relations(
   promptOverrideVersions,
   ({ one }) => ({
+    createdByUser: one(user, {
+      fields: [promptOverrideVersions.createdBy],
+      references: [user.id],
+    }),
     promptOverride: one(promptOverrides, {
       fields: [promptOverrideVersions.promptOverrideId],
       references: [promptOverrides.id],
+    }),
+    tenant: one(tenants, {
+      fields: [promptOverrideVersions.tenantId],
+      references: [tenants.id],
     }),
   })
 );

@@ -158,12 +158,12 @@ describe("styles schema fragment", () => {
     ];
     for (const { childTable, parentName } of cases) {
       const config = getTableConfig(childTable);
-      expect(config.foreignKeys).toHaveLength(1);
-      const [foreignKey] = config.foreignKeys;
-      expect(foreignKey.onDelete).toBe("cascade");
-      expect(getTableConfig(foreignKey.reference().foreignTable).name).toBe(
-        parentName
+      const parentForeignKey = config.foreignKeys.find(
+        (foreignKey) =>
+          getTableConfig(foreignKey.reference().foreignTable).name ===
+          parentName
       );
+      expect(parentForeignKey?.onDelete).toBe("cascade");
     }
   });
 });

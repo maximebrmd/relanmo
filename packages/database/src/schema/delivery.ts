@@ -57,6 +57,7 @@ import type {
   OutboxEventState,
   OutboxPayload,
 } from "@relanmo/domain/ports/persistence/events";
+import { relations } from "drizzle-orm";
 import {
   index,
   integer,
@@ -67,6 +68,10 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+
+import { campaigns, campaignVersions } from "./campaigns";
+import { prospects, providerAccounts } from "./leads";
+import { tenants } from "./tenancy";
 
 // Enum column types keep their value lists aligned with the owning domain
 // exports (@relanmo/domain/contracts/{action,workflow} and
@@ -110,13 +115,26 @@ export const actions = pgTable(
   "actions",
   {
     id: text("id").$type<ActionId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
-    accountId: text("account_id").$type<AccountId>().notNull(),
-    prospectId: text("prospect_id").$type<ProspectId>().notNull(),
-    campaignId: text("campaign_id").$type<CampaignId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
+    accountId: text("account_id")
+      .$type<AccountId>()
+      .notNull()
+      .references(() => providerAccounts.id, { onDelete: "restrict" }),
+    prospectId: text("prospect_id")
+      .$type<ProspectId>()
+      .notNull()
+      .references(() => prospects.id, { onDelete: "restrict" }),
+    campaignId: text("campaign_id")
+      .$type<CampaignId>()
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "restrict" }),
     campaignVersionId: text("campaign_version_id")
       .$type<CampaignVersionId>()
-      .notNull(),
+      .notNull()
+      .references(() => campaignVersions.id, { onDelete: "restrict" }),
     step: text("step").$type<SequenceStep>().notNull(),
     payload: jsonb("payload").$type<ActionPayload>().notNull(),
     evidenceIds: jsonb("evidence_ids").$type<readonly EvidenceId[]>().notNull(),
@@ -173,12 +191,18 @@ export const sendAttempts = pgTable(
   "send_attempts",
   {
     id: text("id").$type<SendAttemptId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     actionId: text("action_id")
       .$type<ActionId>()
       .notNull()
       .references(() => actions.id),
-    accountId: text("account_id").$type<AccountId>().notNull(),
+    accountId: text("account_id")
+      .$type<AccountId>()
+      .notNull()
+      .references(() => providerAccounts.id, { onDelete: "restrict" }),
     requestId: text("request_id").notNull(),
     fence: integer("fence").notNull(),
     workerId: text("worker_id").$type<PersistenceWorkerId>().notNull(),
@@ -217,7 +241,10 @@ export const sendReceipts = pgTable(
   "send_receipts",
   {
     id: text("id").$type<SendReceiptId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     actionId: text("action_id")
       .$type<ActionId>()
       .notNull()
@@ -258,8 +285,14 @@ export const accountLeases = pgTable(
   "account_leases",
   {
     id: text("id").$type<AccountLeaseId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
-    accountId: text("account_id").$type<AccountId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
+    accountId: text("account_id")
+      .$type<AccountId>()
+      .notNull()
+      .references(() => providerAccounts.id, { onDelete: "restrict" }),
     owner: text("owner").$type<PersistenceWorkerId>().notNull(),
     fence: integer("fence").notNull(),
     acquiredAt: timestamp("acquired_at", {
@@ -282,13 +315,22 @@ export const quotaReservations = pgTable(
   "quota_reservations",
   {
     id: text("id").$type<QuotaReservationId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
-    accountId: text("account_id").$type<AccountId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
+    accountId: text("account_id")
+      .$type<AccountId>()
+      .notNull()
+      .references(() => providerAccounts.id, { onDelete: "restrict" }),
     actionId: text("action_id")
       .$type<ActionId>()
       .notNull()
       .references(() => actions.id),
-    campaignId: text("campaign_id").$type<CampaignId>().notNull(),
+    campaignId: text("campaign_id")
+      .$type<CampaignId>()
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "restrict" }),
     bucket: quotaBucketEnum("bucket").$type<QuotaBucket>().notNull(),
     state: quotaReservationStateEnum("state")
       .$type<QuotaReservationState>()
@@ -336,7 +378,10 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: text("id").$type<InboxEventId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     provider: text("provider").notNull(),
     dedupeKey: text("dedupe_key").notNull(),
     kind: inboxEventKindEnum("kind").$type<InboxEventKind>().notNull(),
@@ -403,7 +448,10 @@ export const outboxEvents = pgTable(
   "outbox_events",
   {
     id: text("id").$type<OutboxEventId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     kind: outboxEventKindEnum("kind").$type<OutboxEventKind>().notNull(),
     state: outboxEventStateEnum("state").$type<OutboxEventState>().notNull(),
     dedupeKey: text("dedupe_key").notNull(),
@@ -446,7 +494,10 @@ export const actionEvents = pgTable(
   "action_events",
   {
     id: text("id").$type<ActionEventId>().primaryKey(),
-    tenantId: text("tenant_id").$type<TenantId>().notNull(),
+    tenantId: text("tenant_id")
+      .$type<TenantId>()
+      .notNull()
+      .references(() => tenants.id),
     actionId: text("action_id")
       .$type<ActionId>()
       .notNull()
@@ -464,12 +515,121 @@ export const actionEvents = pgTable(
   ]
 );
 
+export const actionsRelations = relations(actions, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [actions.accountId],
+    references: [providerAccounts.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [actions.campaignId],
+    references: [campaigns.id],
+  }),
+  campaignVersion: one(campaignVersions, {
+    fields: [actions.campaignVersionId],
+    references: [campaignVersions.id],
+  }),
+  prospect: one(prospects, {
+    fields: [actions.prospectId],
+    references: [prospects.id],
+  }),
+  tenant: one(tenants, {
+    fields: [actions.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const sendAttemptsRelations = relations(sendAttempts, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [sendAttempts.accountId],
+    references: [providerAccounts.id],
+  }),
+  action: one(actions, {
+    fields: [sendAttempts.actionId],
+    references: [actions.id],
+  }),
+  tenant: one(tenants, {
+    fields: [sendAttempts.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const sendReceiptsRelations = relations(sendReceipts, ({ one }) => ({
+  action: one(actions, {
+    fields: [sendReceipts.actionId],
+    references: [actions.id],
+  }),
+  attempt: one(sendAttempts, {
+    fields: [sendReceipts.attemptId],
+    references: [sendAttempts.id],
+  }),
+  tenant: one(tenants, {
+    fields: [sendReceipts.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const accountLeasesRelations = relations(accountLeases, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [accountLeases.accountId],
+    references: [providerAccounts.id],
+  }),
+  tenant: one(tenants, {
+    fields: [accountLeases.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const quotaReservationsRelations = relations(
+  quotaReservations,
+  ({ one }) => ({
+    account: one(providerAccounts, {
+      fields: [quotaReservations.accountId],
+      references: [providerAccounts.id],
+    }),
+    action: one(actions, {
+      fields: [quotaReservations.actionId],
+      references: [actions.id],
+    }),
+    campaign: one(campaigns, {
+      fields: [quotaReservations.campaignId],
+      references: [campaigns.id],
+    }),
+    tenant: one(tenants, {
+      fields: [quotaReservations.tenantId],
+      references: [tenants.id],
+    }),
+  })
+);
+
+export const webhookEventsRelations = relations(webhookEvents, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [webhookEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const outboxEventsRelations = relations(outboxEvents, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [outboxEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const actionEventsRelations = relations(actionEvents, ({ one }) => ({
+  action: one(actions, {
+    fields: [actionEvents.actionId],
+    references: [actions.id],
+  }),
+  tenant: one(tenants, {
+    fields: [actionEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
 /**
- * Cross-fragment foreign-key intent for P020 (packages/database/src/schema/
- * integration owner). This fragment does not import the sibling tenancy
- * (P015), campaigns (P016) or leads (P017) schema files; P020 adds the real
- * `.references()` once every fragment has merged, matching the pattern in
- * P017's leadsExternalForeignKeyIntent.
+ * Cross-fragment foreign-key intent realized by P020. Keep this list as the
+ * fragment's original integration contract; schema tests assert the matching
+ * `.references()` now exist.
  */
 export const deliveryExternalForeignKeyIntent = [
   { column: "actions.tenant_id", references: "tenants.id (P015 tenancy.ts)" },

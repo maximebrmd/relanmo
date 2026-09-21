@@ -98,9 +98,11 @@ describe("campaigns schema fragment", () => {
 
   it("scopes campaign_versions to its campaign with cascade delete", () => {
     const config = getTableConfig(campaignVersions);
-    expect(config.foreignKeys).toHaveLength(1);
-    const [foreignKey] = config.foreignKeys;
-    expect(foreignKey.onDelete).toBe("cascade");
+    const campaignForeignKey = config.foreignKeys.find(
+      (foreignKey) =>
+        getTableConfig(foreignKey.reference().foreignTable).name === "campaigns"
+    );
+    expect(campaignForeignKey?.onDelete).toBe("cascade");
   });
 
   it("prevents duplicate version numbers for the same campaign", () => {

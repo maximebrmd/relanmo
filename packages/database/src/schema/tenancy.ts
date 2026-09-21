@@ -171,12 +171,8 @@ export const freelancerProfilesRelations = relations(
 );
 
 /**
- * Tenant-scoped tables owned by sibling fragments (P016-P019) and the
- * cross-fragment CurrentVersionSet pointers (campaign/style/prompt/model)
- * inside TenantRecord.currentVersions all need `tenant_id -> tenants.id`.
- * This task cannot import those unmerged schemas; P020 adds the actual
- * `.references()` once every fragment listed in AGENTS.md/contracts.md C3
- * has merged.
+ * Tenant-scoped tables owned by sibling fragments. P020 wires each listed
+ * `tenant_id` column to `tenants.id`.
  */
 export const TENANCY_EXTERNAL_FOREIGN_KEY_INTENT = [
   { column: "provider_accounts.tenant_id", referencesTable: "tenants.id" },

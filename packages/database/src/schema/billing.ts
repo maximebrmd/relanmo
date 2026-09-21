@@ -1,5 +1,5 @@
 import { ENTITLEMENT_STATES } from "@relanmo/domain/ports/persistence";
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -11,16 +11,19 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { tenants } from "./tenancy";
+
 // `state` columns below are constrained to ENTITLEMENT_STATES, frozen by C3's
 // BillingRepository port (packages/domain/src/ports/persistence/billing.ts). Keep both
 // aligned. `.inlineParams()` matches P015's tenancy.ts and renders literal SQL, since bind
 // placeholders are not valid inside a CHECK clause.
 
-// Cross-fragment FK intent for P020 (packages/domain/src/ports/persistence/README.md):
-// tenantId -> tenants.id on every table below. providerCustomerId/providerSubscriptionId/
-// providerEventId are external Stripe identifiers and never gain a local foreign key.
+// providerCustomerId/providerSubscriptionId/providerEventId are external Stripe
+// identifiers and never gain a local foreign key.
 export const billingCustomers = pgTable("billing_customers", {
-  tenantId: text("tenant_id").primaryKey(),
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
   providerCustomerId: text("provider_customer_id").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -35,7 +38,9 @@ export const subscriptions = pgTable(
   "subscriptions",
   {
     providerSubscriptionId: text("provider_subscription_id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     providerCustomerId: text("provider_customer_id").notNull(),
     state: text("state").notNull(),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
@@ -59,7 +64,9 @@ export const subscriptions = pgTable(
 export const billingEntitlements = pgTable(
   "billing_entitlements",
   {
-    tenantId: text("tenant_id").primaryKey(),
+    tenantId: text("tenant_id")
+      .primaryKey()
+      .references(() => tenants.id),
     state: text("state").notNull(),
     active: boolean("active").notNull(),
     effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
@@ -82,7 +89,9 @@ export const billingEvents = pgTable(
   "billing_events",
   {
     eventId: text("event_id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     providerEventId: text("provider_event_id").notNull(),
     eventType: text("event_type").notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
@@ -119,3 +128,37 @@ export const billingEvents = pgTable(
     ),
   ]
 );
+
+export const billingCustomersRelations = relations(
+  billingCustomers,
+  ({ one }) => ({
+    tenant: one(tenants, {
+      fields: [billingCustomers.tenantId],
+      references: [tenants.id],
+    }),
+  })
+);
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [subscriptions.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const billingEntitlementsRelations = relations(
+  billingEntitlements,
+  ({ one }) => ({
+    tenant: one(tenants, {
+      fields: [billingEntitlements.tenantId],
+      references: [tenants.id],
+    }),
+  })
+);
+
+export const billingEventsRelations = relations(billingEvents, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [billingEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));

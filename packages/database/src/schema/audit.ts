@@ -1,5 +1,5 @@
 import { USAGE_KINDS } from "@relanmo/domain/ports/persistence";
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   check,
   index,
@@ -11,28 +11,36 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { actions } from "./delivery";
+import { providerAccounts } from "./leads";
+import { tenants } from "./tenancy";
+
 // `kind` is constrained to USAGE_KINDS, frozen by C3's UsageRepository port
 // (packages/domain/src/ports/persistence/billing.ts). Keep both aligned. `.inlineParams()`
 // matches P015's tenancy.ts and renders literal SQL, since bind placeholders are not valid
 // inside a CHECK clause.
 
-// Cross-fragment FK intent for P020 (packages/domain/src/ports/persistence/README.md):
-// tenantId -> tenants.id; accountId -> provider_accounts.id; actionId -> actions.id on
-// usage_events. audit_events.entityId is a polymorphic reference (see entityKind) that
-// P020 does not turn into a single foreign key.
+// audit_events.entityId is a polymorphic reference (see entityKind) and is
+// not a single foreign key.
 export const usageEvents = pgTable(
   "usage_events",
   {
     eventId: text("event_id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     kind: text("kind").notNull(),
     unit: text("unit").notNull(),
     quantity: integer("quantity").notNull(),
     measurement: text("measurement").notNull(),
     model: text("model"),
     promptVersionId: text("prompt_version_id"),
-    accountId: text("account_id"),
-    actionId: text("action_id"),
+    accountId: text("account_id").references(() => providerAccounts.id, {
+      onDelete: "set null",
+    }),
+    actionId: text("action_id").references(() => actions.id, {
+      onDelete: "set null",
+    }),
     costMinorUnits: integer("cost_minor_units"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -59,7 +67,9 @@ export const auditEvents = pgTable(
   "audit_events",
   {
     eventId: text("event_id").primaryKey(),
-    tenantId: text("tenant_id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
     idempotencyKey: text("idempotency_key").notNull(),
     type: text("type").notNull(),
     entityKind: text("entity_kind").notNull(),
@@ -92,3 +102,25 @@ export const auditEvents = pgTable(
     ),
   ]
 );
+
+export const usageEventsRelations = relations(usageEvents, ({ one }) => ({
+  account: one(providerAccounts, {
+    fields: [usageEvents.accountId],
+    references: [providerAccounts.id],
+  }),
+  action: one(actions, {
+    fields: [usageEvents.actionId],
+    references: [actions.id],
+  }),
+  tenant: one(tenants, {
+    fields: [usageEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [auditEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
