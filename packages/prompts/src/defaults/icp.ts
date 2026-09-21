@@ -74,6 +74,11 @@ const RECRUITER_ROLE_MARKERS = [
 
 const RECRUITER_COMPANY_MARKERS = ["esn", "portage"] as const;
 
+const BUSINESS_DEVELOPMENT_ROLE_MARKERS = [
+  "business dev",
+  "business developer",
+] as const;
+
 const PEER_MARKERS = [
   "as a service",
   "coach",
@@ -222,7 +227,7 @@ export function classifyIcpAudience(
   }
   if (
     containsMarker(role, RECRUITER_ROLE_MARKERS) ||
-    (containsMarker(role, ["business developer"]) &&
+    (containsMarker(role, BUSINESS_DEVELOPMENT_ROLE_MARKERS) &&
       containsMarker(lower, RECRUITER_COMPANY_MARKERS))
   ) {
     return "RECRUITER_ESN";

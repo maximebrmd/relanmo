@@ -5,7 +5,6 @@ import type {
   Dm2FollowUpFact,
   Dm3FollowUpFact,
   Dm1Hook,
-  IcpAudience,
   IcpExclusion,
   LeadAgentRuleSource,
   SignalRelevance,
@@ -22,7 +21,6 @@ export type FixtureProspect = Readonly<{
 }>;
 
 export type FixtureDrafting = Readonly<{
-  audience: IcpAudience;
   dm2Fact: Dm2FollowUpFact | null;
   dm3Fact: Dm3FollowUpFact | null;
   signalKind: BuyingSignalKind;
@@ -64,7 +62,6 @@ const NO_SEQUENCE_STEPS: readonly SequenceStep[] = Object.freeze([]);
 export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
-      audience: "DECISION_MAKER",
       dm2Fact: null,
       dm3Fact: null,
       signalKind: "HIRING",
@@ -97,7 +94,6 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   }),
   Object.freeze({
     drafting: Object.freeze({
-      audience: "RECRUITER_ESN",
       dm2Fact: null,
       dm3Fact: null,
       signalKind: "HIRING",
@@ -130,7 +126,6 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   }),
   Object.freeze({
     drafting: Object.freeze({
-      audience: "DECISION_MAKER",
       dm2Fact: null,
       dm3Fact: null,
       signalKind: "NONE",
@@ -162,7 +157,6 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   }),
   Object.freeze({
     drafting: Object.freeze({
-      audience: "DECISION_MAKER",
       dm2Fact: null,
       dm3Fact: null,
       signalKind: "HIRING",

@@ -48,6 +48,19 @@ describe("French message evaluation fixtures", () => {
     ]);
   });
 
+  it("derives the planning audience from ICP qualification", () => {
+    const fixture = evaluationFixtureById("recruiter-esn");
+    expect(() =>
+      evaluateFixture({
+        ...fixture,
+        prospect: {
+          ...fixture.prospect,
+          headline: "Business Dev @ Product SaaS",
+        },
+      })
+    ).toThrow("fixture recruiter-esn is not ICP eligible");
+  });
+
   it("keeps a historical reply under human ownership with no further DMs", () => {
     const actual = evaluateFixture(evaluationFixtureById("historical-reply"));
     expect(actual.ownership).toBe("HUMAN_OWNED");

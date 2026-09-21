@@ -180,6 +180,12 @@ describe("French prompt defaults", () => {
     ).toBe("RECRUITER_ESN");
     expect(
       qualifyIcp({
+        headline: "Business Dev @ Nova ESN",
+        observedSignalText: null,
+      }).audience
+    ).toBe("RECRUITER_ESN");
+    expect(
+      qualifyIcp({
         headline: "CEO @ Freelance.com",
         observedSignalText: null,
       }).audience

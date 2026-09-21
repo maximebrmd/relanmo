@@ -19,9 +19,12 @@ export function evaluateFixture(
     headline: fixture.prospect.headline,
     observedSignalText: fixture.prospect.observedSignalText,
   });
+  if (!qualification.eligible) {
+    throw new Error(`fixture ${fixture.id} is not ICP eligible`);
+  }
   const incomingReplyPresent = fixture.prospect.incomingReply !== null;
   const plan = planFrenchSequence({
-    audience: fixture.drafting.audience,
+    audience: qualification.audience,
     dm2Fact: fixture.drafting.dm2Fact,
     dm3Fact: fixture.drafting.dm3Fact,
     incomingReplyPresent,
