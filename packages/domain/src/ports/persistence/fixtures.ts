@@ -24,6 +24,7 @@ export const emptyCurrentVersionSetFixture: CurrentVersionSet = Object.freeze({
   explicitStyle: null,
   model: null,
   profile: null,
+  promptOverride: null,
 });
 
 export const profileFactsFixture = Object.freeze({

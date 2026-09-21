@@ -582,14 +582,11 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
             );
             expect(sameTenantProspect.rowCount).toBe(1);
 
-            await worker.query("savepoint style_profile_insert");
-            await expect(
-              worker.query(
-                "insert into style_profiles (id, tenant_id) values ($1, $2)",
-                ["worker-style-profile", TENANT_A]
-              )
-            ).rejects.toMatchObject({ code: "42501" });
-            await worker.query("rollback to savepoint style_profile_insert");
+            const bootstrappedStyleProfile = await worker.query(
+              "insert into style_profiles (id, tenant_id) values ($1, $2)",
+              ["worker-style-profile", TENANT_A]
+            );
+            expect(bootstrappedStyleProfile.rowCount).toBe(1);
 
             await worker.query("savepoint cross_tenant_quota");
             await expect(

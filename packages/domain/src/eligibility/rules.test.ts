@@ -31,6 +31,7 @@ type RawVersions = Readonly<{
   explicitStyle: RawVersionRef | null;
   model: string;
   profile: RawVersionRef | null;
+  promptOverride: RawVersionRef | null;
 }>;
 
 type RawDuePlan = Readonly<{
@@ -101,6 +102,7 @@ const VERSIONS: RawVersions = {
   explicitStyle: null,
   model: "claude-sonnet-4-5",
   profile: null,
+  promptOverride: null,
 };
 
 const STALE_VERSIONS: RawVersions = {
@@ -388,6 +390,32 @@ describe("evaluateEligibility: draft and version currency", () => {
     const result = evaluateEligibility(
       buildCheck(DM1_RAW_CHECK, {
         versions: { candidate: STALE_VERSIONS, current: VERSIONS },
+      })
+    );
+    expect(result.outcome).toBe("DENY");
+    expect(reasonCodes(result)).toContain("STALE_VERSION");
+  });
+
+  it("denies a draft composed with a superseded campaign prompt override", () => {
+    const promptOverride = {
+      createdAt: FIXTURE_TIME,
+      id: "prompt_override_1",
+      kind: "PROMPT_OVERRIDE",
+      revision: 1,
+    };
+    const result = evaluateEligibility(
+      buildCheck(DM1_RAW_CHECK, {
+        versions: {
+          candidate: { ...VERSIONS, promptOverride },
+          current: {
+            ...VERSIONS,
+            promptOverride: {
+              ...promptOverride,
+              id: "prompt_override_2",
+              revision: 2,
+            },
+          },
+        },
       })
     );
     expect(result.outcome).toBe("DENY");

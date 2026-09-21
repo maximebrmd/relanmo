@@ -10,7 +10,7 @@ Owner: P003. Location: `packages/domain/src/contracts/`. IDs must distinguish te
 | --- | --- |
 | Ownership | `BOT_ELIGIBLE` or `HUMAN_OWNED`, plus reason and recorded time. Account/prospect ownership survives campaign changes. Suppression is a separate durable exclusion. |
 | Action | Immutable logical ID for tenant + account + prospect + campaign/version + step; exact payload and source versions. State is `READY`, `IN_FLIGHT`, `CONFIRMED`, `FAILED` or `UNKNOWN`. A campaign edit must not make a completed step eligible again under a new version. |
-| Versions | Profile, campaign, explicit style, accepted inferred style, default-prompt and model versions. Draft persistence and final send authorization compare relevant current versions. |
+| Versions | Profile, campaign, explicit style, accepted inferred style, default-prompt, campaign prompt-override and model versions. Draft persistence and final send authorization compare relevant current versions. |
 | Message | Provider message ID when present; account/prospect/conversation identity; direction; occurrence and receipt times; optional text; attachments; provider source. Empty text with an attachment is still a message. |
 | Eligibility | A pure result with allowed/hold/deny and stable reasons. It consumes an authoritative snapshot; it does not read a database or call a model. |
 | Due plan | Step, intended target, earliest allowed time and closure time. Delays preserve minimum gaps and permitted windows. |

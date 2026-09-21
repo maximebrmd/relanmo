@@ -99,6 +99,9 @@ function findVersionMismatches(
   if (!refMatches(candidate.defaultPrompt, current.defaultPrompt)) {
     mismatches.push("defaultPrompt");
   }
+  if (!refMatches(candidate.promptOverride, current.promptOverride)) {
+    mismatches.push("promptOverride");
+  }
   if (candidate.model !== current.model) {
     mismatches.push("model");
   }

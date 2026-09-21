@@ -370,6 +370,17 @@ BEGIN
       )
     );
 
+  CREATE POLICY style_profiles_worker_bootstrap_insert
+    ON style_profiles AS RESTRICTIVE
+    FOR INSERT TO relanmo_worker
+    WITH CHECK (
+      source = 'DEFAULT'
+      AND explicit_version_id IS NULL
+      AND accepted_inferred_version_id IS NULL
+      AND suggested_inferred_version_id IS NULL
+      AND revision = 0
+    );
+
   CREATE POLICY usage_events_tenant_parents_insert
     ON usage_events AS RESTRICTIVE
     FOR INSERT TO relanmo_app, relanmo_worker
@@ -636,6 +647,8 @@ BEGIN
     revision,
     updated_at
   ) ON TABLE style_profiles TO relanmo_worker;
+
+  GRANT INSERT ON TABLE style_profiles TO relanmo_worker;
 
   GRANT UPDATE (
     status,

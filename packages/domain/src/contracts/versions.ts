@@ -14,6 +14,7 @@ export const VERSION_KINDS = [
   "STYLE_EXPLICIT",
   "STYLE_INFERRED",
   "PROMPT_DEFAULT",
+  "PROMPT_OVERRIDE",
 ] as const;
 
 export type VersionKind = (typeof VERSION_KINDS)[number];
@@ -58,12 +59,20 @@ export type PromptVersionRef = Readonly<
   }
 >;
 
+export type PromptOverrideVersionRef = Readonly<
+  VersionRefBase & {
+    id: PromptVersionId;
+    kind: "PROMPT_OVERRIDE";
+  }
+>;
+
 export type VersionRef =
   | ProfileVersionRef
   | CampaignVersionRef
   | ExplicitStyleVersionRef
   | InferredStyleVersionRef
-  | PromptVersionRef;
+  | PromptVersionRef
+  | PromptOverrideVersionRef;
 
 /** The complete current version state used by pure eligibility checks. */
 export type CurrentVersionSet = Readonly<{
@@ -73,6 +82,7 @@ export type CurrentVersionSet = Readonly<{
   explicitStyle: ExplicitStyleVersionRef | null;
   model: ModelVersion | null;
   profile: ProfileVersionRef | null;
+  promptOverride: PromptOverrideVersionRef | null;
 }>;
 
 export type DraftSourceVersions = Readonly<{
@@ -82,4 +92,5 @@ export type DraftSourceVersions = Readonly<{
   explicitStyle: ExplicitStyleVersionRef | null;
   model: ModelVersion;
   profile: ProfileVersionRef | null;
+  promptOverride: PromptOverrideVersionRef | null;
 }>;
