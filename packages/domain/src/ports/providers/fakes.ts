@@ -378,7 +378,9 @@ function scopedEventNormalization(input: ProviderEventNormalizationInput) {
   };
 }
 
-function scopedDedupeIdentity(input: ProviderEventDedupeInput) {
+function scopedDedupeIdentity(
+  input: ProviderEventDedupeInput
+): ProviderEventDedupeIdentity {
   const { event } = input;
   const { providerEventId } = event;
   const source: ProviderEventDedupeIdentity["source"] = providerEventId
@@ -389,6 +391,7 @@ function scopedDedupeIdentity(input: ProviderEventDedupeInput) {
     ...providerEventDedupeIdentityFixture,
     dedupeKey: `${event.scope.tenantId}:${event.scope.accountId}:${eventPart}`,
     eventKind: event.kind,
+    provider: "LINKEDIN",
     providerEventId,
     scope: event.scope,
     source,

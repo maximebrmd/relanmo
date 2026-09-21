@@ -34,6 +34,8 @@ import {
   parseUtcTimestamp,
 } from "../../contracts/values";
 import { workflowIdFor } from "../../contracts/workflow";
+import type { ProviderEventDedupeIdentity } from "../providers/events";
+import { providerEventDedupeIdentityFixture } from "../providers/fixtures";
 import type {
   AccountLeaseRecord,
   ActionRepository,
@@ -84,15 +86,19 @@ import type {
   InboxIncomingEvent,
   InboxEventRecord,
   InboxOutgoingEvent,
+  InboxRepository,
   InboxUnrecognizedEvent,
   ManualTakeoverResult,
   QuarantineAccountOutcome,
   QuarantineInboxEventResult,
+  RecordInboxEventInput,
   RecordInboxEventResult,
   WorkflowStopOutboxEvent,
 } from "./events";
 import {
   accountIdsToHoldForInboxEvent,
+  inboxEventDedupeIdentitiesEqual,
+  inboxEventDedupeIdentityFromProvider,
   validateInboxEventScope,
 } from "./events";
 import type {
@@ -226,6 +232,7 @@ const inboxEvent: InboxEventRecord = {
   lastError: null,
   lease: null,
   processedAt: timestamp,
+  provider: "LINKEDIN",
   quarantinedAt: null,
   receivedAt: timestamp,
   state: "PROCESSED",
@@ -241,6 +248,7 @@ const outgoingInboxRecord: InboxEventRecord = {
   lastError: null,
   lease: null,
   processedAt: timestamp,
+  provider: "LINKEDIN",
   quarantinedAt: null,
   receivedAt: timestamp,
   state: "PROCESSED",
@@ -256,6 +264,7 @@ const unrecognizedInboxRecord: InboxEventRecord = {
   lastError: "UNKNOWN_MAPPING",
   lease: null,
   processedAt: null,
+  provider: "LINKEDIN",
   quarantinedAt: timestamp,
   receivedAt: timestamp,
   state: "QUARANTINED",
@@ -368,6 +377,49 @@ const atomicStopResult: AtomicReplyStopResult = {
 interface ConsumerAtomicReplyFixture {
   calls: { input: AtomicReplyStopInput; tx: PersistenceTransaction }[];
   repository: AtomicReplyStopRepository;
+}
+
+/**
+ * Test-only inbox recorder. It documents the provider-scoped dedupe identity
+ * consumers must pass; it is not evidence of PostgreSQL uniqueness.
+ */
+function consumerInboxRecorder(): Pick<InboxRepository, "record"> {
+  const records = new Map<string, InboxEventRecord>();
+  return {
+    record: (input, tx) => {
+      if (input.tenantId !== tx.scope.tenantId) {
+        return Promise.resolve(tenantMismatch());
+      }
+      const key = `${input.tenantId}\0${input.provider}\0${input.dedupeKey}`;
+      const existing = records.get(key);
+      if (existing) {
+        return Promise.resolve({
+          ok: true,
+          value: { event: existing, outcome: "DUPLICATE" },
+        });
+      }
+      const event: InboxEventRecord = {
+        availableAt: input.availableAt,
+        attempt: 0,
+        dedupeKey: input.dedupeKey,
+        event: input.event,
+        eventId: input.eventId,
+        lastError: null,
+        lease: null,
+        processedAt: null,
+        provider: input.provider,
+        quarantinedAt: null,
+        receivedAt: input.receivedAt,
+        state: "RECEIVED",
+        tenantId: input.tenantId,
+      };
+      records.set(key, event);
+      return Promise.resolve({
+        ok: true,
+        value: { event, outcome: "RECORDED" },
+      });
+    },
+  };
 }
 
 function consumerAtomicReplyFake() {
@@ -617,6 +669,7 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     const input: AtomicReplyStopInput = {
       event: incomingInboxEvent,
       eventId: inboxEvent.eventId,
+      provider: "LINKEDIN",
       stoppedAt: timestamp,
       tenantId,
     };
@@ -814,11 +867,92 @@ describe("atomic reply-stop and delivery safety contracts", () => {
     expect(duplicateIncoming.event.event.dedupeKey).toBe(
       incomingInboxEvent.dedupeKey
     );
+    expect(duplicateIncoming.event.provider).toBe("LINKEDIN");
     expect(duplicateOutgoingEcho.priorOutcome).toBe("BOT_ECHO_CONFIRMED");
     expect(duplicateOwnerTakeover.priorOutcome).toBe("TAKEN_OVER");
     expect(duplicateOutbox.event.eventId).toBe(stopOutboxEvent.eventId);
     expect(acknowledgedInbox.outcome).toBe("ALREADY_PROCESSED");
     expect(acknowledgedOutbox.outcome).toBe("ALREADY_DELIVERED");
+  });
+
+  it("scopes inbox dedupe identity by tenant, provider and key", async () => {
+    const providerIdentity: ProviderEventDedupeIdentity =
+      providerEventDedupeIdentityFixture;
+    const persistenceIdentity =
+      inboxEventDedupeIdentityFromProvider(providerIdentity);
+    expect(persistenceIdentity).toEqual({
+      dedupeKey: providerIdentity.dedupeKey,
+      provider: "LINKEDIN",
+      tenantId: providerIdentity.scope.tenantId,
+    });
+    expect(
+      inboxEventDedupeIdentitiesEqual(persistenceIdentity, persistenceIdentity)
+    ).toBe(true);
+    expect(
+      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
+        ...persistenceIdentity,
+        provider: "BILLING",
+      })
+    ).toBe(false);
+    expect(
+      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
+        ...persistenceIdentity,
+        tenantId: otherTenantId,
+      })
+    ).toBe(false);
+    expect(
+      inboxEventDedupeIdentitiesEqual(persistenceIdentity, {
+        ...persistenceIdentity,
+        dedupeKey: "other-provider-event",
+      })
+    ).toBe(false);
+
+    const recorder = consumerInboxRecorder();
+    const tx = testTransaction();
+    const linkedInInput: RecordInboxEventInput = {
+      availableAt: timestamp,
+      dedupeKey: persistenceIdentity.dedupeKey,
+      event: incomingInboxEvent,
+      eventId: testPersistenceId<InboxEventId>("inbox_linkedin_1"),
+      provider: persistenceIdentity.provider,
+      receivedAt: timestamp,
+      tenantId: persistenceIdentity.tenantId,
+    };
+    const recorded = await recorder.record(linkedInInput, tx);
+    const duplicate = await recorder.record(
+      {
+        ...linkedInInput,
+        eventId: testPersistenceId<InboxEventId>("inbox_linkedin_replay"),
+      },
+      tx
+    );
+    const billing = await recorder.record(
+      {
+        ...linkedInInput,
+        eventId: testPersistenceId<InboxEventId>("inbox_billing_1"),
+        provider: "BILLING",
+      },
+      tx
+    );
+
+    expect(recorded).toMatchObject({
+      ok: true,
+      value: { outcome: "RECORDED" },
+    });
+    expect(duplicate).toMatchObject({
+      ok: true,
+      value: { outcome: "DUPLICATE" },
+    });
+    expect(billing).toMatchObject({
+      ok: true,
+      value: { outcome: "RECORDED" },
+    });
+    if (recorded.ok && duplicate.ok && billing.ok) {
+      expect(duplicate.value.event.eventId).toBe(recorded.value.event.eventId);
+      expect(billing.value.event.eventId).toBe("inbox_billing_1");
+      expect(billing.value.event.provider).toBe("BILLING");
+      expect(recorded.value.event.provider).toBe("LINKEDIN");
+    }
   });
 
   it("makes reply-stop commit ordering and all authorization holds explicit", () => {

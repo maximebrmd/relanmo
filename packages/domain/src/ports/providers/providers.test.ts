@@ -146,6 +146,7 @@ describe("provider port contracts", () => {
       })
     );
     expect(dedupe.source).toBe("PROVIDER_EVENT_ID");
+    expect(dedupe.provider).toBe("LINKEDIN");
     expect(dedupe.dedupeKey).toContain("tenant_demo:account_demo");
     expect(providerEventAuthenticationFixture.mechanism).toBe(
       "PROVIDER_DEFINED"
@@ -226,6 +227,7 @@ describe("provider port contracts", () => {
         event: normalized.event,
       })
     );
+    expect(dedupe.provider).toBe("LINKEDIN");
     expect(dedupe.dedupeKey).toBe(
       "tenant_other:account_other:provider_event_inbound_1"
     );
