@@ -1,11 +1,11 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import * as committedAuthSchema from "@relanmo/database/schema/auth";
 import { type DBAdapter, generateDrizzleSchema } from "auth/api";
-import { is } from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
+import { is, SQL } from "drizzle-orm";
+import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import {
   createTableRelationsHelpers,
   extractTablesRelationalConfig,
@@ -21,10 +21,26 @@ import {
 
 type AuthTable = Parameters<typeof getTableConfig>[0];
 
+const pgDialect = new PgDialect();
+
 function sorted<T>(values: T[]) {
   return values.sort((left, right) =>
     JSON.stringify(left).localeCompare(JSON.stringify(right))
   );
+}
+
+function normalizeDefault(value: unknown) {
+  if (value === undefined) {
+    return { kind: "none" } as const;
+  }
+  if (is(value, SQL)) {
+    const query = pgDialect.sqlToQuery(value);
+    return { kind: "sql", params: query.params, sql: query.sql } as const;
+  }
+  return {
+    kind: "value",
+    value: value instanceof Date ? value.toISOString() : value,
+  } as const;
 }
 
 function normalizeTable(table: AuthTable) {
@@ -32,7 +48,7 @@ function normalizeTable(table: AuthTable) {
   return {
     columns: sorted(
       config.columns.map((column) => ({
-        databaseDefault: column.default !== undefined,
+        default: normalizeDefault(column.default),
         hasDefault: column.hasDefault,
         name: column.name,
         notNull: column.notNull,
@@ -66,6 +82,17 @@ function normalizeTable(table: AuthTable) {
     ),
     name: config.name,
   };
+}
+
+async function installedPackageVersion(specifier: string) {
+  const entry = import.meta.resolve(specifier);
+  const manifest = JSON.parse(
+    await readFile(new URL("../package.json", entry), "utf8")
+  ) as { version?: unknown };
+  if (typeof manifest.version !== "string") {
+    throw new TypeError(`${specifier} package has no version`);
+  }
+  return manifest.version;
 }
 
 function normalizeSchema(schema: Record<string, unknown>) {
@@ -145,10 +172,17 @@ describe("auth schema-config", () => {
     expect(authSchemaConfig.rateLimit.storage).toBe("database");
   });
 
-  it("pins the generator to the same release as the better-auth runtime dependency", () => {
-    expect(authSchemaGeneratorVersions.betterAuth).toBe(
-      authSchemaGeneratorVersions.drizzleAdapter
-    );
+  it("pins the installed generator, runtime, and adapter releases", async () => {
+    const [generator, runtime, adapter] = await Promise.all([
+      installedPackageVersion("auth/api"),
+      installedPackageVersion("better-auth"),
+      installedPackageVersion("@better-auth/drizzle-adapter"),
+    ]);
+    expect({ adapter, generator, runtime }).toEqual({
+      adapter: authSchemaGeneratorVersions.drizzleAdapter,
+      generator: authSchemaGeneratorVersions.betterAuth,
+      runtime: authSchemaGeneratorVersions.betterAuth,
+    });
   });
 
   it("matches the pinned generator's complete Drizzle schema", async () => {
