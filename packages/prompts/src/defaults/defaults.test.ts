@@ -187,7 +187,16 @@ describe("French prompt defaults", () => {
   });
 
   it("requires identifiable company evidence for executive titles", () => {
-    for (const headline of ["Founder", "CTO", "CEO @ "]) {
+    for (const headline of [
+      "Founder",
+      "CTO",
+      "CEO @ ",
+      "Founder @ Open to work",
+      "CTO | Looking for opportunities",
+      "CEO · Available",
+      "Founder — En recherche",
+      "CTO @ Startup",
+    ]) {
       const qualification = qualifyIcp({
         headline,
         observedSignalText: null,

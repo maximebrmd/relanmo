@@ -126,6 +126,30 @@ const TARGET_FUNCTION_MARKERS = [
   "technology",
 ] as const;
 
+const COMPANY_EVIDENCE_FILLERS = new Set([
+  "confidential",
+  "ma societe",
+  "my company",
+  "new venture",
+  "none",
+  "project",
+  "projet",
+  "saas",
+  "startup",
+  "stealth",
+  "stealth startup",
+]);
+
+const COMPANY_STATUS_PATTERNS = [
+  /^a la recherche\b/u,
+  /^available(?: for work| immediately| now)?$/u,
+  /^disponible(?: immediatement| maintenant)?$/u,
+  /^en recherche\b/u,
+  /^looking for (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
+  /^open (?:for|to) (?:opportunities|work)\b/u,
+  /^seeking (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
+] as const;
+
 function folded(value: string): string {
   return value
     .toLowerCase()
@@ -148,7 +172,16 @@ function headlineCompany(headline: string): string | null {
   }
 
   const company = lower.slice(delimiter.index + delimiter[0].length).trim();
-  return /[a-z0-9]/u.test(company) ? company : null;
+  const normalized = company.replaceAll(/[^a-z0-9]+/gu, " ").trim();
+  if (
+    normalized.length === 0 ||
+    COMPANY_EVIDENCE_FILLERS.has(normalized) ||
+    COMPANY_STATUS_PATTERNS.some((pattern) => pattern.test(normalized))
+  ) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function headlineRole(headline: string): string {
