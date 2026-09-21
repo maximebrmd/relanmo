@@ -133,14 +133,19 @@ function createPortWithGateway(
   directory: UnipileAccountDirectory = authorizedDirectory,
   options: Pick<UnipileDiscoveryConfig, "clock" | "sleep"> = {}
 ) {
-  return createUnipileLinkedInDiscoveryPort({
+  const config: UnipileDiscoveryConfig = {
     apiKey: unipileDiscoveryApiKey,
     baseUrl: unipileDiscoveryBaseUrl,
-    clock:
-      options.clock ?? (() => new Date("2026-09-17T10:00:00.000Z")),
+    clock: options.clock ?? (() => new Date("2026-09-17T10:00:00.000Z")),
     directory,
     gateway,
-    ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+  };
+  if (options.sleep === undefined) {
+    return createUnipileLinkedInDiscoveryPort(config);
+  }
+  return createUnipileLinkedInDiscoveryPort({
+    ...config,
+    sleep: options.sleep,
   });
 }
 
@@ -363,7 +368,7 @@ describe("Unipile LinkedIn discovery adapter", () => {
       },
     };
     const port = createPortWithGateway(gateway, authorizedDirectory, {
-      sleep: () => Promise.race<void>([]),
+      sleep: () => Promise.race([]),
     });
 
     const result = await port.searchCandidates({

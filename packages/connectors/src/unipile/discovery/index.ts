@@ -401,9 +401,7 @@ class UnipileLinkedInDiscovery implements LinkedInDiscoveryPort {
           throw lastError;
         }
         await this.#withDeadline(
-          this.#sleep(
-            UNIPILE_DISCOVERY_READ_BACKOFF_MS * 2 ** (attempt - 1)
-          ),
+          this.#sleep(UNIPILE_DISCOVERY_READ_BACKOFF_MS * 2 ** (attempt - 1)),
           context.deadlineAt
         );
       }
