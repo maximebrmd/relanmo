@@ -38,6 +38,7 @@ export const COMPOSE_FAILURE_CODES = [
   "MISSING_EVIDENCE",
   "INVALID_STYLE_INPUT",
   "INVALID_EVIDENCE_INPUT",
+  "INVALID_CONTEXT_INPUT",
   "STEP_NOT_IN_PLAN",
 ] as const;
 export type ComposeFailureCode = (typeof COMPOSE_FAILURE_CODES)[number];
@@ -121,12 +122,16 @@ export type ProspectContextSnapshot = Readonly<{
   company: string | null;
   craft: string | null;
   firstName: string | null;
+  hiringRole: GroundedFact | null;
   prospectId: ProspectId;
   sharedConnection: GroundedFact | null;
+  signalDetail: GroundedFact | null;
+  signalFact: GroundedFact | null;
 }>;
 
 export type CompositionProvenance = Readonly<{
   allowedEvidenceIds: readonly EvidenceId[];
+  drafting: SequenceDraftingContext;
   prospectContext: ProspectContextSnapshot;
   sourceVersions: DraftSourceVersions;
 }>;

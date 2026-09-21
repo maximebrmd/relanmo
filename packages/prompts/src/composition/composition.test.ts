@@ -657,11 +657,17 @@ describe("composeGroundedPrompt", () => {
     if (withoutEvidence.kind === "COMPOSED") {
       expect(withoutEvidence.hook).toBe("NEUTRAL");
       expect(withoutEvidence.targetText).not.toContain("Morgan Dupont");
+      expect(withoutEvidence.provenance.prospectContext.sharedConnection).toBe(
+        null
+      );
     }
     expect(withEvidence.kind).toBe("COMPOSED");
     if (withEvidence.kind === "COMPOSED") {
       expect(withEvidence.hook).toBe("SHARED_CONNECTION");
       expect(withEvidence.targetText).toContain("Morgan Dupont");
+      expect(withEvidence.provenance.prospectContext.sharedConnection).toEqual(
+        prospect.sharedConnection
+      );
     }
   });
 
@@ -700,6 +706,46 @@ describe("composeGroundedPrompt", () => {
     if (result.kind === "COMPOSED") {
       expect(result.hook).toBe("NEUTRAL");
       expect(result.targetText).not.toContain("angle B");
+    }
+  });
+
+  it("persists the normalized drafting selection used for composition", () => {
+    const offerEvidence = parseEvidence({
+      accountId: null,
+      assertions: [
+        { detail: null, kind: "OFFER", value: "offre data" },
+      ],
+      capturedAt: FIXTURE_TIME,
+      contentHash: null,
+      evidenceId: "evidence_offer_data_1",
+      normalizedClaim: "Une offre data est publiée.",
+      prospectId: PROSPECT,
+      provenance: "PROVIDER_POST",
+      sourceId: "source_offer_data_1",
+      sourceUrl: null,
+      tenantId: TENANT,
+    });
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [offerEvidence],
+        drafting: {
+          ...noSignalDrafting,
+          dm2Fact: {
+            detail: null,
+            evidenceId: offerEvidence.evidenceId,
+            fact: "  offre data  ",
+            kind: "OFFER",
+            relevance: "RELEVANT",
+          },
+        },
+        step: "DM2",
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.provenance.drafting.dm2Fact?.fact).toBe("offre data");
+      expect(result.targetText).toContain("offre data");
     }
   });
 
@@ -876,12 +922,19 @@ describe("composeGroundedPrompt", () => {
     expect(result.composedInput).not.toContain("evidence_foreign_1");
     expect(result.provenance).toEqual({
       allowedEvidenceIds: [HIRING_EVIDENCE_ID],
+      drafting: hiringDrafting,
       prospectContext: {
         company: "Nordwave SaaS",
         craft: "frontend",
         firstName: "Camille",
+        hiringRole: {
+          evidenceId: HIRING_EVIDENCE_ID,
+          text: "frontend",
+        },
         prospectId: PROSPECT,
         sharedConnection: null,
+        signalDetail: null,
+        signalFact: null,
       },
       sourceVersions: result.sourceVersions,
     });
@@ -901,6 +954,17 @@ describe("composeGroundedPrompt", () => {
       evidenceId: parseEvidenceId(`evidence_total_${String(index)}`),
       normalizedClaim: "x".repeat(1000),
     }));
+    const foreignClaims = Array.from({ length: 21 }, (_, index) => ({
+      ...foreignEvidence,
+      evidenceId: parseEvidenceId(`evidence_foreign_${String(index)}`),
+    }));
+
+    const scopedResult = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [hiringEvidence, ...foreignClaims],
+      })
+    );
+    expect(scopedResult.kind).toBe("COMPOSED");
 
     for (const allowedEvidence of [
       [oversizedClaim],
@@ -911,6 +975,51 @@ describe("composeGroundedPrompt", () => {
       expect(result.kind).toBe("FAILED");
       if (result.kind === "FAILED") {
         expect(result.reasons[0].code).toBe("INVALID_EVIDENCE_INPUT");
+      }
+    }
+  });
+
+  it("rejects profile and prospect context beyond centralized limits", () => {
+    const oversizedLists = Array.from({ length: 20 }, () => "x".repeat(100));
+    const cases: ComposePromptInput[] = [
+      composeInput({
+        prospect: { ...hiringProspect, firstName: "x".repeat(101) },
+      }),
+      composeInput({
+        profile: {
+          facts: { ...defaultProfile, offer: "x".repeat(501) },
+          version: PROFILE_VERSION,
+        },
+      }),
+      composeInput({
+        prospect: {
+          ...hiringProspect,
+          hiringRole: {
+            evidenceId: HIRING_EVIDENCE_ID,
+            text: "x".repeat(1001),
+          },
+        },
+      }),
+      composeInput({
+        profile: {
+          facts: {
+            availability: "x".repeat(500),
+            exclusions: oversizedLists,
+            geography: "x".repeat(200),
+            offer: "x".repeat(500),
+            skills: oversizedLists,
+            targetMarket: "x".repeat(500),
+          },
+          version: PROFILE_VERSION,
+        },
+      }),
+    ];
+
+    for (const input of cases) {
+      const result = composeGroundedPrompt(input);
+      expect(result.kind).toBe("FAILED");
+      if (result.kind === "FAILED") {
+        expect(result.reasons[0].code).toBe("INVALID_CONTEXT_INPUT");
       }
     }
   });

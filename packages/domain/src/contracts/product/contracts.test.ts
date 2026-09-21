@@ -329,6 +329,14 @@ describe("product DTO invalid cases", () => {
       }).success
     ).toBe(false);
     expect(
+      safeParseProfileCommand({
+        expectedRevision: 1,
+        input: { ...profileInput, offer: "x".repeat(501) },
+        kind: "SAVE_PROFILE",
+        tenantId: "tenant_demo",
+      }).success
+    ).toBe(false);
+    expect(
       safeParseCampaignCommand({
         input: {
           ...campaignInput,

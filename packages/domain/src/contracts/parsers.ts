@@ -5,6 +5,7 @@ import {
   ACTION_STATES,
   ACTION_UNKNOWN_REASONS,
 } from "./action";
+import { COMPOSITION_CONTEXT_LIMITS } from "./composition";
 import type {
   Action,
   ActionFailureReason,
@@ -439,11 +440,20 @@ function parseEvidenceAssertion(
     readRequired(record, "value"),
     `${path}.value`
   );
-  if (detail !== null && detail.length > 1000) {
-    throw new ContractValidationError(`${path}.detail exceeds 1000 characters`);
+  if (
+    detail !== null &&
+    detail.length > COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters
+  ) {
+    throw new ContractValidationError(
+      `${path}.detail exceeds ${String(COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters)} characters`
+    );
   }
-  if (assertionValue.length > 1000) {
-    throw new ContractValidationError(`${path}.value exceeds 1000 characters`);
+  if (
+    assertionValue.length > COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters
+  ) {
+    throw new ContractValidationError(
+      `${path}.value exceeds ${String(COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters)} characters`
+    );
   }
   return Object.freeze({
     detail,

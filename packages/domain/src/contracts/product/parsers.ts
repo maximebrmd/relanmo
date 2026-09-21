@@ -1,6 +1,7 @@
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type -- Product parsers are the explicit untrusted UI/transport boundary. */
 
 import { ACTION_UNKNOWN_REASONS } from "../action";
+import { COMPOSITION_CONTEXT_LIMITS } from "../composition";
 import { ELIGIBILITY_REASON_CODES } from "../eligibility";
 import type { TenantId } from "../ids";
 import {
@@ -223,7 +224,7 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     availability: parseNullableProductText(
       readRequired(record, "availability"),
       `${path}.availability`,
-      500
+      COMPOSITION_CONTEXT_LIMITS.availabilityCharacters
     ),
     dayRateCents: nullable(readRequired(record, "dayRateCents"), (input) =>
       expectInteger(input, `${path}.dayRateCents`, 0, 10_000_000)
@@ -231,18 +232,18 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     exclusions: parseProductStringList(
       readRequired(record, "exclusions"),
       `${path}.exclusions`,
-      20,
-      240
+      COMPOSITION_CONTEXT_LIMITS.listItems,
+      COMPOSITION_CONTEXT_LIMITS.listItemCharacters
     ),
     geography: parseNullableProductText(
       readRequired(record, "geography"),
       `${path}.geography`,
-      500
+      COMPOSITION_CONTEXT_LIMITS.geographyCharacters
     ),
     offer: parseProductText(
       readRequired(record, "offer"),
       `${path}.offer`,
-      1000
+      COMPOSITION_CONTEXT_LIMITS.offerCharacters
     ),
     preferredTone: member(
       readRequired(record, "preferredTone"),
@@ -252,13 +253,13 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     skills: parseProductStringList(
       readRequired(record, "skills"),
       `${path}.skills`,
-      30,
-      160
+      COMPOSITION_CONTEXT_LIMITS.listItems,
+      COMPOSITION_CONTEXT_LIMITS.listItemCharacters
     ),
     targetMarket: parseNullableProductText(
       readRequired(record, "targetMarket"),
       `${path}.targetMarket`,
-      500
+      COMPOSITION_CONTEXT_LIMITS.targetMarketCharacters
     ),
     writingSamples: parseProductStringList(
       readRequired(record, "writingSamples"),

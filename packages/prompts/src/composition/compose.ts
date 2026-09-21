@@ -5,6 +5,7 @@ import type {
   EvidenceAssertionKind,
   SequenceStep,
 } from "@relanmo/domain/contracts";
+import { COMPOSITION_CONTEXT_LIMITS } from "@relanmo/domain/contracts";
 
 import {
   ALLOWED_TEMPLATE_VARIABLES,
@@ -17,6 +18,7 @@ import type {
   AllowedTemplateVariable,
   MessageHook,
   MessageTemplate,
+  SequenceDraftingContext,
 } from "../defaults";
 import type {
   AddressForm,
@@ -75,23 +77,32 @@ function scopedEvidence(input: ComposePromptInput): readonly Evidence[] {
 }
 
 function prospectContextSnapshot(
-  input: ComposePromptInput
+  input: ComposePromptInput,
+  sharedConnection: GroundedFact | null,
+  values: Readonly<Record<AllowedTemplateVariable, string | null>>
 ): ProspectContextSnapshot {
-  const sharedConnectionText = optionalText(
-    input.prospect.sharedConnection?.text
-  );
+  const groundedSnapshot = (
+    fact: GroundedFact | null,
+    text: string | null
+  ): GroundedFact | null =>
+    fact === null || text === null
+      ? null
+      : Object.freeze({ evidenceId: fact.evidenceId, text });
   return Object.freeze({
     company: optionalText(input.prospect.company),
     craft: optionalText(input.prospect.craft),
     firstName: optionalText(input.prospect.firstName),
+    hiringRole: groundedSnapshot(
+      input.prospect.hiringRole,
+      values.hiringRole
+    ),
     prospectId: input.prospect.prospectId,
-    sharedConnection:
-      input.prospect.sharedConnection === null || sharedConnectionText === null
-        ? null
-        : Object.freeze({
-            evidenceId: input.prospect.sharedConnection.evidenceId,
-            text: sharedConnectionText,
-          }),
+    sharedConnection,
+    signalDetail: groundedSnapshot(
+      input.prospect.signalDetail,
+      values.signalDetail
+    ),
+    signalFact: groundedSnapshot(input.prospect.signalFact, values.signalFact),
   });
 }
 
@@ -166,11 +177,62 @@ function canonicalEvidenceText(value: string): string {
     .replaceAll(/\s+/gu, " ");
 }
 
-function variableValues(
+function validatedSharedConnection(
   input: ComposePromptInput,
   evidenceById: ReadonlyMap<string, Evidence>
+): GroundedFact | null {
+  const grounded = groundedPair(
+    input.prospect.sharedConnection,
+    null,
+    evidenceById,
+    "SHARED_CONNECTION"
+  );
+  return grounded.fact === null || input.prospect.sharedConnection === null
+    ? null
+    : Object.freeze({
+        evidenceId: input.prospect.sharedConnection.evidenceId,
+        text: grounded.fact,
+      });
+}
+
+function normalizedDraftingSnapshot(
+  input: ComposePromptInput,
+  sharedConnection: GroundedFact | null
+): SequenceDraftingContext {
+  const dm2Fact =
+    input.drafting.dm2Fact === null
+      ? null
+      : Object.freeze({
+          ...input.drafting.dm2Fact,
+          detail: optionalText(input.drafting.dm2Fact.detail),
+          fact: optionalText(input.drafting.dm2Fact.fact) ?? "",
+        });
+  const dm3Fact =
+    input.drafting.dm3Fact === null
+      ? null
+      : Object.freeze({
+          ...input.drafting.dm3Fact,
+          detail: optionalText(input.drafting.dm3Fact.detail),
+          fact: optionalText(input.drafting.dm3Fact.fact) ?? "",
+        });
+  return Object.freeze({
+    audience: input.drafting.audience,
+    dm2Fact,
+    dm3Fact,
+    incomingReplyPresent: input.drafting.incomingReplyPresent,
+    signalKind: input.drafting.signalKind,
+    signalRelevance: input.drafting.signalRelevance,
+    verifiedSharedConnection: sharedConnection?.text ?? null,
+  });
+}
+
+function variableValues(
+  input: ComposePromptInput,
+  drafting: SequenceDraftingContext,
+  sharedConnection: GroundedFact | null,
+  evidenceById: ReadonlyMap<string, Evidence>
 ): Readonly<Record<AllowedTemplateVariable, string | null>> {
-  const { drafting, prospect } = input;
+  const { prospect } = input;
   const signalKind =
     drafting.signalKind === "HIRING" || drafting.signalKind === "NONE"
       ? null
@@ -182,12 +244,6 @@ function variableValues(
     null,
     evidenceById,
     "HIRING_ROLE"
-  );
-  const sharedConnection = groundedPair(
-    prospect.sharedConnection,
-    null,
-    evidenceById,
-    "SHARED_CONNECTION"
   );
   const signal =
     signalKind === null
@@ -207,7 +263,7 @@ function variableValues(
     dm3Fact: dm3.fact,
     firstName: optionalText(prospect.firstName),
     hiringRole: hiring.fact,
-    sharedConnection: sharedConnection.fact,
+    sharedConnection: sharedConnection?.text ?? null,
     signalDetail: signal.detail,
     signalFact: signal.fact,
   });
@@ -521,15 +577,15 @@ function invalidStyleReason(input: ComposePromptInput): ComposeFailureReason | n
 }
 
 function invalidEvidenceReason(
-  input: ComposePromptInput
+  evidence: readonly Evidence[]
 ): ComposeFailureReason | null {
-  const claims = input.allowedEvidence.map((item) => item.normalizedClaim);
+  const claims = evidence.map((item) => item.normalizedClaim);
   const invalid =
     claims.length > EVIDENCE_LIMITS.claims ||
     claims.some((claim) => claim.length > EVIDENCE_LIMITS.claimCharacters) ||
     claims.reduce((total, claim) => total + claim.length, 0) >
       EVIDENCE_LIMITS.totalClaimCharacters ||
-    input.allowedEvidence.some((item) =>
+    evidence.some((item) =>
       item.assertions.some(
         (assertion) =>
           assertion.value.length > EVIDENCE_LIMITS.claimCharacters ||
@@ -540,6 +596,81 @@ function invalidEvidenceReason(
     ? Object.freeze({
         code: "INVALID_EVIDENCE_INPUT",
         detail: "allowed evidence exceeds composition limits",
+      })
+    : null;
+}
+
+function invalidContextReason(
+  input: ComposePromptInput
+): ComposeFailureReason | null {
+  const profile = input.profile?.facts;
+  const prospect = input.prospect;
+  const groundedFacts = [
+    prospect.hiringRole?.text,
+    prospect.sharedConnection?.text,
+    prospect.signalDetail?.text,
+    prospect.signalFact?.text,
+    input.drafting.dm2Fact?.fact,
+    input.drafting.dm2Fact?.detail,
+    input.drafting.dm3Fact?.fact,
+    input.drafting.dm3Fact?.detail,
+  ];
+  const listValues = [
+    ...(profile?.skills ?? []),
+    ...(profile?.exclusions ?? []),
+  ];
+  const contextValues = [
+    prospect.firstName,
+    prospect.company,
+    prospect.craft,
+    profile?.geography,
+    profile?.availability,
+    profile?.offer,
+    profile?.targetMarket,
+    ...listValues,
+    ...groundedFacts,
+  ];
+  const invalid =
+    exceeds(prospect.firstName, COMPOSITION_CONTEXT_LIMITS.firstNameCharacters) ||
+    exceeds(prospect.company, COMPOSITION_CONTEXT_LIMITS.companyCharacters) ||
+    exceeds(prospect.craft, COMPOSITION_CONTEXT_LIMITS.craftCharacters) ||
+    exceeds(
+      prospect.sharedConnection?.text,
+      COMPOSITION_CONTEXT_LIMITS.sharedConnectionCharacters
+    ) ||
+    exceeds(
+      profile?.geography,
+      COMPOSITION_CONTEXT_LIMITS.geographyCharacters
+    ) ||
+    exceeds(
+      profile?.availability,
+      COMPOSITION_CONTEXT_LIMITS.availabilityCharacters
+    ) ||
+    exceeds(profile?.offer, COMPOSITION_CONTEXT_LIMITS.offerCharacters) ||
+    exceeds(
+      profile?.targetMarket,
+      COMPOSITION_CONTEXT_LIMITS.targetMarketCharacters
+    ) ||
+    (profile !== undefined &&
+      (listExceeds(
+        profile.skills,
+        COMPOSITION_CONTEXT_LIMITS.listItems,
+        COMPOSITION_CONTEXT_LIMITS.listItemCharacters
+      ) ||
+        listExceeds(
+          profile.exclusions,
+          COMPOSITION_CONTEXT_LIMITS.listItems,
+          COMPOSITION_CONTEXT_LIMITS.listItemCharacters
+        ))) ||
+    groundedFacts.some((value) =>
+      exceeds(value, COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters)
+    ) ||
+    contextValues.reduce((total, value) => total + (value?.length ?? 0), 0) >
+      COMPOSITION_CONTEXT_LIMITS.combinedCharacters;
+  return invalid
+    ? Object.freeze({
+        code: "INVALID_CONTEXT_INPUT",
+        detail: "profile or prospect context exceeds composition limits",
       })
     : null;
 }
@@ -570,12 +701,10 @@ function sourceVersionsFor(
 }
 
 function plannedTemplate(
-  input: ComposePromptInput
+  input: ComposePromptInput,
+  drafting: SequenceDraftingContext
 ): MessageTemplate | ComposePromptResult {
-  const plan = planFrenchSequence({
-    ...input.drafting,
-    verifiedSharedConnection: input.prospect.sharedConnection?.text ?? null,
-  });
+  const plan = planFrenchSequence(drafting);
   if (plan.kind === "STOPPED") {
     return Object.freeze({
       kind: "STOPPED",
@@ -905,9 +1034,14 @@ function outputBudgetFor(maxCharacters: number): {
 export function composeGroundedPrompt(
   input: ComposePromptInput
 ): ComposePromptResult {
-  const planned = plannedTemplate(input);
-  if ("kind" in planned) {
-    return planned;
+  if (input.drafting.incomingReplyPresent) {
+    const stopped = plannedTemplate(
+      input,
+      normalizedDraftingSnapshot(input, null)
+    );
+    if ("kind" in stopped) {
+      return stopped;
+    }
   }
 
   const styleFailure = invalidStyleReason(input);
@@ -915,16 +1049,32 @@ export function composeGroundedPrompt(
     return failed(input, [styleFailure]);
   }
 
-  const evidenceFailure = invalidEvidenceReason(input);
+  const contextFailure = invalidContextReason(input);
+  if (contextFailure !== null) {
+    return failed(input, [contextFailure]);
+  }
+
+  const allowed = scopedEvidence(input);
+  const evidenceFailure = invalidEvidenceReason(allowed);
   if (evidenceFailure !== null) {
     return failed(input, [evidenceFailure]);
   }
 
-  const allowed = scopedEvidence(input);
   const evidenceById = new Map<string, Evidence>(
     allowed.map((item) => [item.evidenceId, item] as const)
   );
-  const values = variableValues(input, evidenceById);
+  const sharedConnection = validatedSharedConnection(input, evidenceById);
+  const drafting = normalizedDraftingSnapshot(input, sharedConnection);
+  const planned = plannedTemplate(input, drafting);
+  if ("kind" in planned) {
+    return planned;
+  }
+  const values = variableValues(
+    input,
+    drafting,
+    sharedConnection,
+    evidenceById
+  );
   const filled = selectFilledTemplate(
     input,
     planned,
@@ -946,7 +1096,11 @@ export function composeGroundedPrompt(
   }
 
   const resolvedStyle = resolveStyle(input);
-  const contextSnapshot = prospectContextSnapshot(input);
+  const contextSnapshot = prospectContextSnapshot(
+    input,
+    sharedConnection,
+    values
+  );
   const composedInput = buildComposedInput(
     input,
     resolvedStyle,
@@ -965,6 +1119,7 @@ export function composeGroundedPrompt(
       allowedEvidenceIds: Object.freeze(
         allowed.map((item) => item.evidenceId)
       ),
+      drafting,
       prospectContext: contextSnapshot,
       sourceVersions: sourceVersionsFor(input),
     }),
