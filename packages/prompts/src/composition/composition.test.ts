@@ -29,11 +29,14 @@ import type {
   VersionedExplicitStyleLayer,
 } from "./index";
 
+// These fixtures deliberately construct malformed and legacy boundary inputs
+// to verify that the composer rejects them without trusting TypeScript types.
+// oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion
 function compositionEvidence(input: unknown): Evidence {
   const parsed = parseEvidence(input);
-  const assertions = (input as { assertions?: unknown }).assertions;
+  const { assertions } = input as { assertions?: unknown };
   if (!Array.isArray(assertions)) {
-    throw new Error("composition evidence fixture requires assertions");
+    throw new TypeError("composition evidence fixture requires assertions");
   }
   return Object.freeze({
     ...parsed,
@@ -405,9 +408,7 @@ describe("composeGroundedPrompt", () => {
       const result = composeGroundedPrompt(
         composeInput({
           campaignOverride: campaignLayer({
-            stepOverrides: Object.freeze([
-              assertionOverride("DM1", item.text),
-            ]),
+            stepOverrides: Object.freeze([assertionOverride("DM1", item.text)]),
           }),
         })
       );
@@ -675,9 +676,7 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           allowedEvidence: [],
           campaignOverride: campaignLayer({
-            stepOverrides: [
-              legacyOverride as unknown as StyleStepOverride,
-            ],
+            stepOverrides: [legacyOverride as unknown as StyleStepOverride],
           }),
           drafting: noSignalDrafting,
         })

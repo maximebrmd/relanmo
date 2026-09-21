@@ -51,11 +51,7 @@ export type ComposeSendControls = typeof COMPOSE_SEND_CONTROLS;
 export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
 export type AddressForm = (typeof ADDRESS_FORMS)[number];
 
-export const STYLE_FORMALITY_LEVELS = [
-  "CASUAL",
-  "NEUTRAL",
-  "FORMAL",
-] as const;
+export const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
 export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
 
 export const EVIDENCE_ASSERTION_KINDS = [
@@ -72,8 +68,7 @@ export const EVIDENCE_ASSERTION_KINDS = [
   "SHARED_CONNECTION",
   "SPEAKING",
 ] as const;
-export type EvidenceAssertionKind =
-  (typeof EVIDENCE_ASSERTION_KINDS)[number];
+export type EvidenceAssertionKind = (typeof EVIDENCE_ASSERTION_KINDS)[number];
 
 export type EvidenceAssertion = Readonly<{
   detail: string | null;

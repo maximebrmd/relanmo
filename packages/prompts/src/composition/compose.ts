@@ -36,10 +36,7 @@ import type {
   StyleStepOverride,
   StyleFormality,
 } from "./types";
-import {
-  COMPOSE_SEND_CONTROLS,
-  EVIDENCE_ASSERTION_KINDS,
-} from "./types";
+import { COMPOSE_SEND_CONTROLS, EVIDENCE_ASSERTION_KINDS } from "./types";
 
 const DEFAULT_TONE = "CONCISE";
 const DEFAULT_FORMALITY: StyleFormality = "NEUTRAL";
@@ -555,10 +552,11 @@ function listExceeds(
   );
 }
 
-function overrideGroundingExceedsLimits(
-  override: StyleStepOverride
-): boolean {
-  const grounding = (override as { grounding?: unknown }).grounding;
+// Persisted legacy overrides predate the typed grounding contract, so this
+// compatibility boundary must inspect their runtime representation safely.
+// oxlint-disable anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion
+function overrideGroundingExceedsLimits(override: StyleStepOverride): boolean {
+  const { grounding } = override as { grounding?: unknown };
   if (
     typeof grounding !== "object" ||
     grounding === null ||
@@ -582,6 +580,7 @@ function overrideGroundingExceedsLimits(
     )
   );
 }
+// oxlint-enable anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion
 
 // oxlint-disable-next-line complexity -- Every persisted customer-controlled style field has an explicit bound.
 function invalidStyleReason(
@@ -925,11 +924,15 @@ function assertionMatches(
   );
 }
 
+// Persisted legacy overrides predate the typed grounding contract, so this
+// compatibility boundary validates their runtime shape before using it.
+// oxlint-disable anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion
+// oxlint-disable-next-line complexity -- Each legacy grounding field is validated before use.
 function overrideGroundingProvenance(
   override: StyleStepOverride,
   evidence: readonly Evidence[]
 ): CampaignOverrideGroundingProvenance | null {
-  const grounding = (override as { grounding?: unknown }).grounding;
+  const { grounding } = override as { grounding?: unknown };
   if (
     typeof grounding !== "object" ||
     grounding === null ||
@@ -984,6 +987,7 @@ function overrideGroundingProvenance(
     evidenceIds: Object.freeze(evidenceIds),
   });
 }
+// oxlint-enable anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion
 
 function selectFilledTemplate(
   input: ComposePromptInput,
@@ -999,10 +1003,7 @@ function selectFilledTemplate(
     campaignOverride === null
       ? null
       : overrideGroundingProvenance(campaignOverride, evidence);
-  if (
-    campaignOverride !== null &&
-    campaignOverrideGrounding !== null
-  ) {
+  if (campaignOverride !== null && campaignOverrideGrounding !== null) {
     const body = campaignOverride.text;
     const templateId = `campaign-step-override:${input.step}`;
     const filled = fillTemplate(body, values);
