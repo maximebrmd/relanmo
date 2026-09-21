@@ -402,6 +402,7 @@ export const writingInputFixture: WritingInput = Object.freeze({
       kind: "PROFILE",
       revision: 4,
     },
+    promptOverride: null,
   }),
   step: "DM1",
   tenantId: parseTenantId("tenant_demo"),

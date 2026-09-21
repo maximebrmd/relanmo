@@ -424,8 +424,9 @@ describe("style and prompt version persistence (live local Postgres)", () => {
               createdBy: parseUserId(USER_A),
               expectedCurrent: { expected: current.current },
               settings: { greeting: "Bonjour à tous", tone: "WARM" },
+              stepOverrides: [{ step: "DM2", text: "Relance personnalisée" }],
               tenantId,
-              versionId: parseExplicitStyleVersionId("style-override-1"),
+              versionId: parsePromptVersionId("prompt-override-1"),
             },
             tx
           )
@@ -439,10 +440,19 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         greeting: "Bonjour à tous",
         tone: "WARM",
       });
+      expect(override.value.override.stepOverrides).toEqual([
+        { step: "DM2", text: "Relance personnalisée" },
+      ]);
+      expect(override.value.current.promptOverride?.id).toBe(
+        "prompt-override-1"
+      );
 
       const afterOverride = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          styles.get({ tenantId }, tx)
+          styles.get(
+            { campaignId: parseCampaignId("campaign-a"), tenantId },
+            tx
+          )
         )
       );
       const reset = expectOk(
@@ -454,8 +464,9 @@ describe("style and prompt version persistence (live local Postgres)", () => {
               createdBy: parseUserId(USER_A),
               expectedCurrent: { expected: afterOverride.current },
               settings: {},
+              stepOverrides: [],
               tenantId,
-              versionId: parseExplicitStyleVersionId("style-override-reset"),
+              versionId: parsePromptVersionId("prompt-override-reset"),
             },
             tx
           )
@@ -466,6 +477,10 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         throw new Error("expected campaign override reset");
       }
       expect(reset.value.override.settings).toEqual({});
+      expect(reset.value.override.stepOverrides).toEqual([]);
+      expect(reset.value.current.promptOverride?.id).toBe(
+        "prompt-override-reset"
+      );
       const listed = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
           styles.get({ tenantId }, tx)
@@ -513,6 +528,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         explicitStyle: previousExplicit,
         model: parseModelVersion("claude-sonnet-test"),
         profile: null,
+        promptOverride: null,
       };
       await withClient(database.migrationUrl, async (client) => {
         await client.query(
@@ -655,6 +671,31 @@ describe("style and prompt version persistence (live local Postgres)", () => {
       };
       const workerClient = createDatabaseRuntimeClient(workerEnv);
       try {
+        const workerInference = expectOk(
+          await createPersistenceTransactionRunner(workerClient.db).run({
+            access: mintTrustedWorkerAccess(workerScope(TENANT_B)),
+            work: (tx) =>
+              styles.saveInferred(
+                {
+                  createdAt: CREATED_AT,
+                  model: parseModelVersion("worker-inference-test"),
+                  settings: {
+                    confidence: 0.7,
+                    formality: "NEUTRAL",
+                    tone: "CONCISE",
+                  },
+                  sourceEvidenceIds: [parseEvidenceId("worker-evidence-1")],
+                  tenantId: parseTenantId(TENANT_B),
+                  versionId: parseInferredStyleVersionId(
+                    "worker-inferred-first"
+                  ),
+                },
+                tx
+              ),
+          })
+        );
+        expect(workerInference.outcome).toBe("CREATED");
+
         const tenantId = parseTenantId(TENANT_A);
         const current = expectOk(
           await runAsMember(TENANT_A, USER_A, (tx) =>
@@ -682,6 +723,47 @@ describe("style and prompt version persistence (live local Postgres)", () => {
       } finally {
         await workerClient.close();
       }
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
+    "resets accepted customer style to code defaults with a revision guard",
+    async (ctx) => {
+      if (!database || !appClient) {
+        ctx.skip();
+        return;
+      }
+      const tenantId = parseTenantId(TENANT_A);
+      const before = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          styles.get({ tenantId }, tx)
+        )
+      );
+      expect(before.current.explicitStyle).not.toBeNull();
+      const reset = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          styles.resetToDefaults(
+            { expectedCurrent: { expected: before.current }, tenantId },
+            tx
+          )
+        )
+      );
+      expect(reset.outcome).toBe("UPDATED");
+      if (reset.outcome !== "UPDATED") {
+        throw new Error("expected style defaults to be restored");
+      }
+      expect(reset.value.current.explicitStyle).toBeNull();
+      expect(reset.value.current.acceptedInferredStyle).toBeNull();
+      const stale = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          styles.resetToDefaults(
+            { expectedCurrent: { expected: before.current }, tenantId },
+            tx
+          )
+        )
+      );
+      expect(stale.outcome).toBe("REVISION_CONFLICT");
     },
     TEST_TIMEOUT_MS
   );

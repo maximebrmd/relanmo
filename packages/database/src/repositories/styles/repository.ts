@@ -9,6 +9,7 @@ import {
   parseInferredStyleVersionId,
   parseModelVersion,
   parseProfileVersionId,
+  parsePromptVersionId,
   parseTenantId,
   parseUserId,
   parseUtcTimestamp,
@@ -32,6 +33,8 @@ import type {
   PersistenceFailure,
   PersistenceResult,
   PersistenceTransaction,
+  ResetStyleToDefaultsInput,
+  ResetStyleToDefaultsResult,
   RevisionConflict,
   SaveExplicitStyleInput,
   SaveExplicitStyleResult,
@@ -65,6 +68,7 @@ const EMPTY_CURRENT_VERSION_SET: CurrentVersionSet = Object.freeze({
   explicitStyle: null,
   model: null,
   profile: null,
+  promptOverride: null,
 });
 
 const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
@@ -146,6 +150,7 @@ function currentVersionSetsEqual(
     versionRefEqual(left.campaign, right.campaign) &&
     versionRefEqual(left.defaultPrompt, right.defaultPrompt) &&
     versionRefEqual(left.profile, right.profile) &&
+    versionRefEqual(left.promptOverride, right.promptOverride) &&
     left.model === right.model
   );
 }
@@ -296,11 +301,12 @@ function toOverrideRecord(
     createdAt: toInstant(version.createdAt),
     createdBy: parseUserId(version.createdBy),
     settings: version.settings,
+    stepOverrides: version.stepOverrides,
     tenantId: parseTenantId(override.tenantId),
     version: {
       createdAt: toInstant(version.createdAt),
-      id: parseExplicitStyleVersionId(version.id),
-      kind: "STYLE_EXPLICIT",
+      id: parsePromptVersionId(version.id),
+      kind: "PROMPT_OVERRIDE",
       revision: version.revision,
     },
   };
@@ -439,6 +445,7 @@ async function assembleCurrent(
       explicitStyle: explicit,
       model,
       profile: await loadProfileVersion(db, profile.tenantId),
+      promptOverride: null,
     },
   };
 }
@@ -534,7 +541,8 @@ async function ensurePromptOverride(
 async function loadStyleState(
   db: TransactionExecutor,
   tenantId: string,
-  profile: StyleProfileRow | null
+  profile: StyleProfileRow | null,
+  campaignId?: string
 ): Promise<PersistenceResult<GetStyleResult>> {
   const versions = profile
     ? await loadVersionRows(db, profile.id, tenantId)
@@ -543,6 +551,9 @@ async function loadStyleState(
   if (!current.ok) {
     return current;
   }
+  const overrides = await loadOverrides(db, tenantId);
+  const promptOverride =
+    overrides.find((item) => item.campaignId === campaignId)?.version ?? null;
   let explicit: ExplicitStyleVersionRecord | null = null;
   let acceptedInferred: InferredStyleVersionRecord | null = null;
   if (profile?.explicitVersionId) {
@@ -571,9 +582,9 @@ async function loadStyleState(
     ok: true,
     value: {
       acceptedInferred,
-      current: current.value,
+      current: { ...current.value, promptOverride },
       explicit,
-      overrides: await loadOverrides(db, tenantId),
+      overrides,
     },
   };
 }
@@ -632,7 +643,7 @@ async function getStyle(
         .from(styleProfiles)
         .where(eq(styleProfiles.tenantId, input.tenantId))
     )) ?? null;
-  return loadStyleState(db, input.tenantId, profile);
+  return loadStyleState(db, input.tenantId, profile, input.campaignId);
 }
 
 async function saveExplicit(
@@ -804,6 +815,62 @@ async function saveInferred(
   return { ok: true, value: { outcome: "CREATED", style: record.value } };
 }
 
+async function resetToDefaults(
+  input: ResetStyleToDefaultsInput,
+  tx: PersistenceTransaction
+): Promise<PersistenceResult<ResetStyleToDefaultsResult>> {
+  const scoped = requireTenantScope(tx, input.tenantId);
+  if (scoped) {
+    return scoped;
+  }
+  const db = resolveTransactionExecutor(tx);
+  const profile = await ensureStyleProfile(db, input.tenantId);
+  const versions = await loadVersionRows(db, profile.id, input.tenantId);
+  const current = await assembleCurrent(db, profile, versions);
+  if (!current.ok) {
+    return current;
+  }
+  if (!currentVersionSetsEqual(current.value, input.expectedCurrent.expected)) {
+    return {
+      ok: true,
+      value: revisionConflict(current.value, input.expectedCurrent.expected),
+    };
+  }
+  const updated = await takeFirst(
+    db
+      .update(styleProfiles)
+      .set({
+        acceptedInferredVersionId: null,
+        explicitVersionId: null,
+        revision: profile.revision + 1,
+        source: "DEFAULT",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(styleProfiles.id, profile.id),
+          eq(styleProfiles.tenantId, input.tenantId)
+        )
+      )
+      .returning()
+  );
+  if (!updated) {
+    return failure("INTEGRITY", "style profile was not reset");
+  }
+  await lockReadyDrafts(db, input.tenantId);
+  const snapshot = await loadStyleState(db, input.tenantId, updated);
+  if (!snapshot.ok) {
+    return snapshot;
+  }
+  return {
+    ok: true,
+    value: {
+      outcome: "UPDATED",
+      value: { current: snapshot.value.current },
+    },
+  };
+}
+
 async function acceptInferred(
   input: AcceptInferredStyleInput,
   tx: PersistenceTransaction
@@ -909,10 +976,22 @@ async function saveOverride(
   if (!current.ok) {
     return current;
   }
-  if (!currentVersionSetsEqual(current.value, input.expectedCurrent.expected)) {
+  const activeOverride = (await loadOverrides(db, input.tenantId)).find(
+    (item) => item.campaignId === input.campaignId
+  );
+  const contextualCurrent: CurrentVersionSet = {
+    ...current.value,
+    promptOverride: activeOverride?.version ?? null,
+  };
+  if (
+    !currentVersionSetsEqual(contextualCurrent, input.expectedCurrent.expected)
+  ) {
     return {
       ok: true,
-      value: revisionConflict(current.value, input.expectedCurrent.expected),
+      value: revisionConflict(
+        contextualCurrent,
+        input.expectedCurrent.expected
+      ),
     };
   }
   const override = await ensurePromptOverride(
@@ -929,7 +1008,7 @@ async function saveOverride(
     promptOverrideId: override.id,
     revision: nextRevision,
     settings,
-    stepOverrides: [],
+    stepOverrides: [...input.stepOverrides],
     tenantId: input.tenantId,
   });
   const updatedOverride = await takeFirst(
@@ -951,19 +1030,6 @@ async function saveOverride(
   if (!updatedOverride) {
     return failure("INTEGRITY", "prompt override was not updated");
   }
-  const nextStyleRevision = profile.revision + 1;
-  await db
-    .update(styleProfiles)
-    .set({
-      revision: nextStyleRevision,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(styleProfiles.id, profile.id),
-        eq(styleProfiles.tenantId, input.tenantId)
-      )
-    );
   await lockReadyDrafts(db, input.tenantId);
   const version = await takeFirst(
     db
@@ -979,10 +1045,12 @@ async function saveOverride(
   if (!version) {
     return failure("INTEGRITY", "prompt override version was not readable");
   }
-  const snapshot = await loadStyleState(db, input.tenantId, {
-    ...profile,
-    revision: nextStyleRevision,
-  });
+  const snapshot = await loadStyleState(
+    db,
+    input.tenantId,
+    profile,
+    input.campaignId
+  );
   if (!snapshot.ok) {
     return snapshot;
   }
@@ -1002,6 +1070,7 @@ export function createStyleRepository(): StyleRepository {
   return {
     acceptInferred,
     get: getStyle,
+    resetToDefaults,
     saveExplicit,
     saveInferred,
     saveOverride,

@@ -5,9 +5,11 @@ import type {
   ExplicitStyleVersionId,
   InferredStyleVersionId,
   ModelVersion,
+  PromptVersionId,
   TenantId,
   UserId,
 } from "../../contracts/ids";
+import type { StyleStepOverride } from "../../contracts/product/style";
 import type {
   BusinessWindowConfiguration,
   SequenceStep,
@@ -18,6 +20,7 @@ import type {
   CurrentVersionSet,
   ExplicitStyleVersionRef,
   InferredStyleVersionRef,
+  PromptOverrideVersionRef,
 } from "../../contracts/versions";
 import type {
   CurrentVersionGuard,
@@ -205,7 +208,7 @@ export type ExplicitStyleVersionRecord = Readonly<{
   createdBy: UserId;
   settings: ExplicitStyleSettings;
   tenantId: TenantId;
-  version: ExplicitStyleVersionRef;
+  version: PromptOverrideVersionRef;
 }>;
 
 export type InferredStyleVersionRecord = Readonly<{
@@ -218,6 +221,7 @@ export type InferredStyleVersionRecord = Readonly<{
 }>;
 
 export type GetStyleInput = Readonly<{
+  campaignId?: CampaignId;
   tenantId: TenantId;
 }>;
 
@@ -242,6 +246,7 @@ export type StyleOverrideVersionRecord = Readonly<{
   createdAt: UtcTimestamp;
   createdBy: UserId;
   settings: StyleOverrideSettings;
+  stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
   version: ExplicitStyleVersionRef;
 }>;
@@ -252,7 +257,7 @@ export type SaveExplicitStyleInput = Readonly<{
   expectedCurrent: CurrentVersionGuard;
   settings: ExplicitStyleSettings;
   tenantId: TenantId;
-  versionId: ExplicitStyleVersionId;
+  versionId: PromptVersionId;
 }>;
 
 export type SaveExplicitStyleValue = Readonly<{
@@ -269,9 +274,19 @@ export type SaveStyleOverrideInput = Readonly<{
   createdBy: UserId;
   expectedCurrent: CurrentVersionGuard;
   settings: StyleOverrideSettings;
+  stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
   versionId: ExplicitStyleVersionId;
 }>;
+
+export type ResetStyleToDefaultsInput = Readonly<{
+  expectedCurrent: CurrentVersionGuard;
+  tenantId: TenantId;
+}>;
+
+export type ResetStyleToDefaultsResult = RevisionMutationResult<
+  Readonly<{ current: CurrentVersionSet }>
+>;
 
 export type SaveStyleOverrideResult = RevisionMutationResult<
   Readonly<{
@@ -322,6 +337,10 @@ export interface StyleRepository {
     input: GetStyleInput,
     tx: PersistenceTransaction
   ) => Promise<PersistenceResult<GetStyleResult>>;
+  resetToDefaults: (
+    input: ResetStyleToDefaultsInput,
+    tx: PersistenceTransaction
+  ) => Promise<PersistenceResult<ResetStyleToDefaultsResult>>;
   saveExplicit: (
     input: SaveExplicitStyleInput,
     tx: PersistenceTransaction

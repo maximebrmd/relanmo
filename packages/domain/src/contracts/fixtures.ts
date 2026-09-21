@@ -45,6 +45,7 @@ const SOURCE_VERSIONS = {
     kind: "PROFILE",
     revision: 4,
   },
+  promptOverride: null,
 } as const;
 
 export const attachmentOnlyInboundMessageFixture: Message = parseMessage({

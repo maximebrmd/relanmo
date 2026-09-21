@@ -218,6 +218,13 @@ function parseVersionRef(value: unknown, path: string): VersionRef {
         kind,
       });
     }
+    case "PROMPT_OVERRIDE": {
+      return Object.freeze({
+        ...common,
+        id: parsePromptVersionId(readRequired(record, "id")),
+        kind,
+      });
+    }
     default: {
       throw new ContractValidationError(`${path}.kind is unsupported`);
     }
@@ -266,6 +273,9 @@ export function parseDraftSourceVersions(value: unknown): DraftSourceVersions {
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "sourceVersions.profile", "PROFILE")
     ),
+    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
+      versionOfKind(input, "sourceVersions.promptOverride", "PROMPT_OVERRIDE")
+    ),
   });
 }
 
@@ -293,6 +303,9 @@ export function parseCurrentVersionSet(value: unknown): CurrentVersionSet {
     model: nullable(readRequired(record, "model"), parseModelVersionId),
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "currentVersions.profile", "PROFILE")
+    ),
+    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
+      versionOfKind(input, "currentVersions.promptOverride", "PROMPT_OVERRIDE")
     ),
   });
 }
