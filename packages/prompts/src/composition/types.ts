@@ -1,9 +1,9 @@
 import type {
   CampaignId,
   CampaignVersionRef,
+  DirectMessageStep,
   DraftSourceVersions,
   Evidence,
-  EvidenceAssertionKind,
   EvidenceId,
   ExplicitStyleVersionRef,
   InferredStyleVersionRef,
@@ -13,12 +13,8 @@ import type {
   PromptOverrideVersionRef,
   SequenceStep,
   TenantId,
+  UtcTimestamp,
 } from "@relanmo/domain/contracts";
-import type {
-  AddressForm,
-  StyleFormality,
-  StyleStepOverride as PersistedStyleStepOverride,
-} from "@relanmo/domain/contracts/product";
 import type {
   ExplicitStyleSettings,
   StyleOverrideSettings,
@@ -53,15 +49,81 @@ export const COMPOSE_SEND_CONTROLS = Object.freeze({
 });
 export type ComposeSendControls = typeof COMPOSE_SEND_CONTROLS;
 
-export type StyleStepOverride = PersistedStyleStepOverride;
+export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
+export type AddressForm = (typeof ADDRESS_FORMS)[number];
+
+export const STYLE_FORMALITY_LEVELS = [
+  "CASUAL",
+  "NEUTRAL",
+  "FORMAL",
+] as const;
+export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
+
+export const EVIDENCE_ASSERTION_KINDS = [
+  "FUNDING",
+  "HIRING_ROLE",
+  "INBOUND_COMMENT",
+  "INBOUND_LIKE",
+  "MIGRATION",
+  "OFFER",
+  "PRODUCT",
+  "PROSPECT_POST",
+  "RELEASE",
+  "ROLE_CHANGE",
+  "SHARED_CONNECTION",
+  "SPEAKING",
+] as const;
+export type EvidenceAssertionKind =
+  (typeof EVIDENCE_ASSERTION_KINDS)[number];
+
+export type EvidenceAssertion = Readonly<{
+  detail: string | null;
+  kind: EvidenceAssertionKind;
+  value: string;
+}>;
+
+export type CompositionEvidence = Readonly<
+  Evidence & {
+    assertions: readonly EvidenceAssertion[];
+  }
+>;
+
+export type StyleOverrideCertification = Readonly<{
+  authority: "APPLICATION_POLICY";
+  certifiedAt: UtcTimestamp;
+  certifiedText: string;
+  certificationId: string;
+  step: DirectMessageStep;
+}>;
+
+export type StyleStepOverride = Readonly<{
+  grounding:
+    | Readonly<{
+        certification: StyleOverrideCertification;
+        kind: "CERTIFIED_NEUTRAL";
+      }>
+    | Readonly<{
+        assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
+        certification: StyleOverrideCertification;
+        kind: "ASSERTIONS";
+      }>;
+  step: DirectMessageStep;
+  text: string;
+}>;
 
 export type CampaignStyleOverride = Readonly<
   StyleOverrideSettings & {
+    addressForm?: AddressForm;
     stepOverrides?: readonly StyleStepOverride[];
   }
 >;
 
-export type ExplicitStyleLayer = ExplicitStyleSettings;
+export type ExplicitStyleLayer = Readonly<
+  ExplicitStyleSettings & {
+    addressForm: AddressForm;
+    formality: StyleFormality;
+  }
+>;
 
 export type InferredStyleLayer = Readonly<{
   formality: StyleFormality | null;
@@ -155,7 +217,7 @@ export type CompositionProvenance = Readonly<{
 
 export type ComposePromptInput = Readonly<{
   acceptedInferredStyle: VersionedAcceptedInferredStyleLayer | null;
-  allowedEvidence: readonly Evidence[];
+  allowedEvidence: readonly CompositionEvidence[];
   campaignId: CampaignId;
   campaignOverride: VersionedCampaignStyleOverride | null;
   drafting: SequenceDraftingContext;

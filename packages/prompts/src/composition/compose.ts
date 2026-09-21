@@ -1,15 +1,7 @@
 import type {
   DraftSourceVersions,
-  Evidence,
-  EvidenceAssertion,
-  EvidenceAssertionKind,
   SequenceStep,
 } from "@relanmo/domain/contracts";
-import {
-  COMPOSITION_CONTEXT_LIMITS,
-  EVIDENCE_ASSERTION_KINDS,
-} from "@relanmo/domain/contracts";
-import type { StyleFormality } from "@relanmo/domain/contracts/product";
 
 import {
   ALLOWED_TEMPLATE_VARIABLES,
@@ -27,11 +19,14 @@ import type {
 import type {
   CampaignStyleOverride,
   CampaignOverrideGroundingProvenance,
+  CompositionEvidence as Evidence,
   ComposeFailureReason,
   ComposePromptInput,
   ComposePromptResult,
   ComposedPrompt,
   CompositionHook,
+  EvidenceAssertion,
+  EvidenceAssertionKind,
   ExplicitStyleLayer,
   GroundedFact,
   InferredStyleLayer,
@@ -39,8 +34,12 @@ import type {
   ResolvedStyle,
   ResolvedStyleField,
   StyleStepOverride,
+  StyleFormality,
 } from "./types";
-import { COMPOSE_SEND_CONTROLS } from "./types";
+import {
+  COMPOSE_SEND_CONTROLS,
+  EVIDENCE_ASSERTION_KINDS,
+} from "./types";
 
 const DEFAULT_TONE = "CONCISE";
 const DEFAULT_FORMALITY: StyleFormality = "NEUTRAL";
@@ -60,6 +59,20 @@ const EVIDENCE_LIMITS = Object.freeze({
   claims: 20,
   claimCharacters: 1000,
   totalClaimCharacters: 12_000,
+});
+const COMPOSITION_CONTEXT_LIMITS = Object.freeze({
+  availabilityCharacters: 500,
+  combinedCharacters: 5000,
+  companyCharacters: 200,
+  craftCharacters: 200,
+  firstNameCharacters: 100,
+  geographyCharacters: 200,
+  groundedFactCharacters: 1000,
+  listItemCharacters: 100,
+  listItems: 20,
+  offerCharacters: 500,
+  sharedConnectionCharacters: 200,
+  targetMarketCharacters: 500,
 });
 
 function optionalText(value: string | null | undefined): string | null {
@@ -321,6 +334,15 @@ function fillTemplate(
   }
 
   PLACEHOLDER_PATTERN.lastIndex = 0;
+  const templateWithoutPlaceholders = body.replaceAll(PLACEHOLDER_PATTERN, "");
+  if (/[{}]/u.test(templateWithoutPlaceholders)) {
+    return Object.freeze({
+      kind: "UNSUPPORTED",
+      names: Object.freeze(["unmatched_brace"]),
+    });
+  }
+
+  PLACEHOLDER_PATTERN.lastIndex = 0;
   const filled = body.replaceAll(
     PLACEHOLDER_PATTERN,
     (_match, name: string) => {
@@ -330,12 +352,6 @@ function fillTemplate(
       return values[name] ?? "";
     }
   );
-  if (/[{}]/u.test(filled)) {
-    return Object.freeze({
-      kind: "UNSUPPORTED",
-      names: Object.freeze(["unmatched_brace"]),
-    });
-  }
   return Object.freeze({ kind: "FILLED", text: filled });
 }
 

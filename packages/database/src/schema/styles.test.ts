@@ -78,7 +78,6 @@ describe("styles schema fragment", () => {
       "tenant_id",
       "kind",
       "revision",
-      "address_form",
       "tone",
       "formality",
       "greeting",
@@ -102,7 +101,6 @@ describe("styles schema fragment", () => {
 
   it("stores the version revision and leaves kind-specific settings nullable until written", () => {
     expect(styleProfileVersions.revision.notNull).toBe(true);
-    expect(styleProfileVersions.addressForm.notNull).toBe(false);
     expect(styleProfileVersions.tone.notNull).toBe(false);
     expect(styleProfileVersions.formality.notNull).toBe(false);
     expect(styleProfileVersions.greeting.notNull).toBe(false);

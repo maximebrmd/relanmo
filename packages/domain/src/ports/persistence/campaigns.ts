@@ -5,15 +5,11 @@ import type {
   ExplicitStyleVersionId,
   InferredStyleVersionId,
   ModelVersion,
-  PromptOverrideVersionId,
+  PromptVersionId,
   TenantId,
   UserId,
 } from "../../contracts/ids";
-import type {
-  AddressForm,
-  StyleFormality,
-  StyleStepOverride,
-} from "../../contracts/product/style";
+import type { StyleStepOverride } from "../../contracts/product/style";
 import type {
   BusinessWindowConfiguration,
   SequenceStep,
@@ -192,11 +188,10 @@ export interface CampaignRepository {
 }
 
 export type ExplicitStyleSettings = Readonly<{
-  addressForm: AddressForm;
   closing: string | null;
   examples: readonly string[];
   forbiddenPhrases: readonly string[];
-  formality: StyleFormality;
+  formality: "CASUAL" | "NEUTRAL" | "FORMAL";
   greeting: string | null;
   instructions: string | null;
   maxCharacters: number | null;
@@ -205,7 +200,7 @@ export type ExplicitStyleSettings = Readonly<{
 
 export type InferredStyleSettings = Readonly<{
   confidence: number | null;
-  formality: StyleFormality | null;
+  formality: "CASUAL" | "NEUTRAL" | "FORMAL" | null;
   tone: string | null;
 }>;
 
@@ -242,12 +237,7 @@ export type StyleOverrideSettings = Readonly<
   Partial<
     Pick<
       ExplicitStyleSettings,
-      | "addressForm"
-      | "closing"
-      | "forbiddenPhrases"
-      | "greeting"
-      | "maxCharacters"
-      | "tone"
+      "closing" | "forbiddenPhrases" | "greeting" | "maxCharacters" | "tone"
     >
   >
 >;
@@ -287,7 +277,7 @@ export type SaveStyleOverrideInput = Readonly<{
   settings: StyleOverrideSettings;
   stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
-  versionId: PromptOverrideVersionId;
+  versionId: PromptVersionId;
 }>;
 
 export type ResetStyleToDefaultsInput = Readonly<{

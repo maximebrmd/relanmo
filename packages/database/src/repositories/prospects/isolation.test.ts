@@ -86,7 +86,6 @@ describe("prospect persistence tenant isolation", () => {
             {
               evidence: {
                 accountId: ACCOUNT_B,
-                assertions: [],
                 capturedAt: observedAt,
                 contentHash: null,
                 evidenceId: evidenceB,

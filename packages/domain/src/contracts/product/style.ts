@@ -1,4 +1,3 @@
-import type { EvidenceAssertion } from "../evidence";
 import type {
   CampaignId,
   EvidenceId,
@@ -23,47 +22,15 @@ export const STYLE_SOURCES = [
 ] as const;
 export type StyleSource = (typeof STYLE_SOURCES)[number];
 
-export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
-export type AddressForm = (typeof ADDRESS_FORMS)[number];
-
-export const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
-export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
-
-export type StyleOverrideCertification = Readonly<{
-  authority: "APPLICATION_POLICY";
-  certifiedAt: UtcTimestamp;
-  certifiedText: string;
-  certificationId: string;
-  step: DirectMessageStep;
-}>;
-
-export type StyleStepOverrideGrounding =
-  | Readonly<{
-      certification: StyleOverrideCertification;
-      kind: "CERTIFIED_NEUTRAL";
-    }>
-  | Readonly<{
-      assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
-      certification: StyleOverrideCertification;
-      kind: "ASSERTIONS";
-    }>;
-
 export type StyleStepOverride = Readonly<{
-  grounding: StyleStepOverrideGrounding;
-  step: DirectMessageStep;
-  text: string;
-}>;
-
-export type StyleStepOverrideInput = Readonly<{
   step: DirectMessageStep;
   text: string;
 }>;
 
 export type StyleInput = Readonly<{
-  addressForm: AddressForm;
   examples: readonly string[];
   instructions: string | null;
-  stepOverrides: readonly StyleStepOverrideInput[];
+  stepOverrides: readonly StyleStepOverride[];
   tone: FrenchTone;
 }>;
 

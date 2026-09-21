@@ -175,7 +175,6 @@ function toProspectRecord(
 function toEvidence(row: EvidenceRow): Evidence {
   return {
     accountId: row.accountId === null ? null : parseAccountId(row.accountId),
-    assertions: row.assertions,
     capturedAt: utcFromColumn(row.capturedAt),
     contentHash: row.contentHash,
     evidenceId: parseEvidenceId(row.id),
@@ -730,7 +729,6 @@ const evidenceRepository: EvidenceRepository = {
         .insert(evidenceTable)
         .values({
           accountId: evidence.accountId,
-          assertions: evidence.assertions,
           capturedAt: asDate(evidence.capturedAt),
           contentHash: evidence.contentHash,
           id: evidence.evidenceId,

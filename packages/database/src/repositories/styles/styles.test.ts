@@ -14,7 +14,6 @@ import {
   parseExplicitStyleVersionId,
   parseInferredStyleVersionId,
   parseModelVersion,
-  parsePromptOverrideVersionId,
   parsePromptVersionId,
   parseTenantId,
   parseUserId,
@@ -57,7 +56,6 @@ const TEST_TIMEOUT_MS = 30_000;
 const CREATED_AT = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 
 const EXPLICIT_SETTINGS: ExplicitStyleSettings = {
-  addressForm: "VOUS",
   closing: "Cordialement",
   examples: ["Bonjour, je vous contacte au sujet de votre recrutement."],
   forbiddenPhrases: ["j'espère que vous allez bien"],
@@ -277,7 +275,6 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         throw new Error("expected explicit style to be created");
       }
       expect(saved.value.style.settings).toMatchObject({
-        addressForm: "VOUS",
         closing: "Cordialement",
         formality: "FORMAL",
         greeting: "Bonjour",
@@ -444,24 +441,9 @@ describe("style and prompt version persistence (live local Postgres)", () => {
               createdBy: parseUserId(USER_A),
               expectedCurrent: { expected: current.current },
               settings: { greeting: "Bonjour à tous", tone: "WARM" },
-              stepOverrides: [
-                {
-                  grounding: {
-                    certification: {
-                      authority: "APPLICATION_POLICY",
-                      certifiedAt: CREATED_AT,
-                      certifiedText: "Relance personnalisée",
-                      certificationId: "certification-override-1",
-                      step: "DM2",
-                    },
-                    kind: "CERTIFIED_NEUTRAL",
-                  },
-                  step: "DM2",
-                  text: "Relance personnalisée",
-                },
-              ],
+              stepOverrides: [{ step: "DM2", text: "Relance personnalisée" }],
               tenantId,
-              versionId: parsePromptOverrideVersionId("prompt-override-1"),
+              versionId: parsePromptVersionId("prompt-override-1"),
             },
             tx
           )
@@ -476,20 +458,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         tone: "WARM",
       });
       expect(override.value.override.stepOverrides).toEqual([
-        {
-          grounding: {
-            certification: {
-              authority: "APPLICATION_POLICY",
-              certifiedAt: CREATED_AT,
-              certifiedText: "Relance personnalisée",
-              certificationId: "certification-override-1",
-              step: "DM2",
-            },
-            kind: "CERTIFIED_NEUTRAL",
-          },
-          step: "DM2",
-          text: "Relance personnalisée",
-        },
+        { step: "DM2", text: "Relance personnalisée" },
       ]);
       expect(override.value.current.promptOverride?.id).toBe(
         "prompt-override-1"
@@ -514,9 +483,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
               settings: {},
               stepOverrides: [],
               tenantId,
-              versionId: parsePromptOverrideVersionId(
-                "prompt-override-reset"
-              ),
+              versionId: parsePromptVersionId("prompt-override-reset"),
             },
             tx
           )

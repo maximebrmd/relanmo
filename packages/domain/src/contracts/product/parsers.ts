@@ -1,7 +1,6 @@
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type -- Product parsers are the explicit untrusted UI/transport boundary. */
 
 import { ACTION_UNKNOWN_REASONS } from "../action";
-import { COMPOSITION_CONTEXT_LIMITS } from "../composition";
 import { ELIGIBILITY_REASON_CODES } from "../eligibility";
 import type { TenantId } from "../ids";
 import {
@@ -130,12 +129,12 @@ import type {
   ProfileInput,
   ProfileView,
 } from "./profile";
-import { ADDRESS_FORMS, STYLE_COMMAND_KINDS, STYLE_SOURCES } from "./style";
+import { STYLE_COMMAND_KINDS, STYLE_SOURCES } from "./style";
 import type {
   DraftPreviewView,
   StyleCommand,
   StyleInput,
-  StyleStepOverrideInput,
+  StyleStepOverride,
   StyleView,
 } from "./style";
 import { TIMELINE_AUTOMATION_STATES } from "./timeline";
@@ -224,7 +223,7 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     availability: parseNullableProductText(
       readRequired(record, "availability"),
       `${path}.availability`,
-      COMPOSITION_CONTEXT_LIMITS.availabilityCharacters
+      500
     ),
     dayRateCents: nullable(readRequired(record, "dayRateCents"), (input) =>
       expectInteger(input, `${path}.dayRateCents`, 0, 10_000_000)
@@ -232,18 +231,18 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     exclusions: parseProductStringList(
       readRequired(record, "exclusions"),
       `${path}.exclusions`,
-      COMPOSITION_CONTEXT_LIMITS.listItems,
-      COMPOSITION_CONTEXT_LIMITS.listItemCharacters
+      20,
+      240
     ),
     geography: parseNullableProductText(
       readRequired(record, "geography"),
       `${path}.geography`,
-      COMPOSITION_CONTEXT_LIMITS.geographyCharacters
+      500
     ),
     offer: parseProductText(
       readRequired(record, "offer"),
       `${path}.offer`,
-      COMPOSITION_CONTEXT_LIMITS.offerCharacters
+      1000
     ),
     preferredTone: member(
       readRequired(record, "preferredTone"),
@@ -253,13 +252,13 @@ function parseProfileInputAt(value: unknown, path: string): ProfileInput {
     skills: parseProductStringList(
       readRequired(record, "skills"),
       `${path}.skills`,
-      COMPOSITION_CONTEXT_LIMITS.listItems,
-      COMPOSITION_CONTEXT_LIMITS.listItemCharacters
+      30,
+      160
     ),
     targetMarket: parseNullableProductText(
       readRequired(record, "targetMarket"),
       `${path}.targetMarket`,
-      COMPOSITION_CONTEXT_LIMITS.targetMarketCharacters
+      500
     ),
     writingSamples: parseProductStringList(
       readRequired(record, "writingSamples"),
@@ -977,7 +976,7 @@ function parseStyleStepOverride(
   value: unknown,
   path: string,
   seen: Set<string>
-): StyleStepOverrideInput {
+): StyleStepOverride {
   const record = expectRecord(value, path);
   const step = member(
     readRequired(record, "step"),
@@ -998,11 +997,6 @@ function parseStyleInputAt(value: unknown, path: string): StyleInput {
   const record = expectRecord(value, path);
   const seen = new Set<string>();
   return Object.freeze({
-    addressForm: member(
-      readRequired(record, "addressForm"),
-      ADDRESS_FORMS,
-      `${path}.addressForm`
-    ),
     examples: parseProductStringList(
       readRequired(record, "examples"),
       `${path}.examples`,

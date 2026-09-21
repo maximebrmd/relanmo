@@ -10,11 +10,11 @@ Owner: P003. Location: `packages/domain/src/contracts/`. IDs must distinguish te
 | --- | --- |
 | Ownership | `BOT_ELIGIBLE` or `HUMAN_OWNED`, plus reason and recorded time. Account/prospect ownership survives campaign changes. Suppression is a separate durable exclusion. |
 | Action | Immutable logical ID for tenant + account + prospect + campaign/version + step; exact payload and source versions. State is `READY`, `IN_FLIGHT`, `CONFIRMED`, `FAILED` or `UNKNOWN`. A campaign edit must not make a completed step eligible again under a new version. |
-| Versions | Profile, campaign, explicit style, accepted inferred style, prompt-override, default-prompt and model versions. Draft persistence and final send authorization compare relevant current versions. |
+| Versions | Profile, campaign, explicit style, accepted inferred style, default-prompt, campaign prompt-override and model versions. Draft persistence and final send authorization compare relevant current versions. |
 | Message | Provider message ID when present; account/prospect/conversation identity; direction; occurrence and receipt times; optional text; attachments; provider source. Empty text with an attachment is still a message. |
 | Eligibility | A pure result with allowed/hold/deny and stable reasons. It consumes an authoritative snapshot; it does not read a database or call a model. |
 | Due plan | Step, intended target, earliest allowed time and closure time. Delays preserve minimum gaps and permitted windows. |
-| Evidence | Source identifier/URL, captured time, bounded normalized claim, typed factual assertions and provenance. No unsupported claim becomes evidence just because a model returns it. |
+| Evidence | Source identifier/URL, captured time, normalized factual claim and provenance. No unsupported claim becomes evidence just because a model returns it. |
 
 The sequence invitation has no note. DM1 follows acceptance; follow-up targets are DM1 +2/+5/+9/+14 days. Minimum consecutive gaps are 2/3/4/5 days respectively, measured from the actual prior send; target scheduling uses the later constraint and moves into the next permitted window. Final closure is no earlier than DM1 +21 days and seven days after an actually delayed DM5. Clarify any imported legacy custom cadence instead of silently resetting it.
 
@@ -29,7 +29,7 @@ Owner: P004. Location: `packages/domain/src/ports/providers/`. Use typed inputs/
 | LinkedIn delivery | Invite, inspect acceptance, send message and read recent conversation activity. Success returns provider evidence; definitive refusal and uncertain outcome are distinct. Disable blind SDK retries on writes. |
 | Provider events | Authenticate by the supported mechanism, validate, normalize and derive scoped dedupe identity. Do not invent an HMAC header if the provider does not supply one. |
 | TypeSafe decisions | Bounded inputs/questions/choices, validated answer/evidence IDs, uncertainty, model/version and billed usage. No send permission in the result. |
-| Writing | Composed input, allowed evidence, source versions, normalized drafting/prospect provenance and output budget → text plus usage/error. |
+| Writing | Composed input, allowed evidence, model/prompt/style versions and output budget → text plus usage/error. |
 | Billing | Checkout/Portal creation, current subscription reads and raw-body signature verification. Use Stripe-supported idempotency where applicable. |
 | Email | Semantic notification/auth template, recipient and stable delivery identity; retries respect available provider semantics. |
 | Objects | Authorized key, bounded content/metadata and expiry → private object result or presigned operation. Server chooses tenant prefix. |

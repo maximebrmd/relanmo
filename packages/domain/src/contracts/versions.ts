@@ -4,7 +4,6 @@ import type {
   InferredStyleVersionId,
   ModelVersion,
   ProfileVersionId,
-  PromptOverrideVersionId,
   PromptVersionId,
 } from "./ids";
 import type { UtcTimestamp } from "./values";
@@ -14,8 +13,8 @@ export const VERSION_KINDS = [
   "CAMPAIGN",
   "STYLE_EXPLICIT",
   "STYLE_INFERRED",
-  "PROMPT_OVERRIDE",
   "PROMPT_DEFAULT",
+  "PROMPT_OVERRIDE",
 ] as const;
 
 export type VersionKind = (typeof VERSION_KINDS)[number];
@@ -62,7 +61,7 @@ export type PromptVersionRef = Readonly<
 
 export type PromptOverrideVersionRef = Readonly<
   VersionRefBase & {
-    id: PromptOverrideVersionId;
+    id: PromptVersionId;
     kind: "PROMPT_OVERRIDE";
   }
 >;
@@ -72,8 +71,8 @@ export type VersionRef =
   | CampaignVersionRef
   | ExplicitStyleVersionRef
   | InferredStyleVersionRef
-  | PromptOverrideVersionRef
-  | PromptVersionRef;
+  | PromptVersionRef
+  | PromptOverrideVersionRef;
 
 /** The complete current version state used by pure eligibility checks. */
 export type CurrentVersionSet = Readonly<{

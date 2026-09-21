@@ -8,20 +8,13 @@ import {
   parseInferredStyleVersionId,
   parseModelVersion,
   parseProfileVersionId,
-  parsePromptOverrideVersionId,
   parsePromptVersionId,
   parseTenantId,
   parseUserId,
   parseUtcTimestamp,
 } from "@relanmo/domain/contracts";
-import {
-  ADDRESS_FORMS,
-  FRENCH_TONES,
-} from "@relanmo/domain/contracts/product";
-import type {
-  AddressForm,
-  FrenchTone,
-} from "@relanmo/domain/contracts/product";
+import { FRENCH_TONES } from "@relanmo/domain/contracts/product";
+import type { FrenchTone } from "@relanmo/domain/contracts/product";
 import type {
   CurrentVersionSet,
   ExplicitStyleVersionRef,
@@ -179,22 +172,6 @@ function parseFrenchTone(
   return { ok: true, value };
 }
 
-function parseAddressForm(
-  value: string | null,
-  required: boolean
-): PersistenceResult<AddressForm | null> {
-  if (value === null) {
-    if (required) {
-      return failure("VALIDATION", "address form is required");
-    }
-    return { ok: true, value: null };
-  }
-  if (!isMember(value, ADDRESS_FORMS)) {
-    return failure("VALIDATION", "address form is not supported");
-  }
-  return { ok: true, value };
-}
-
 function parseFormality(
   value: string | null,
   required: boolean
@@ -236,10 +213,6 @@ function toExplicitRecord(
   if (row.kind !== "STYLE_EXPLICIT" || row.createdBy === null) {
     return failure("INTEGRITY", "explicit style version is incomplete");
   }
-  const addressForm = parseAddressForm(row.addressForm, true);
-  if (!addressForm.ok) {
-    return addressForm;
-  }
   const tone = parseFrenchTone(row.tone, true);
   if (!tone.ok) {
     return tone;
@@ -248,11 +221,7 @@ function toExplicitRecord(
   if (!formality.ok) {
     return formality;
   }
-  if (
-    addressForm.value === null ||
-    tone.value === null ||
-    formality.value === null
-  ) {
+  if (tone.value === null || formality.value === null) {
     return failure("INTEGRITY", "explicit style version is incomplete");
   }
   return {
@@ -261,7 +230,6 @@ function toExplicitRecord(
       createdAt: toInstant(row.createdAt),
       createdBy: parseUserId(row.createdBy),
       settings: {
-        addressForm: addressForm.value,
         closing: row.closing,
         examples: asStringArray(row.examples),
         forbiddenPhrases: asStringArray(row.forbiddenPhrases),
@@ -328,7 +296,7 @@ function toOverrideRecord(
     tenantId: parseTenantId(override.tenantId),
     version: {
       createdAt: toInstant(version.createdAt),
-      id: parsePromptOverrideVersionId(version.id),
+      id: parsePromptVersionId(version.id),
       kind: "PROMPT_OVERRIDE",
       revision: version.revision,
     },
@@ -609,7 +577,6 @@ async function loadStyleState(
 }
 
 type ValidatedExplicitSettings = Readonly<{
-  addressForm: AddressForm;
   closing: string | null;
   examples: readonly string[];
   forbiddenPhrases: readonly string[];
@@ -623,10 +590,6 @@ type ValidatedExplicitSettings = Readonly<{
 function validateExplicitSettings(
   settings: ExplicitStyleSettings
 ): PersistenceResult<ValidatedExplicitSettings> {
-  const addressForm = parseAddressForm(settings.addressForm, true);
-  if (!addressForm.ok) {
-    return addressForm;
-  }
   const tone = parseFrenchTone(settings.tone, true);
   if (!tone.ok) {
     return tone;
@@ -635,17 +598,12 @@ function validateExplicitSettings(
   if (!formality.ok) {
     return formality;
   }
-  if (
-    addressForm.value === null ||
-    tone.value === null ||
-    formality.value === null
-  ) {
+  if (tone.value === null || formality.value === null) {
     return failure("VALIDATION", "explicit style settings are incomplete");
   }
   return {
     ok: true,
     value: {
-      addressForm: addressForm.value,
       closing: settings.closing,
       examples: settings.examples,
       forbiddenPhrases: settings.forbiddenPhrases,
@@ -704,7 +662,6 @@ async function saveExplicit(
   }
   const nextRevision = profile.revision + 1;
   await db.insert(styleProfileVersions).values({
-    addressForm: settings.value.addressForm,
     closing: settings.value.closing,
     createdAt: new Date(input.createdAt),
     createdBy: input.createdBy,

@@ -15,7 +15,6 @@ import type {
   ActionPayload,
   ActionUnknownReason,
 } from "./action";
-import { COMPOSITION_CONTEXT_LIMITS } from "./composition";
 import type { DuePlan } from "./due-plan";
 import {
   DRAFT_STATUSES,
@@ -34,12 +33,8 @@ import type {
   EligibilitySnapshot,
   EligibilityVersionSnapshot,
 } from "./eligibility";
-import { EVIDENCE_ASSERTION_KINDS, EVIDENCE_PROVENANCE } from "./evidence";
-import type {
-  Evidence,
-  EvidenceAssertion,
-  EvidenceProvenance,
-} from "./evidence";
+import { EVIDENCE_PROVENANCE } from "./evidence";
+import type { Evidence, EvidenceProvenance } from "./evidence";
 import {
   parseAccountId,
   parseActionId,
@@ -56,7 +51,6 @@ import {
   parseProfileVersionId,
   parseProspectId,
   parsePromptVersionId,
-  parsePromptOverrideVersionId,
   parseSendAttemptId,
   parseTenantId,
   parseUserId,
@@ -227,7 +221,7 @@ function parseVersionRef(value: unknown, path: string): VersionRef {
     case "PROMPT_OVERRIDE": {
       return Object.freeze({
         ...common,
-        id: parsePromptOverrideVersionId(readRequired(record, "id")),
+        id: parsePromptVersionId(readRequired(record, "id")),
         kind,
       });
     }
@@ -415,71 +409,20 @@ function parseEvidenceProvenance(
   return member(value, EVIDENCE_PROVENANCE, path);
 }
 
-function parseEvidenceAssertion(
-  value: unknown,
-  path: string
-): EvidenceAssertion {
-  const record = expectRecord(value, path);
-  const detail = nullableNonEmptyString(
-    readRequired(record, "detail"),
-    `${path}.detail`
-  );
-  const assertionValue = expectNonEmptyString(
-    readRequired(record, "value"),
-    `${path}.value`
-  );
-  if (
-    detail !== null &&
-    detail.length > COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters
-  ) {
-    throw new ContractValidationError(
-      `${path}.detail exceeds ${String(COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters)} characters`
-    );
-  }
-  if (
-    assertionValue.length > COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters
-  ) {
-    throw new ContractValidationError(
-      `${path}.value exceeds ${String(COMPOSITION_CONTEXT_LIMITS.groundedFactCharacters)} characters`
-    );
-  }
-  return Object.freeze({
-    detail,
-    kind: member(
-      readRequired(record, "kind"),
-      EVIDENCE_ASSERTION_KINDS,
-      `${path}.kind`
-    ),
-    value: assertionValue,
-  });
-}
-
 export function parseEvidence(value: unknown): Evidence {
   const record = expectRecord(value, "evidence");
-  const normalizedClaim = expectNonEmptyString(
-    readRequired(record, "normalizedClaim"),
-    "evidence.normalizedClaim"
-  );
-  if (normalizedClaim.length > 1000) {
-    throw new ContractValidationError(
-      "evidence.normalizedClaim exceeds 1000 characters"
-    );
-  }
   return Object.freeze({
     accountId: nullable(readRequired(record, "accountId"), parseAccountId),
-    assertions: expectArrayOf(
-      readRequired(record, "assertions"),
-      parseEvidenceAssertion,
-      "evidence.assertions",
-      20
-    ),
     capturedAt: parseUtcTimestamp(readRequired(record, "capturedAt")),
     contentHash: nullableNonEmptyString(
       readRequired(record, "contentHash"),
       "evidence.contentHash"
     ),
     evidenceId: parseEvidenceId(readRequired(record, "evidenceId")),
-    normalizedClaim,
+    normalizedClaim: expectNonEmptyString(
+      readRequired(record, "normalizedClaim"),
+      "evidence.normalizedClaim"
+    ),
     prospectId: parseProspectId(readRequired(record, "prospectId")),
     provenance: parseEvidenceProvenance(
       readRequired(record, "provenance"),

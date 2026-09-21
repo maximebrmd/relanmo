@@ -2,7 +2,6 @@ import type {
   AccountId,
   Attachment,
   ConversationId,
-  EvidenceAssertion,
   EvidenceId,
   MessageId,
   ProspectId,
@@ -139,10 +138,6 @@ export const evidence = pgTable(
     sourceId: text("source_id").notNull(),
     sourceUrl: text("source_url"),
     normalizedClaim: text("normalized_claim").notNull(),
-    assertions: jsonb("assertions")
-      .$type<readonly EvidenceAssertion[]>()
-      .notNull()
-      .default([]),
     contentHash: text("content_hash"),
     capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

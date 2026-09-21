@@ -232,7 +232,6 @@ describe("product DTO fixtures", () => {
       parseStyleCommand({
         expectedRevision: 2,
         input: {
-          addressForm: "VOUS",
           examples: [],
           instructions: null,
           stepOverrides: [],
@@ -329,14 +328,6 @@ describe("product DTO invalid cases", () => {
       }).success
     ).toBe(false);
     expect(
-      safeParseProfileCommand({
-        expectedRevision: 1,
-        input: { ...profileInput, offer: "x".repeat(501) },
-        kind: "SAVE_PROFILE",
-        tenantId: "tenant_demo",
-      }).success
-    ).toBe(false);
-    expect(
       safeParseCampaignCommand({
         input: {
           ...campaignInput,
@@ -353,7 +344,6 @@ describe("product DTO invalid cases", () => {
       safeParseStyleCommand({
         expectedRevision: 2,
         input: {
-          addressForm: "VOUS",
           examples: [],
           instructions: null,
           stepOverrides: [

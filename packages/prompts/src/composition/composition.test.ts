@@ -1,4 +1,3 @@
-import type { Evidence } from "@relanmo/domain/contracts";
 import {
   parseCampaignId,
   parseDraftSourceVersions,
@@ -18,6 +17,7 @@ import {
 } from "../defaults";
 import { composeGroundedPrompt, promptCompositionSurface } from "./index";
 import type {
+  CompositionEvidence as Evidence,
   ComposePromptInput,
   ExplicitStyleLayer,
   FreelancerProfileFacts,
@@ -29,6 +29,18 @@ import type {
   VersionedExplicitStyleLayer,
 } from "./index";
 
+function compositionEvidence(input: unknown): Evidence {
+  const parsed = parseEvidence(input);
+  const assertions = (input as { assertions?: unknown }).assertions;
+  if (!Array.isArray(assertions)) {
+    throw new Error("composition evidence fixture requires assertions");
+  }
+  return Object.freeze({
+    ...parsed,
+    assertions: Object.freeze(assertions),
+  }) as Evidence;
+}
+
 const TENANT = parseTenantId("tenant_demo");
 const PROSPECT = parseProspectId("prospect_demo");
 const OTHER_TENANT = parseTenantId("tenant_other");
@@ -37,7 +49,7 @@ const OTHER_CAMPAIGN = parseCampaignId("campaign_other");
 const FIXTURE_TIME = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const HIRING_EVIDENCE_ID = parseEvidenceId("evidence_hiring_post_1");
 
-const hiringEvidence: Evidence = parseEvidence({
+const hiringEvidence: Evidence = compositionEvidence({
   accountId: null,
   assertions: [{ detail: null, kind: "HIRING_ROLE", value: "frontend" }],
   capturedAt: FIXTURE_TIME,
@@ -52,7 +64,7 @@ const hiringEvidence: Evidence = parseEvidence({
   tenantId: TENANT,
 });
 
-const foreignEvidence: Evidence = parseEvidence({
+const foreignEvidence: Evidence = compositionEvidence({
   accountId: null,
   assertions: [],
   capturedAt: FIXTURE_TIME,
@@ -66,7 +78,7 @@ const foreignEvidence: Evidence = parseEvidence({
   tenantId: OTHER_TENANT,
 });
 
-const negatedHiringEvidence: Evidence = parseEvidence({
+const negatedHiringEvidence: Evidence = compositionEvidence({
   accountId: null,
   assertions: [],
   capturedAt: FIXTURE_TIME,
@@ -478,7 +490,7 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("uses the typed hiring assertion rather than a matching subject token", () => {
-    const evidence = parseEvidence({
+    const evidence = compositionEvidence({
       accountId: null,
       assertions: [{ detail: null, kind: "HIRING_ROLE", value: "CTO" }],
       capturedAt: FIXTURE_TIME,
@@ -544,7 +556,7 @@ describe("composeGroundedPrompt", () => {
     const withoutEvidence = composeGroundedPrompt(
       composeInput({ campaignOverride: override })
     );
-    const fundingEvidence = parseEvidence({
+    const fundingEvidence = compositionEvidence({
       accountId: null,
       assertions: [{ detail: null, kind: "FUNDING", value: "50 M€" }],
       capturedAt: FIXTURE_TIME,
@@ -668,7 +680,7 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("grounds shared connections in typed allowed evidence", () => {
-    const sharedEvidence = parseEvidence({
+    const sharedEvidence = compositionEvidence({
       accountId: null,
       assertions: [
         {
@@ -729,7 +741,7 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("does not combine signal fields from different evidence assertions", () => {
-    const evidenceA = parseEvidence({
+    const evidenceA = compositionEvidence({
       ...hiringEvidence,
       assertions: [
         { detail: "angle A", kind: "PROSPECT_POST", value: "sujet A" },
@@ -738,7 +750,7 @@ describe("composeGroundedPrompt", () => {
       normalizedClaim: "Post A",
       sourceId: "source_post_a",
     });
-    const evidenceB = parseEvidence({
+    const evidenceB = compositionEvidence({
       ...hiringEvidence,
       assertions: [
         { detail: "angle B", kind: "PROSPECT_POST", value: "sujet B" },
@@ -766,8 +778,47 @@ describe("composeGroundedPrompt", () => {
     }
   });
 
+  it("treats braces in grounded prospect data as literal data", () => {
+    const evidence = compositionEvidence({
+      ...hiringEvidence,
+      assertions: [
+        {
+          detail: "exemple { userId }",
+          kind: "PROSPECT_POST",
+          value: "contrôle d'accès",
+        },
+      ],
+      evidenceId: "evidence_post_braces",
+      normalizedClaim: "Post sur un exemple de contrôle d'accès.",
+      sourceId: "source_post_braces",
+    });
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [evidence],
+        drafting: { ...hiringDrafting, signalKind: "PROSPECT_POST" },
+        prospect: {
+          ...hiringProspect,
+          signalDetail: {
+            evidenceId: evidence.evidenceId,
+            text: "exemple { userId }",
+          },
+          signalFact: {
+            evidenceId: evidence.evidenceId,
+            text: "contrôle d'accès",
+          },
+        },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("PROSPECT_POST");
+      expect(result.targetText).toContain("{ userId }");
+    }
+  });
+
   it("persists the normalized drafting selection used for composition", () => {
-    const offerEvidence = parseEvidence({
+    const offerEvidence = compositionEvidence({
       accountId: null,
       assertions: [{ detail: null, kind: "OFFER", value: "offre data" }],
       capturedAt: FIXTURE_TIME,

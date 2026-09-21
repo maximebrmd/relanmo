@@ -131,12 +131,7 @@ describe("leads schema fragment", () => {
 
   it("traces evidence to the prospect it grounds and dedupes by claim", () => {
     expect(columnNames(evidence)).toEqual(
-      expect.arrayContaining([
-        "prospect_id",
-        "source_id",
-        "normalized_claim",
-        "assertions",
-      ])
+      expect.arrayContaining(["prospect_id", "source_id", "normalized_claim"])
     );
     const config = getTableConfig(evidence);
     expect(
