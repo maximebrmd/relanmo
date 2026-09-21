@@ -22,6 +22,15 @@ import {
 type AuthTable = Parameters<typeof getTableConfig>[0];
 
 const pgDialect = new PgDialect();
+const logicalAliases: Record<string, string> = {
+  login_account: "loginAccount",
+  login_accounts: "loginAccounts",
+  login_account_userId_idx: "loginAccount_userId_idx",
+};
+
+function logicalName(name: string) {
+  return logicalAliases[name] ?? name;
+}
 
 function sorted<T>(values: T[]) {
   return values.sort((left, right) =>
@@ -51,7 +60,10 @@ function normalizeSql(value: SQL | undefined) {
   return { params: query.params, sql: query.sql };
 }
 
-function normalizeTable(table: AuthTable) {
+function normalizeTable(
+  table: AuthTable,
+  logicalColumns: Record<string, string>
+) {
   const config = getTableConfig(table);
   return {
     columns: sorted(
@@ -63,12 +75,14 @@ function normalizeTable(table: AuthTable) {
         generated: column.generated ?? null,
         generatedIdentity: column.generatedIdentity ?? null,
         hasDefault: column.hasDefault,
+        logicalName: logicalColumns[column.name],
         name: column.name,
         notNull: column.notNull,
         onUpdate: typeof column.onUpdateFn === "function",
         primary: column.primary,
         type: column.getSQLType(),
         unique: column.isUnique,
+        uniqueName: column.uniqueName,
         uniqueType: column.uniqueType ?? null,
       }))
     ),
@@ -86,6 +100,7 @@ function normalizeTable(table: AuthTable) {
           columns: reference.columns.map((column) => column.name),
           foreignColumns: reference.foreignColumns.map((column) => column.name),
           foreignTable: getTableConfig(reference.foreignTable).name,
+          name: foreignKey.getName(),
           onDelete: foreignKey.onDelete ?? "no action",
           onUpdate: foreignKey.onUpdate ?? "no action",
         };
@@ -106,6 +121,7 @@ function normalizeTable(table: AuthTable) {
         }),
         concurrently: index.config.concurrently === true,
         method: index.config.method ?? "btree",
+        name: logicalName(index.config.name ?? ""),
         only: index.config.only,
         unique: index.config.unique,
         where: normalizeSql(index.config.where),
@@ -124,14 +140,16 @@ function normalizeTable(table: AuthTable) {
       }))
     ),
     primaryKeys: sorted(
-      config.primaryKeys.map((primaryKey) =>
-        primaryKey.columns.map((column) => column.name)
-      )
+      config.primaryKeys.map((primaryKey) => ({
+        columns: primaryKey.columns.map((column) => column.name),
+        name: primaryKey.getName(),
+      }))
     ),
     schema: config.schema ?? null,
     uniqueConstraints: sorted(
       config.uniqueConstraints.map((constraint) => ({
         columns: constraint.columns.map((column) => column.name),
+        name: constraint.getName(),
         nullsNotDistinct: constraint.nullsNotDistinct,
       }))
     ),
@@ -160,16 +178,21 @@ function normalizeSchema(schema: Record<string, unknown>) {
       if (!firstColumn) {
         throw new TypeError(`Auth table ${table.dbName} has no columns`);
       }
+      const logicalColumns = Object.fromEntries(
+        Object.entries(table.columns).map(([key, column]) => [column.name, key])
+      );
       return {
-        ...normalizeTable(firstColumn.table),
+        ...normalizeTable(firstColumn.table, logicalColumns),
+        logicalName: logicalName(table.tsName),
         relations: sorted(
-          Object.values(table.relations).map((relation) => {
+          Object.entries(table.relations).map(([key, relation]) => {
             const one = is(relation, One);
             return {
               fields: one
                 ? (relation.config?.fields.map((field) => field.name) ?? [])
                 : [],
               kind: one ? "one" : "many",
+              logicalName: logicalName(key),
               referencedTable: relation.referencedTableName,
               references: one
                 ? (relation.config?.references.map(
