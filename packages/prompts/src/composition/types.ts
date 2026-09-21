@@ -12,16 +12,16 @@ import type {
   SequenceStep,
   TenantId,
 } from "@relanmo/domain/contracts";
-import type { WritingOutputBudget } from "@relanmo/domain/ports/providers";
-import type {
-  ExplicitStyleSettings,
-  StyleOverrideSettings,
-} from "@relanmo/domain/ports/persistence/campaigns";
 import type {
   AddressForm,
   StyleFormality,
   StyleStepOverride as PersistedStyleStepOverride,
 } from "@relanmo/domain/contracts/product";
+import type {
+  ExplicitStyleSettings,
+  StyleOverrideSettings,
+} from "@relanmo/domain/ports/persistence/campaigns";
+import type { WritingOutputBudget } from "@relanmo/domain/ports/providers";
 
 import type { MessageHook, SequenceDraftingContext } from "../defaults";
 
@@ -58,8 +58,6 @@ export type CampaignStyleOverride = Readonly<
     stepOverrides?: readonly StyleStepOverride[];
   }
 >;
-
-export type { PromptOverrideVersionRef };
 
 export type ExplicitStyleLayer = ExplicitStyleSettings;
 

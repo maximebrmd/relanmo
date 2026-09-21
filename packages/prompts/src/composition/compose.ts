@@ -6,6 +6,7 @@ import type {
   SequenceStep,
 } from "@relanmo/domain/contracts";
 import { COMPOSITION_CONTEXT_LIMITS } from "@relanmo/domain/contracts";
+import type { StyleFormality } from "@relanmo/domain/contracts/product";
 
 import {
   ALLOWED_TEMPLATE_VARIABLES,
@@ -21,7 +22,6 @@ import type {
   SequenceDraftingContext,
 } from "../defaults";
 import type {
-  AddressForm,
   CampaignStyleOverride,
   ComposeFailureReason,
   ComposePromptInput,
@@ -35,7 +35,6 @@ import type {
   ResolvedStyleField,
   StyleStepOverride,
 } from "./types";
-import type { StyleFormality } from "@relanmo/domain/contracts/product";
 import { COMPOSE_SEND_CONTROLS } from "./types";
 
 const DEFAULT_TONE = "CONCISE";
@@ -76,26 +75,25 @@ function scopedEvidence(input: ComposePromptInput): readonly Evidence[] {
   );
 }
 
+function groundedSnapshot(
+  fact: GroundedFact | null,
+  text: string | null
+): GroundedFact | null {
+  return fact === null || text === null
+    ? null
+    : Object.freeze({ evidenceId: fact.evidenceId, text });
+}
+
 function prospectContextSnapshot(
   input: ComposePromptInput,
   sharedConnection: GroundedFact | null,
   values: Readonly<Record<AllowedTemplateVariable, string | null>>
 ): ProspectContextSnapshot {
-  const groundedSnapshot = (
-    fact: GroundedFact | null,
-    text: string | null
-  ): GroundedFact | null =>
-    fact === null || text === null
-      ? null
-      : Object.freeze({ evidenceId: fact.evidenceId, text });
   return Object.freeze({
     company: optionalText(input.prospect.company),
     craft: optionalText(input.prospect.craft),
     firstName: optionalText(input.prospect.firstName),
-    hiringRole: groundedSnapshot(
-      input.prospect.hiringRole,
-      values.hiringRole
-    ),
+    hiringRole: groundedSnapshot(input.prospect.hiringRole, values.hiringRole),
     prospectId: input.prospect.prospectId,
     sharedConnection,
     signalDetail: groundedSnapshot(
@@ -106,9 +104,19 @@ function prospectContextSnapshot(
   });
 }
 
+function canonicalEvidenceText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replaceAll(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("fr")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replaceAll(/\s+/gu, " ");
+}
+
 function groundedPair(
-  fact: GroundedFact | null,
-  detail: GroundedFact | null,
+  fact: Readonly<{ evidenceId: string; text: string }> | null,
+  detail: Readonly<{ evidenceId: string; text: string }> | null,
   evidenceById: ReadonlyMap<string, Evidence>,
   kind: EvidenceAssertionKind
 ): Readonly<{ detail: string | null; fact: string | null }> {
@@ -163,18 +171,8 @@ function groundedFollowUp(
       ? null
       : Object.freeze({ evidenceId: fact.evidenceId, text: fact.detail }),
     evidenceById,
-    kindByFact[fact.kind as keyof typeof kindByFact]
+    kindByFact[fact.kind]
   );
-}
-
-function canonicalEvidenceText(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replaceAll(/\p{Diacritic}/gu, "")
-    .toLocaleLowerCase("fr")
-    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replaceAll(/\s+/gu, " ");
 }
 
 function validatedSharedConnection(
@@ -453,6 +451,7 @@ function resolveMaxCharacters(
   return requested;
 }
 
+// oxlint-disable-next-line complexity -- Precedence is explicit per independent style field.
 function resolveStyle(input: ComposePromptInput): ResolvedStyle {
   const campaign = input.campaignOverride?.style ?? null;
   const explicit = input.explicitStyle?.style ?? null;
@@ -515,7 +514,9 @@ function overrideForStep(
     return null;
   }
   const found = overrides.find((item) => item.step === step);
-  return found === undefined || optionalText(found.text) === null ? null : found;
+  return found === undefined || optionalText(found.text) === null
+    ? null
+    : found;
 }
 
 function exceeds(value: string | null | undefined, max: number): boolean {
@@ -534,7 +535,10 @@ function listExceeds(
   );
 }
 
-function invalidStyleReason(input: ComposePromptInput): ComposeFailureReason | null {
+// oxlint-disable-next-line complexity -- Every persisted customer-controlled style field has an explicit bound.
+function invalidStyleReason(
+  input: ComposePromptInput
+): ComposeFailureReason | null {
   const campaign = input.campaignOverride?.style;
   const explicit = input.explicitStyle?.style;
   const campaignInvalid =
@@ -600,11 +604,12 @@ function invalidEvidenceReason(
     : null;
 }
 
+// oxlint-disable-next-line complexity -- The composition boundary validates every independently bounded context field.
 function invalidContextReason(
   input: ComposePromptInput
 ): ComposeFailureReason | null {
   const profile = input.profile?.facts;
-  const prospect = input.prospect;
+  const { prospect } = input;
   const groundedFacts = [
     prospect.hiringRole?.text,
     prospect.sharedConnection?.text,
@@ -631,7 +636,10 @@ function invalidContextReason(
     ...groundedFacts,
   ];
   const invalid =
-    exceeds(prospect.firstName, COMPOSITION_CONTEXT_LIMITS.firstNameCharacters) ||
+    exceeds(
+      prospect.firstName,
+      COMPOSITION_CONTEXT_LIMITS.firstNameCharacters
+    ) ||
     exceeds(prospect.company, COMPOSITION_CONTEXT_LIMITS.companyCharacters) ||
     exceeds(prospect.craft, COMPOSITION_CONTEXT_LIMITS.craftCharacters) ||
     exceeds(
@@ -675,6 +683,17 @@ function invalidContextReason(
     : null;
 }
 
+function sourceVersionsFor(input: ComposePromptInput): DraftSourceVersions {
+  return Object.freeze({
+    ...input.sourceVersions,
+    acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
+    defaultPrompt: frenchDefaultPromptVersion(),
+    explicitStyle: input.explicitStyle?.version ?? null,
+    profile: input.profile?.version ?? null,
+    promptOverride: input.campaignOverride?.version ?? null,
+  });
+}
+
 function failed(
   input: ComposePromptInput,
   reasons: readonly [ComposeFailureReason, ...ComposeFailureReason[]]
@@ -684,19 +703,6 @@ function failed(
     reasons,
     sendControls: COMPOSE_SEND_CONTROLS,
     sourceVersions: sourceVersionsFor(input),
-  });
-}
-
-function sourceVersionsFor(
-  input: ComposePromptInput
-): DraftSourceVersions {
-  return Object.freeze({
-    ...input.sourceVersions,
-    acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
-    defaultPrompt: frenchDefaultPromptVersion(),
-    explicitStyle: input.explicitStyle?.version ?? null,
-    profile: input.profile?.version ?? null,
-    promptOverride: input.campaignOverride?.version ?? null,
   });
 }
 
@@ -761,34 +767,48 @@ function requiredAssertionForHook(
   hook: MessageHook
 ): EvidenceAssertionKind | null {
   switch (hook) {
-    case "RECRUITMENT":
+    case "RECRUITMENT": {
       return "HIRING_ROLE";
-    case "FUNDING":
+    }
+    case "FUNDING": {
       return "FUNDING";
-    case "INBOUND_COMMENT":
+    }
+    case "INBOUND_COMMENT": {
       return "INBOUND_COMMENT";
-    case "INBOUND_LIKE":
+    }
+    case "INBOUND_LIKE": {
       return "INBOUND_LIKE";
-    case "MIGRATION":
+    }
+    case "MIGRATION": {
       return "MIGRATION";
-    case "ROLE_CHANGE":
+    }
+    case "ROLE_CHANGE": {
       return "ROLE_CHANGE";
-    case "PROSPECT_POST":
+    }
+    case "PROSPECT_POST": {
       return "PROSPECT_POST";
-    case "SHARED_CONNECTION":
+    }
+    case "SHARED_CONNECTION": {
       return "SHARED_CONNECTION";
-    case "DM2_OFFER":
+    }
+    case "DM2_OFFER": {
       return "OFFER";
-    case "DM2_PROSPECT_POST":
+    }
+    case "DM2_PROSPECT_POST": {
       return "PROSPECT_POST";
-    case "DM2_RELEASE":
+    }
+    case "DM2_RELEASE": {
       return "RELEASE";
-    case "DM3_PRODUCT":
+    }
+    case "DM3_PRODUCT": {
       return "PRODUCT";
-    case "DM3_SPEAKING":
+    }
+    case "DM3_SPEAKING": {
       return "SPEAKING";
-    default:
+    }
+    default: {
       return null;
+    }
   }
 }
 
@@ -849,7 +869,10 @@ function selectFilledTemplate(
     input.campaignOverride?.style.stepOverrides,
     input.step
   );
-  if (campaignOverride !== null && overrideHasEvidence(campaignOverride, evidence)) {
+  if (
+    campaignOverride !== null &&
+    overrideHasEvidence(campaignOverride, evidence)
+  ) {
     const body = campaignOverride.text;
     const templateId = `campaign-step-override:${input.step}`;
     const filled = fillTemplate(body, values);
@@ -933,6 +956,7 @@ function formatList(values: readonly string[]): string {
   return values.join(", ");
 }
 
+// oxlint-disable-next-line complexity -- Prompt assembly conditionally emits each bounded optional data section.
 function buildComposedInput(
   input: ComposePromptInput,
   style: ResolvedStyle,
@@ -1075,12 +1099,7 @@ export function composeGroundedPrompt(
     sharedConnection,
     evidenceById
   );
-  const filled = selectFilledTemplate(
-    input,
-    planned,
-    values,
-    allowed
-  );
+  const filled = selectFilledTemplate(input, planned, values, allowed);
 
   if ("kind" in filled) {
     const code =
@@ -1116,9 +1135,7 @@ export function composeGroundedPrompt(
     outputBudget: outputBudgetFor(resolvedStyle.maxCharacters.value),
     profileAdaptation: "PROFILE_FACTS_ONLY",
     provenance: Object.freeze({
-      allowedEvidenceIds: Object.freeze(
-        allowed.map((item) => item.evidenceId)
-      ),
+      allowedEvidenceIds: Object.freeze(allowed.map((item) => item.evidenceId)),
       drafting,
       prospectContext: contextSnapshot,
       sourceVersions: sourceVersionsFor(input),

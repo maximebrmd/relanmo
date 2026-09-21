@@ -47,7 +47,7 @@ flowchart TB
     STOP --> STATE
 ```
 
-Apply campaign-specific explicit writing overrides ahead of customer-wide preferences, then accepted inferred style, then shared defaults. Factual grounding constrains every layer. Reply-stop, tenancy, permission, quota and send-state rules remain enforced in code regardless of prompt content.
+Apply campaign-specific explicit writing overrides ahead of customer-wide preferences, then accepted inferred style, then shared defaults. Factual grounding constrains every layer. Prospect claims, including shared connections and factual template overrides, must match typed assertions in tenant- and prospect-scoped allowed evidence. A step override may bypass evidence only after the application has persisted a certification that its exact text is neutral. Reply-stop, tenancy, permission, quota and send-state rules remain enforced in code regardless of prompt content.
 
 Customer text is bounded data in the composer, not a replacement for application control instructions. Validate allowed variables, lengths and template syntax. Use plain structured interpolation; never evaluate customer JavaScript or compile their text as MDX. Prospect content and writing examples cannot instruct the application to call tools or change permissions.
 
@@ -55,7 +55,7 @@ Customer text is bounded data in the composer, not a replacement for application
 
 Use application-owned tables such as `style_profiles`, `style_profile_versions`, `prompt_overrides` and `prompt_override_versions`. Names are proposed schema contracts. Every customer record has tenant ownership; record explicit versus inferred origin, author, timestamps and the active version. Existing campaign versions reference the relevant settings.
 
-Each draft records the shared template version, style version, override version, model, evidence IDs and exact text. Avoid storing a second copy of the entire private profile in every workflow history.
+Each draft records the shared template, campaign, profile, style, override and model versions; allowed evidence IDs; the normalized drafting selection and prospect-context snapshot used for composition; and the exact text. This bounded provenance reconstructs the draft without copying the entire private profile into every workflow history.
 
 Saving a new active style invalidates affected unsent drafts and marks them for regeneration before authorization. A generation that started against an older version must fail the version check before becoming send-eligible. Keep confirmed history unchanged; do not blindly regenerate and resend an `UNKNOWN` or `IN_FLIGHT` action. Preserve the action ID, current cadence and human ownership.
 

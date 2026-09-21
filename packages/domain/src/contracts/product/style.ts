@@ -1,3 +1,4 @@
+import type { EvidenceAssertion } from "../evidence";
 import type {
   CampaignId,
   EvidenceId,
@@ -5,7 +6,6 @@ import type {
   InferredStyleVersionId,
   TenantId,
 } from "../ids";
-import type { EvidenceAssertion } from "../evidence";
 import type { DirectMessageStep, UtcTimestamp } from "../values";
 import type {
   ProductCommandResult,
@@ -26,11 +26,7 @@ export type StyleSource = (typeof STYLE_SOURCES)[number];
 export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
 export type AddressForm = (typeof ADDRESS_FORMS)[number];
 
-export const STYLE_FORMALITY_LEVELS = [
-  "CASUAL",
-  "NEUTRAL",
-  "FORMAL",
-] as const;
+export const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
 export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
 
 export type StyleOverrideCertification = Readonly<{

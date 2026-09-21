@@ -5,6 +5,7 @@ import {
   parseEvidenceId,
   parseProspectId,
   parseTenantId,
+  parseUtcTimestamp,
 } from "@relanmo/domain/contracts";
 import { evaluationFixtureById } from "@relanmo/prompts/fixtures";
 import { describe, expect, it } from "vitest";
@@ -29,14 +30,12 @@ import type {
 const TENANT = parseTenantId("tenant_demo");
 const PROSPECT = parseProspectId("prospect_demo");
 const OTHER_TENANT = parseTenantId("tenant_other");
-const FIXTURE_TIME = "2026-09-17T10:00:00.000Z";
+const FIXTURE_TIME = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const HIRING_EVIDENCE_ID = parseEvidenceId("evidence_hiring_post_1");
 
 const hiringEvidence: Evidence = parseEvidence({
   accountId: null,
-  assertions: [
-    { detail: null, kind: "HIRING_ROLE", value: "frontend" },
-  ],
+  assertions: [{ detail: null, kind: "HIRING_ROLE", value: "frontend" }],
   capturedAt: FIXTURE_TIME,
   contentHash: null,
   evidenceId: HIRING_EVIDENCE_ID,
@@ -383,7 +382,9 @@ describe("composeGroundedPrompt", () => {
 
       expect(result.kind).toBe("FAILED");
       if (result.kind === "FAILED") {
-        expect(result.reasons.map((reason) => reason.code)).toContain(item.code);
+        expect(result.reasons.map((reason) => reason.code)).toContain(
+          item.code
+        );
       }
     }
   });
@@ -513,9 +514,7 @@ describe("composeGroundedPrompt", () => {
       stepOverrides: [
         {
           grounding: {
-            assertions: [
-              { detail: null, kind: "FUNDING", value: "50 M€" },
-            ],
+            assertions: [{ detail: null, kind: "FUNDING", value: "50 M€" }],
             certification: overrideCertification("DM1", text),
             kind: "ASSERTIONS",
           },
@@ -712,9 +711,7 @@ describe("composeGroundedPrompt", () => {
   it("persists the normalized drafting selection used for composition", () => {
     const offerEvidence = parseEvidence({
       accountId: null,
-      assertions: [
-        { detail: null, kind: "OFFER", value: "offre data" },
-      ],
+      assertions: [{ detail: null, kind: "OFFER", value: "offre data" }],
       capturedAt: FIXTURE_TIME,
       contentHash: null,
       evidenceId: "evidence_offer_data_1",
@@ -847,9 +844,7 @@ describe("composeGroundedPrompt", () => {
       composeGroundedPrompt(
         composeInput({
           campaignOverride: campaignLayer({
-            stepOverrides: [
-              certifiedNeutralOverride("DM1", "x".repeat(2001)),
-            ],
+            stepOverrides: [certifiedNeutralOverride("DM1", "x".repeat(2001))],
           }),
         })
       ),
@@ -868,7 +863,10 @@ describe("composeGroundedPrompt", () => {
   it("keeps address form independent from formality", () => {
     const result = composeGroundedPrompt(
       composeInput({
-        explicitStyle: explicitLayer({ addressForm: "TU", formality: "FORMAL" }),
+        explicitStyle: explicitLayer({
+          addressForm: "TU",
+          formality: "FORMAL",
+        }),
       })
     );
 
@@ -941,6 +939,8 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("rejects oversized direct evidence input before composing", () => {
+    // SAFETY: The deliberately oversized claim preserves every Evidence field and
+    // only bypasses the parser so the composer boundary can be exercised directly.
     const oversizedClaim = {
       ...hiringEvidence,
       normalizedClaim: "x".repeat(1001),

@@ -5,7 +5,6 @@ import {
   ACTION_STATES,
   ACTION_UNKNOWN_REASONS,
 } from "./action";
-import { COMPOSITION_CONTEXT_LIMITS } from "./composition";
 import type {
   Action,
   ActionFailureReason,
@@ -16,6 +15,7 @@ import type {
   ActionPayload,
   ActionUnknownReason,
 } from "./action";
+import { COMPOSITION_CONTEXT_LIMITS } from "./composition";
 import type { DuePlan } from "./due-plan";
 import {
   DRAFT_STATUSES,
@@ -279,14 +279,8 @@ export function parseDraftSourceVersions(value: unknown): DraftSourceVersions {
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "sourceVersions.profile", "PROFILE")
     ),
-    promptOverride: nullable(
-      readRequired(record, "promptOverride"),
-      (input) =>
-        versionOfKind(
-          input,
-          "sourceVersions.promptOverride",
-          "PROMPT_OVERRIDE"
-        )
+    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
+      versionOfKind(input, "sourceVersions.promptOverride", "PROMPT_OVERRIDE")
     ),
   });
 }
@@ -316,14 +310,8 @@ export function parseCurrentVersionSet(value: unknown): CurrentVersionSet {
     profile: nullable(readRequired(record, "profile"), (input) =>
       versionOfKind(input, "currentVersions.profile", "PROFILE")
     ),
-    promptOverride: nullable(
-      readRequired(record, "promptOverride"),
-      (input) =>
-        versionOfKind(
-          input,
-          "currentVersions.promptOverride",
-          "PROMPT_OVERRIDE"
-        )
+    promptOverride: nullable(readRequired(record, "promptOverride"), (input) =>
+      versionOfKind(input, "currentVersions.promptOverride", "PROMPT_OVERRIDE")
     ),
   });
 }

@@ -25,7 +25,6 @@ export type {
   InferredStyleLayer,
   ProspectGrounding,
   ProspectContextSnapshot,
-  PromptOverrideVersionRef,
   ResolvedStyle,
   ResolvedStyleField,
   StoppedPrompt,
@@ -40,5 +39,6 @@ export type {
   AddressForm,
   StyleFormality,
 } from "@relanmo/domain/contracts/product";
+export type { PromptOverrideVersionRef } from "@relanmo/domain/contracts";
 
 export const promptCompositionSurface = "ENABLED" as const;

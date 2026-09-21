@@ -9,7 +9,11 @@ import type {
   TenantId,
   UserId,
 } from "../../contracts/ids";
-import type { StyleStepOverride } from "../../contracts/product/style";
+import type {
+  AddressForm,
+  StyleFormality,
+  StyleStepOverride,
+} from "../../contracts/product/style";
 import type {
   BusinessWindowConfiguration,
   SequenceStep,
@@ -22,10 +26,6 @@ import type {
   InferredStyleVersionRef,
   PromptOverrideVersionRef,
 } from "../../contracts/versions";
-import type {
-  AddressForm,
-  StyleFormality,
-} from "../../contracts/product/style";
 import type {
   CurrentVersionGuard,
   PersistenceResult,

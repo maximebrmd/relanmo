@@ -193,9 +193,7 @@ describe("domain contract fixtures", () => {
     expect(() =>
       parseEvidence({
         ...base,
-        assertions: [
-          { detail: null, kind: "OFFER", value: "x".repeat(1001) },
-        ],
+        assertions: [{ detail: null, kind: "OFFER", value: "x".repeat(1001) }],
       })
     ).toThrow();
   });
