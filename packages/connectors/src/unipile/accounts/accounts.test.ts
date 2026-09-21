@@ -268,6 +268,7 @@ describe("Unipile LinkedIn accounts adapter", () => {
     const port = createUnipileLinkedInAccountsPort({
       apiKey: unipileAccountsApiKey,
       baseUrl: unipileAccountsBaseUrl,
+      clock: () => new Date("2026-09-17T10:00:00.000Z"),
       directory: { isAuthorized: () => false },
       gateway,
     });
@@ -282,6 +283,59 @@ describe("Unipile LinkedIn accounts adapter", () => {
     }
     expect(result.code).toBe("ACCOUNT_NOT_AUTHORIZED");
     expect(gateway.getAccountCalls).toEqual([]);
+  });
+
+  it("normalizes authorization store failures without calling Unipile", async () => {
+    const directory: UnipileAccountDirectory = {
+      isAuthorized: () => Promise.reject(new Error("database unavailable")),
+    };
+    const { gateway, port } = createPort({ directory });
+
+    const read = await port.readAccountStatus({
+      account: linkedInAccountFixture,
+      context: providerOperationContextFixture,
+    });
+    expect(read.ok).toBe(false);
+    if (read.ok) {
+      throw new Error("expected authorization read failure");
+    }
+    expect(read.kind).toBe("RETRYABLE_READ_FAILURE");
+    expect(read.code).toBe("UPSTREAM_READ_FAILURE");
+
+    const reconnect = await port.createReconnectFlow(
+      linkedInReconnectInputFixture
+    );
+    expect(reconnect.ok).toBe(false);
+    if (reconnect.ok) {
+      throw new Error("expected authorization write failure");
+    }
+    expect(reconnect.kind).toBe("DEFINITIVE_REFUSAL");
+    expect(reconnect.code).toBe("CAPABILITY_UNAVAILABLE");
+    expect(gateway.getAccountCalls).toEqual([]);
+    expect(gateway.hostedAuthCalls).toEqual([]);
+  });
+
+  it("bounds a stalled authorization lookup by the operation deadline", async () => {
+    const stalled = Promise.withResolvers<boolean>().promise;
+    const deadlineAt = parseUtcTimestamp("2026-09-17T10:00:00.001Z");
+    const { gateway, port } = createPort({
+      directory: { isAuthorized: () => stalled },
+    });
+    const result = await port.createReconnectFlow({
+      ...linkedInReconnectInputFixture,
+      context: {
+        ...providerOperationContextFixture,
+        deadlineAt,
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected authorization deadline failure");
+    }
+    expect(result.kind).toBe("DEFINITIVE_REFUSAL");
+    expect(result.code).toBe("CAPABILITY_UNAVAILABLE");
+    expect(gateway.hostedAuthCalls).toEqual([]);
   });
 
   it("retries bounded Unipile reads and redacts credentials from failures", async () => {

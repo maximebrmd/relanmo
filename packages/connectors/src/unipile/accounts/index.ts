@@ -224,9 +224,17 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     if (expired) {
       return expired;
     }
-    const binding = await this.#authorize(input.account, input.context);
-    if (binding) {
-      return binding;
+    try {
+      const binding = await this.#authorize(input.account, input.context);
+      if (binding) {
+        return binding;
+      }
+    } catch {
+      return providerDefinitiveRefusal(
+        input.context,
+        "CAPABILITY_UNAVAILABLE",
+        "account authorization is temporarily unavailable"
+      );
     }
     return await this.#createFlow({
       context: input.context,
@@ -271,12 +279,11 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
         "providerAccountId must not be empty"
       );
     }
-    const binding = await this.#authorize(input.account, input.context);
-    if (binding) {
-      return binding;
-    }
-
     try {
+      const binding = await this.#authorize(input.account, input.context);
+      if (binding) {
+        return binding;
+      }
       const snapshot = await this.#readAccount(
         input.account.providerAccountId,
         input.context
@@ -305,10 +312,24 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     account: LinkedInAccountRef,
     context: ProviderOperationContext
   ) {
-    const authorized = await this.#directory.isAuthorized(
-      account.providerAccountId,
-      account.tenantId
-    );
+    let authorized: boolean;
+    try {
+      authorized = await this.#withDeadline(
+        Promise.resolve(
+          this.#directory.isAuthorized(
+            account.providerAccountId,
+            account.tenantId
+          )
+        ),
+        context.deadlineAt
+      );
+    } catch (error) {
+      const failure = caughtError(error);
+      if (isDeadlineExceeded(failure)) {
+        throw failure;
+      }
+      throw new Error("account authorization is temporarily unavailable");
+    }
     if (!authorized) {
       return providerDefinitiveRefusal(
         context,
