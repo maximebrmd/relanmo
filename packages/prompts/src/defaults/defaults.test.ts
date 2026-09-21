@@ -150,15 +150,20 @@ describe("French prompt defaults", () => {
   });
 
   it("excludes executives whose company is their own name", () => {
-    const qualification = qualifyIcp({
-      headline: "Founder @ Maxime Bourmaud",
-      observedSignalText: null,
-      prospectName: "Maxime Bourmaud",
-    });
+    for (const headline of [
+      "Founder @ Maxime Bourmaud",
+      "Founder @ Maxime Bourmaud | Product Advisor",
+    ]) {
+      const qualification = qualifyIcp({
+        headline,
+        observedSignalText: null,
+        prospectName: "Maxime Bourmaud",
+      });
 
-    expect(qualification.eligible).toBe(false);
-    expect(qualification.exclusion).toBe("NOT_ICP");
-    expect(qualification.invitationAllowed).toBe(false);
+      expect(qualification.eligible).toBe(false);
+      expect(qualification.exclusion).toBe("NOT_ICP");
+      expect(qualification.invitationAllowed).toBe(false);
+    }
   });
 
   it("stops automated drafting when a historical reply is present", () => {

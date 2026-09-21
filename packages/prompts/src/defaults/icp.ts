@@ -167,6 +167,8 @@ const COMPANY_STATUS_PATTERNS = [
   /^seeking (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
 ] as const;
 
+const HEADLINE_DELIMITER = /\s+(?:@|\||·|—)\s+/u;
+
 function folded(value: string): string {
   return value
     .toLowerCase()
@@ -186,12 +188,18 @@ function normalizedIdentity(value: string): string {
 }
 
 function headlineCompany(headline: string): string | null {
-  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(headline);
+  const delimiter = HEADLINE_DELIMITER.exec(headline);
   if (delimiter?.index === undefined) {
     return null;
   }
 
-  const company = headline.slice(delimiter.index + delimiter[0].length).trim();
+  const remainder = headline.slice(delimiter.index + delimiter[0].length);
+  const nextDelimiter = HEADLINE_DELIMITER.exec(remainder);
+  const company = (
+    nextDelimiter?.index === undefined
+      ? remainder
+      : remainder.slice(0, nextDelimiter.index)
+  ).trim();
   const normalized = normalizedIdentity(company);
   const hasProperNameLikeToken =
     /(?:^|[^\p{L}\p{N}])(?:\p{Lu}[\p{Ll}\p{M}][\p{L}\p{M}\p{N}.'’_-]*|[A-Z0-9]{2,})(?=$|[^\p{L}\p{N}])/u.test(
@@ -211,7 +219,7 @@ function headlineCompany(headline: string): string | null {
 
 function headlineRole(headline: string): string {
   const lower = folded(headline);
-  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(lower);
+  const delimiter = HEADLINE_DELIMITER.exec(lower);
   return delimiter?.index === undefined ? lower : lower.slice(0, delimiter.index);
 }
 
