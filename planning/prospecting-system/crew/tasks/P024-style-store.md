@@ -17,6 +17,9 @@ Read [AGENTS.md](../../AGENTS.md), [architecture.md](../../architecture.md), [co
 ## Write ownership
 
 - `packages/database/src/repositories/styles/`
+- Review-authorized integration exceptions: the style-related version and
+  persistence contracts in `packages/domain/`, plus the worker bootstrap policy
+  in `packages/database/drizzle/0001_rls_runtime_roles.sql`.
 
 Only these paths and adjacent tests inside these directories are in scope. Dependencies, root configuration, package exports, shared contracts, schema exports and migration journals are owned by their named integration tasks. If this task explicitly owns one of those surfaces, its declared write scope is the exception. Do not edit a sibling task's code to get a green build; report the exact missing contract/fix. All paths are relative to the future application repository.
 

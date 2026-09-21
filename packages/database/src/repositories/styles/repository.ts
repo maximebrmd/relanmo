@@ -969,7 +969,8 @@ async function saveOverride(
   if (!current.ok) {
     return current;
   }
-  const activeOverride = (await loadOverrides(db, input.tenantId)).find(
+  const overrides = await loadOverrides(db, input.tenantId);
+  const activeOverride = overrides.find(
     (item) => item.campaignId === input.campaignId
   );
   const contextualCurrent: CurrentVersionSet = {
