@@ -110,6 +110,17 @@ describe("parseDatabaseEnv", () => {
     );
   });
 
+  it("rejects the same endpoint even when database principals differ", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://runtime:pass@host:5432/app",
+        DATABASE_URL_UNPOOLED: "postgres://migration:pass@host:5432/app",
+      })
+    ).toThrow(
+      "DATABASE_URL and DATABASE_URL_UNPOOLED must be separate connection strings"
+    );
+  });
+
   it("rejects query parameters that override the database principal", () => {
     expect(() =>
       parseDatabaseEnv({
@@ -117,9 +128,18 @@ describe("parseDatabaseEnv", () => {
         DATABASE_URL_UNPOOLED:
           "postgres://migration:pass@host:5433/app?user=shared",
       })
-    ).toThrow(
-      "DATABASE_URL must set the database username in the URL authority"
-    );
+    ).toThrow("DATABASE_URL must set user in the URL authority");
+  });
+
+  it("rejects query parameters that override the database endpoint", () => {
+    for (const override of ["host=pooler.example.com", "port=5432"]) {
+      expect(() =>
+        parseDatabaseEnv({
+          DATABASE_URL: "postgres://runtime:pass@pooler.example.com:5432/app",
+          DATABASE_URL_UNPOOLED: `postgres://migration:pass@direct.example.com:6432/app?${override}`,
+        })
+      ).toThrow("DATABASE_URL_UNPOOLED must set");
+    }
   });
 
   it("rejects the same database principal with percent-encoded characters", () => {

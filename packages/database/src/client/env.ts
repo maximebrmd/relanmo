@@ -39,16 +39,18 @@ function requireValue(source: EnvSource, key: string): string {
 const DEFAULT_POSTGRES_PORT = "5432";
 
 /**
- * A scheme-independent identity for a connection URL (host, port, database
- * path, username). `postgres://` and `postgresql://` name the same
+ * A scheme-independent identity for a connection URL (host, port and database
+ * path). `postgres://` and `postgresql://` name the same
  * endpoint, as does an explicit default port vs. an omitted one; comparing
  * raw connection strings would miss both, so the separation check below
  * compares this instead.
  */
 function connectionIdentity(url: URL): string {
   const port = url.port || DEFAULT_POSTGRES_PORT;
-  return `${url.hostname.toLowerCase()}:${port}${url.pathname}:${url.username}`;
+  return `${url.hostname.toLowerCase()}:${port}${url.pathname}`;
 }
+
+const CONNECTION_IDENTITY_QUERY_PARAMETERS = ["host", "port", "user"] as const;
 
 type ParsedConnectionUrl = Readonly<{
   identity: string;
@@ -68,10 +70,12 @@ function parseConnectionUrl(value: string, key: string): ParsedConnectionUrl {
       `${key} must use the postgres:// or postgresql:// scheme`
     );
   }
-  if (parsed.searchParams.has("user")) {
-    throw new DatabaseConfigError(
-      `${key} must set the database username in the URL authority, not the user query parameter`
-    );
+  for (const parameter of CONNECTION_IDENTITY_QUERY_PARAMETERS) {
+    if (parsed.searchParams.has(parameter)) {
+      throw new DatabaseConfigError(
+        `${key} must set ${parameter} in the URL authority; the ${parameter} query parameter is not allowed`
+      );
+    }
   }
   if (parsed.username.length === 0) {
     throw new DatabaseConfigError(
