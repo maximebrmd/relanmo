@@ -25,6 +25,7 @@ export const EVIDENCE_ID_UNKNOWN = parseEvidenceId(
 
 export const approvedEvidenceFixture: Evidence = parseEvidence({
   accountId: null,
+  assertions: [],
   capturedAt: FIXTURE_TIME,
   contentHash: null,
   evidenceId: EVIDENCE_ID_HIRING_POST,

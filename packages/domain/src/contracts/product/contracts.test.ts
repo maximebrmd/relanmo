@@ -232,6 +232,7 @@ describe("product DTO fixtures", () => {
       parseStyleCommand({
         expectedRevision: 2,
         input: {
+          addressForm: "VOUS",
           examples: [],
           instructions: null,
           stepOverrides: [],
@@ -344,6 +345,7 @@ describe("product DTO invalid cases", () => {
       safeParseStyleCommand({
         expectedRevision: 2,
         input: {
+          addressForm: "VOUS",
           examples: [],
           instructions: null,
           stepOverrides: [

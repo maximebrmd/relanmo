@@ -27,7 +27,11 @@ export type StyleStepOverride = Readonly<{
   text: string;
 }>;
 
+export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
+export type AddressForm = (typeof ADDRESS_FORMS)[number];
+
 export type StyleInput = Readonly<{
+  addressForm: AddressForm;
   examples: readonly string[];
   instructions: string | null;
   stepOverrides: readonly StyleStepOverride[];

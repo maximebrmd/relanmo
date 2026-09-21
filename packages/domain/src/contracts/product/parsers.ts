@@ -129,7 +129,7 @@ import type {
   ProfileInput,
   ProfileView,
 } from "./profile";
-import { STYLE_COMMAND_KINDS, STYLE_SOURCES } from "./style";
+import { ADDRESS_FORMS, STYLE_COMMAND_KINDS, STYLE_SOURCES } from "./style";
 import type {
   DraftPreviewView,
   StyleCommand,
@@ -997,6 +997,11 @@ function parseStyleInputAt(value: unknown, path: string): StyleInput {
   const record = expectRecord(value, path);
   const seen = new Set<string>();
   return Object.freeze({
+    addressForm: member(
+      readRequired(record, "addressForm"),
+      ADDRESS_FORMS,
+      `${path}.addressForm`
+    ),
     examples: parseProductStringList(
       readRequired(record, "examples"),
       `${path}.examples`,

@@ -89,6 +89,7 @@ function evidenceInput(
 ): Evidence {
   return {
     accountId: ACCOUNT_A,
+    assertions: [],
     capturedAt: observedAt,
     contentHash: "sha256:claim-1",
     evidenceId,

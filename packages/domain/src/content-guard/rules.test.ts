@@ -56,6 +56,7 @@ describe("evaluateContentGuard", () => {
     // check on the claim's own text catches this.
     const evidence = parseEvidence({
       accountId: null,
+      assertions: [],
       capturedAt: "2026-09-17T10:00:00.000Z",
       contentHash: null,
       evidenceId: EVIDENCE_ID_HIRING_POST,
@@ -128,6 +129,7 @@ describe("evaluateContentGuard", () => {
   it("fails a claim citing real evidence that belongs to a different tenant/prospect", () => {
     const foreignEvidence = parseEvidence({
       accountId: null,
+      assertions: [],
       capturedAt: "2026-09-17T10:00:00.000Z",
       contentHash: null,
       evidenceId: EVIDENCE_ID_HIRING_POST,

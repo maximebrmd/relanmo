@@ -110,6 +110,7 @@ export const styleProfileVersions = pgTable(
       .references(() => tenants.id),
     kind: styleProfileVersionKind("kind").notNull(),
     revision: integer("revision").notNull(),
+    addressForm: text("address_form").$type<"VOUS" | "TU">(),
     tone: frenchTone("tone"),
     formality: styleFormality("formality"),
     greeting: text("greeting"),
@@ -147,7 +148,7 @@ export const styleProfileVersions = pgTable(
     index("styleProfileVersions_tenantId_idx").on(table.tenantId),
     check(
       "styleProfileVersions_explicitRequirements_check",
-      sql`${table.kind} <> 'STYLE_EXPLICIT' OR (${table.createdBy} IS NOT NULL AND ${table.formality} IS NOT NULL AND ${table.tone} IS NOT NULL)`
+      sql`${table.kind} <> 'STYLE_EXPLICIT' OR (${table.createdBy} IS NOT NULL AND ${table.addressForm} IS NOT NULL AND ${table.formality} IS NOT NULL AND ${table.tone} IS NOT NULL)`
     ),
     check(
       "styleProfileVersions_inferredModel_check",

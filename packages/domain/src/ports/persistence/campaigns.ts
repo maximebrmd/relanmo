@@ -5,7 +5,7 @@ import type {
   ExplicitStyleVersionId,
   InferredStyleVersionId,
   ModelVersion,
-  PromptVersionId,
+  PromptOverrideVersionId,
   TenantId,
   UserId,
 } from "../../contracts/ids";
@@ -188,6 +188,7 @@ export interface CampaignRepository {
 }
 
 export type ExplicitStyleSettings = Readonly<{
+  addressForm: "VOUS" | "TU";
   closing: string | null;
   examples: readonly string[];
   forbiddenPhrases: readonly string[];
@@ -237,7 +238,12 @@ export type StyleOverrideSettings = Readonly<
   Partial<
     Pick<
       ExplicitStyleSettings,
-      "closing" | "forbiddenPhrases" | "greeting" | "maxCharacters" | "tone"
+      | "addressForm"
+      | "closing"
+      | "forbiddenPhrases"
+      | "greeting"
+      | "maxCharacters"
+      | "tone"
     >
   >
 >;
@@ -277,7 +283,7 @@ export type SaveStyleOverrideInput = Readonly<{
   settings: StyleOverrideSettings;
   stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
-  versionId: PromptVersionId;
+  versionId: PromptOverrideVersionId;
 }>;
 
 export type ResetStyleToDefaultsInput = Readonly<{

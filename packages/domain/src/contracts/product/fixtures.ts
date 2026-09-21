@@ -242,6 +242,7 @@ export const campaignPausedStateFixture: ProductViewState<CampaignView> = {
 };
 
 export const styleViewFixture: StyleView = parseStyleView({
+  addressForm: "VOUS",
   examples: ["Bonjour, votre expérience m’intéresse."],
   instructions: "Rester précis, humain et concis.",
   acceptedInferredStyleVersionId: null,

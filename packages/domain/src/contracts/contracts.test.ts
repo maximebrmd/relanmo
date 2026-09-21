@@ -152,6 +152,7 @@ describe("domain contract fixtures", () => {
   it("requires evidence provenance instead of accepting model assertions", () => {
     const evidence = parseEvidence({
       accountId: "account_demo",
+      assertions: [],
       capturedAt: timestamp,
       contentHash: null,
       evidenceId: "evidence_offer_1",

@@ -33,8 +33,12 @@ import type {
   EligibilitySnapshot,
   EligibilityVersionSnapshot,
 } from "./eligibility";
-import { EVIDENCE_PROVENANCE } from "./evidence";
-import type { Evidence, EvidenceProvenance } from "./evidence";
+import { EVIDENCE_ASSERTION_KINDS, EVIDENCE_PROVENANCE } from "./evidence";
+import type {
+  Evidence,
+  EvidenceAssertion,
+  EvidenceProvenance,
+} from "./evidence";
 import {
   parseAccountId,
   parseActionId,
@@ -422,10 +426,35 @@ function parseEvidenceProvenance(
   return member(value, EVIDENCE_PROVENANCE, path);
 }
 
+function parseEvidenceAssertion(
+  value: unknown,
+  path: string
+): EvidenceAssertion {
+  const record = expectRecord(value, path);
+  return Object.freeze({
+    detail: nullableNonEmptyString(
+      readRequired(record, "detail"),
+      `${path}.detail`
+    ),
+    kind: member(
+      readRequired(record, "kind"),
+      EVIDENCE_ASSERTION_KINDS,
+      `${path}.kind`
+    ),
+    value: expectNonEmptyString(readRequired(record, "value"), `${path}.value`),
+  });
+}
+
 export function parseEvidence(value: unknown): Evidence {
   const record = expectRecord(value, "evidence");
   return Object.freeze({
     accountId: nullable(readRequired(record, "accountId"), parseAccountId),
+    assertions: expectArrayOf(
+      readRequired(record, "assertions"),
+      parseEvidenceAssertion,
+      "evidence.assertions",
+      20
+    ),
     capturedAt: parseUtcTimestamp(readRequired(record, "capturedAt")),
     contentHash: nullableNonEmptyString(
       readRequired(record, "contentHash"),

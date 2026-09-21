@@ -1,6 +1,5 @@
 import type {
   CampaignVersionRef,
-  DirectMessageStep,
   DraftSourceVersions,
   Evidence,
   EvidenceId,
@@ -14,6 +13,11 @@ import type {
   TenantId,
 } from "@relanmo/domain/contracts";
 import type { WritingOutputBudget } from "@relanmo/domain/ports/providers";
+import type {
+  ExplicitStyleSettings,
+  StyleOverrideSettings,
+} from "@relanmo/domain/ports/persistence/campaigns";
+import type { StyleStepOverride as PersistedStyleStepOverride } from "@relanmo/domain/contracts/product";
 
 import type { MessageHook, SequenceDraftingContext } from "../defaults";
 
@@ -34,6 +38,7 @@ export type AddressForm = (typeof ADDRESS_FORMS)[number];
 export const COMPOSE_FAILURE_CODES = [
   "UNSUPPORTED_VARIABLE",
   "MISSING_EVIDENCE",
+  "INVALID_STYLE_INPUT",
   "STEP_NOT_IN_PLAN",
 ] as const;
 export type ComposeFailureCode = (typeof COMPOSE_FAILURE_CODES)[number];
@@ -46,33 +51,17 @@ export const COMPOSE_SEND_CONTROLS = Object.freeze({
 });
 export type ComposeSendControls = typeof COMPOSE_SEND_CONTROLS;
 
-export type StyleStepOverride = Readonly<{
-  step: DirectMessageStep;
-  text: string;
-}>;
+export type StyleStepOverride = PersistedStyleStepOverride;
 
-export type CampaignStyleOverride = Readonly<{
-  closing?: string | null;
-  forbiddenPhrases?: readonly string[];
-  greeting?: string | null;
-  maxCharacters?: number | null;
-  stepOverrides?: readonly StyleStepOverride[];
-  tone?: string | null;
-}>;
+export type CampaignStyleOverride = Readonly<
+  StyleOverrideSettings & {
+    stepOverrides?: readonly StyleStepOverride[];
+  }
+>;
 
 export type { PromptOverrideVersionRef };
 
-export type ExplicitStyleLayer = Readonly<{
-  closing: string | null;
-  examples: readonly string[];
-  forbiddenPhrases: readonly string[];
-  formality: FormalityLevel;
-  greeting: string | null;
-  instructions: string | null;
-  maxCharacters: number | null;
-  stepOverrides: readonly StyleStepOverride[];
-  tone: string;
-}>;
+export type ExplicitStyleLayer = ExplicitStyleSettings;
 
 export type InferredStyleLayer = Readonly<{
   formality: FormalityLevel | null;

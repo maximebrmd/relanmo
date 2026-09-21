@@ -34,6 +34,9 @@ const HIRING_EVIDENCE_ID = parseEvidenceId("evidence_hiring_post_1");
 
 const hiringEvidence: Evidence = parseEvidence({
   accountId: null,
+  assertions: [
+    { detail: null, kind: "HIRING_ROLE", value: "frontend" },
+  ],
   capturedAt: FIXTURE_TIME,
   contentHash: null,
   evidenceId: HIRING_EVIDENCE_ID,
@@ -48,6 +51,7 @@ const hiringEvidence: Evidence = parseEvidence({
 
 const foreignEvidence: Evidence = parseEvidence({
   accountId: null,
+  assertions: [],
   capturedAt: FIXTURE_TIME,
   contentHash: null,
   evidenceId: "evidence_foreign_1",
@@ -61,6 +65,7 @@ const foreignEvidence: Evidence = parseEvidence({
 
 const negatedHiringEvidence: Evidence = parseEvidence({
   accountId: null,
+  assertions: [],
   capturedAt: FIXTURE_TIME,
   contentHash: null,
   evidenceId: "evidence_negated_hiring_1",
@@ -189,6 +194,7 @@ function explicitLayer(
 ): VersionedExplicitStyleLayer {
   return Object.freeze({
     style: Object.freeze({
+      addressForm: "VOUS",
       closing: null,
       examples: Object.freeze([]),
       forbiddenPhrases: Object.freeze([]),
@@ -196,7 +202,6 @@ function explicitLayer(
       greeting: null,
       instructions: null,
       maxCharacters: null,
-      stepOverrides: Object.freeze([]),
       tone: "DIRECT",
       ...overrides,
     }),
@@ -345,7 +350,7 @@ describe("composeGroundedPrompt", () => {
     for (const item of cases) {
       const result = composeGroundedPrompt(
         composeInput({
-          explicitStyle: explicitLayer({
+          campaignOverride: campaignLayer({
             stepOverrides: Object.freeze([
               Object.freeze({ step: "DM1" as const, text: item.text }),
             ]),
@@ -428,6 +433,55 @@ describe("composeGroundedPrompt", () => {
     expect(result.hook).toBe("NEUTRAL");
     expect(result.targetText).not.toContain("CEO");
     expect(result.usedNeutralFallback).toBe(true);
+  });
+
+  it("uses the typed hiring assertion rather than a matching subject token", () => {
+    const evidence = parseEvidence({
+      accountId: null,
+      assertions: [{ detail: null, kind: "HIRING_ROLE", value: "CTO" }],
+      capturedAt: FIXTURE_TIME,
+      contentHash: null,
+      evidenceId: "evidence_cto_hiring_1",
+      normalizedClaim: "Le CEO recherche un CTO.",
+      prospectId: PROSPECT,
+      provenance: "PROVIDER_POST",
+      sourceId: "source_cto_hiring_1",
+      sourceUrl: null,
+      tenantId: TENANT,
+    });
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [evidence],
+        prospect: {
+          ...hiringProspect,
+          hiringRole: { evidenceId: evidence.evidenceId, text: "CEO" },
+        },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("NEUTRAL");
+      expect(result.targetText).not.toContain("CEO");
+    }
+  });
+
+  it("uses a neutral prompt when a factual hook has no typed evidence", () => {
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [],
+        drafting: {
+          ...hiringDrafting,
+          signalKind: "FUNDING",
+        },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("NEUTRAL");
+      expect(result.targetText).not.toContain("levée");
+    }
   });
 
   it("fails when even the neutral template cannot be filled", () => {
@@ -515,6 +569,49 @@ describe("composeGroundedPrompt", () => {
     );
     expect(result.composedInput).toContain("BEGIN_CUSTOMER_EXAMPLES");
     expect(result.composedInput).toContain("BEGIN_CUSTOMER_INSTRUCTIONS");
+  });
+
+  it("rejects customer style fields beyond persisted product limits", () => {
+    const results = [
+      composeGroundedPrompt(
+        composeInput({
+          explicitStyle: explicitLayer({ instructions: "x".repeat(2001) }),
+        })
+      ),
+      composeGroundedPrompt(
+        composeInput({
+          campaignOverride: campaignLayer({
+            stepOverrides: [{ step: "DM1", text: "x".repeat(2001) }],
+          }),
+        })
+      ),
+    ];
+
+    for (const result of results) {
+      expect(result.kind).toBe("FAILED");
+      if (result.kind === "FAILED") {
+        expect(result.reasons.map((reason) => reason.code)).toContain(
+          "INVALID_STYLE_INPUT"
+        );
+      }
+    }
+  });
+
+  it("keeps address form independent from formality", () => {
+    const result = composeGroundedPrompt(
+      composeInput({
+        explicitStyle: explicitLayer({ addressForm: "TU", formality: "FORMAL" }),
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.resolvedStyle.addressForm).toEqual({
+        source: "EXPLICIT",
+        value: "TU",
+      });
+      expect(result.resolvedStyle.formality.value).toBe("FORMAL");
+    }
   });
 
   it("attaches prompt, style, campaign and model versions plus tenant-scoped evidence", () => {
