@@ -20,7 +20,6 @@ import type {
 } from "@relanmo/domain";
 import { parseUtcTimestamp } from "@relanmo/domain/contracts";
 
-import { MemoryUnipileAccountDirectory } from "./bindings";
 import type { UnipileAccountDirectory } from "./bindings";
 import { normalizeAccountHealth } from "./health";
 import { createSdkGateway, withNotifyUrl } from "./hosted";
@@ -36,11 +35,7 @@ import {
 } from "./parse";
 import type { UnipileLinkedInAccountSnapshot } from "./parse";
 
-export {
-  MemoryUnipileAccountDirectory,
-  type UnipileAccountBindingResult,
-  type UnipileAccountDirectory,
-} from "./bindings";
+export type { UnipileAccountDirectory } from "./bindings";
 export {
   unipileAccountsApiKey,
   unipileAccountsBaseUrl,
@@ -63,7 +58,7 @@ export type UnipileAccountsConfig = Readonly<{
   apiKey: string;
   baseUrl: string;
   clock?: () => Date;
-  directory?: UnipileAccountDirectory;
+  directory: UnipileAccountDirectory;
   gateway?: UnipileAccountsGateway;
   notifyUrl?: string;
 }>;
@@ -168,16 +163,15 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
   readonly #baseUrl: string;
   readonly #clock: () => Date;
   readonly #directory: UnipileAccountDirectory;
-  readonly #gateway: UnipileAccountsGateway;
+  #gateway: UnipileAccountsGateway | undefined;
   readonly #notifyUrl: string | null;
 
   constructor(config: UnipileAccountsConfig) {
     this.#apiKey = config.apiKey;
     this.#baseUrl = config.baseUrl;
     this.#clock = config.clock ?? (() => new Date());
-    this.#directory = config.directory ?? new MemoryUnipileAccountDirectory();
-    this.#gateway =
-      config.gateway ?? createSdkGateway(config.baseUrl, config.apiKey);
+    this.#directory = config.directory;
+    this.#gateway = config.gateway;
     this.#notifyUrl = config.notifyUrl ?? null;
   }
 
@@ -311,15 +305,15 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     account: LinkedInAccountRef,
     context: ProviderOperationContext
   ) {
-    const result = await this.#directory.bind(
+    const authorized = await this.#directory.isAuthorized(
       account.providerAccountId,
       account.tenantId
     );
-    if (result === "CONFLICT") {
+    if (!authorized) {
       return providerDefinitiveRefusal(
         context,
         "ACCOUNT_NOT_AUTHORIZED",
-        "provider account is bound to another tenant"
+        "provider account is not authorized for this tenant"
       );
     }
     return null;
@@ -333,7 +327,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
   }): Promise<ProviderWriteResult<LinkedInHostedFlow>> {
     try {
       const response = await this.#withDeadline(
-        this.#gateway.createHostedAuthLink(input.request),
+        this.#getGateway().createHostedAuthLink(input.request),
         input.context.deadlineAt
       );
       if (response.url.trim().length === 0) {
@@ -370,7 +364,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
       }
       try {
         return await this.#withDeadline(
-          this.#gateway.getAccount(providerAccountId),
+          this.#getGateway().getAccount(providerAccountId),
           context.deadlineAt
         );
       } catch (error) {
@@ -413,6 +407,11 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
       return providerUnavailableCredentials(context, "LINKEDIN", "APPLICATION");
     }
     return null;
+  }
+
+  #getGateway(): UnipileAccountsGateway {
+    this.#gateway ??= createSdkGateway(this.#baseUrl, this.#apiKey);
+    return this.#gateway;
   }
 
   #readFailure(

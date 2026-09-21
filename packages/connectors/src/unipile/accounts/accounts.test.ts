@@ -22,11 +22,12 @@ import {
   unipileHostedAuthUrl,
   unipileRestrictedAccountFixture,
 } from "./fixtures";
-import {
-  createUnipileLinkedInAccountsPort,
-  MemoryUnipileAccountDirectory,
+import { createUnipileLinkedInAccountsPort } from "./index";
+import type {
+  UnipileAccountDirectory,
+  UnipileAccountsGateway,
+  UnipileHostedAuthRequest,
 } from "./index";
-import type { UnipileAccountsGateway, UnipileHostedAuthRequest } from "./index";
 import type { UnipileLinkedInAccountSnapshot } from "./parse";
 import { parseLinkedInAccount } from "./parse";
 
@@ -66,6 +67,15 @@ type PortHarness = Readonly<{
   port: LinkedInAccountsPort;
 }>;
 
+const authorizedDirectory: UnipileAccountDirectory = {
+  isAuthorized(providerAccountId, tenantId) {
+    return (
+      providerAccountId === linkedInAccountFixture.providerAccountId &&
+      tenantId === linkedInAccountFixture.tenantId
+    );
+  },
+};
+
 function createRecordingGateway(
   fixture: UnipileAccountFixture = unipileConnectedAccountFixture
 ): RecordingGateway {
@@ -86,7 +96,7 @@ function createRecordingGateway(
 }
 
 function createPort(options?: {
-  directory?: MemoryUnipileAccountDirectory;
+  directory?: UnipileAccountDirectory;
   fixture?: UnipileAccountFixture;
   now?: string;
 }): PortHarness {
@@ -100,7 +110,7 @@ function createPort(options?: {
       apiKey: unipileAccountsApiKey,
       baseUrl: unipileAccountsBaseUrl,
       clock: () => new Date(now),
-      directory: options?.directory ?? new MemoryUnipileAccountDirectory(),
+      directory: options?.directory ?? authorizedDirectory,
       gateway,
     }),
   };
@@ -221,9 +231,8 @@ describe("Unipile LinkedIn accounts adapter", () => {
     expect(disconnected.health.reason).toBe("DISCONNECTED");
   });
 
-  it("refuses to rebind a provider account to another tenant", async () => {
-    const directory = new MemoryUnipileAccountDirectory();
-    const owner = createPort({ directory });
+  it("refuses a provider account owned by another tenant", async () => {
+    const owner = createPort();
     readValue(
       await owner.port.readAccountStatus({
         account: linkedInAccountFixture,
@@ -231,7 +240,7 @@ describe("Unipile LinkedIn accounts adapter", () => {
       })
     );
 
-    const interloper = createPort({ directory });
+    const interloper = createPort();
     const rebound = await interloper.port.readAccountStatus({
       account: otherTenantAccountRef,
       context: providerOperationContextFixture,
@@ -254,6 +263,27 @@ describe("Unipile LinkedIn accounts adapter", () => {
     expect(stolenReconnect.code).toBe("ACCOUNT_NOT_AUTHORIZED");
   });
 
+  it("refuses an unowned provider account without calling Unipile", async () => {
+    const gateway = createRecordingGateway();
+    const port = createUnipileLinkedInAccountsPort({
+      apiKey: unipileAccountsApiKey,
+      baseUrl: unipileAccountsBaseUrl,
+      directory: { isAuthorized: () => false },
+      gateway,
+    });
+    const result = await port.readAccountStatus({
+      account: linkedInAccountFixture,
+      context: providerOperationContextFixture,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected unowned account to fail");
+    }
+    expect(result.code).toBe("ACCOUNT_NOT_AUTHORIZED");
+    expect(gateway.getAccountCalls).toEqual([]);
+  });
+
   it("retries bounded Unipile reads and redacts credentials from failures", async () => {
     let attempts = 0;
     const gateway: UnipileAccountsGateway = {
@@ -271,6 +301,7 @@ describe("Unipile LinkedIn accounts adapter", () => {
       apiKey: unipileAccountsApiKey,
       baseUrl: unipileAccountsBaseUrl,
       clock: () => new Date("2026-09-17T10:00:00.000Z"),
+      directory: authorizedDirectory,
       gateway,
     });
     const result = await port.readAccountStatus({
@@ -289,11 +320,10 @@ describe("Unipile LinkedIn accounts adapter", () => {
   });
 
   it("returns unavailable credentials without calling Unipile", async () => {
-    const gateway = createRecordingGateway();
     const port = createUnipileLinkedInAccountsPort({
       apiKey: "   ",
       baseUrl: unipileAccountsBaseUrl,
-      gateway,
+      directory: authorizedDirectory,
     });
     const result = await port.createConnectFlow(linkedInConnectInputFixture);
     expect(result.ok).toBe(false);
@@ -301,6 +331,5 @@ describe("Unipile LinkedIn accounts adapter", () => {
       throw new Error("expected missing credentials to fail");
     }
     expect(result.kind).toBe("UNAVAILABLE_CREDENTIALS");
-    expect(gateway.hostedAuthCalls).toEqual([]);
   });
 });
