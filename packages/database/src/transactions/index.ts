@@ -9,5 +9,6 @@ export {
   unregisterExecutor,
 } from "./registry";
 export { createPersistenceTransactionRunner } from "./runner";
+export type { TrustedPersistenceTransactionRunner } from "./runner";
 
 export const databaseTransactionsSurface = "node-portable-server" as const;

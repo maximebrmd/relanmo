@@ -3,10 +3,10 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 /**
- * RLS policies (a later task) read this per-transaction setting. It is set
- * with `set_config(..., is_local = true)`, so PostgreSQL discards it when
- * the transaction commits or rolls back; a pooled connection therefore
- * starts its next transaction with no residual tenant context.
+ * Tenant RLS policies read this per-transaction setting. It is set with
+ * `set_config(..., is_local = true)`, so PostgreSQL discards it when the
+ * transaction commits or rolls back; a pooled connection therefore starts
+ * its next transaction with no residual tenant context.
  */
 export const TENANT_CONTEXT_GUC = "app.tenant_id" as const;
 

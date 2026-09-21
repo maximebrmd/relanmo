@@ -2,6 +2,8 @@
 
 import type { PersistenceError } from "@relanmo/domain/ports/persistence";
 
+import { UntrustedSqlAccessError } from "../security/errors";
+
 type PgLikeError = Readonly<{ code?: unknown; message?: unknown }>;
 
 function isPgLikeError(error: unknown): error is PgLikeError {
@@ -36,6 +38,9 @@ const SERIALIZATION_SQLSTATES = new Set(["40001", "40P01"]);
  * this path; only unexpected/thrown errors do.
  */
 export function mapUnexpectedError(error: unknown): PersistenceError {
+  if (error instanceof UntrustedSqlAccessError) {
+    return { code: "FORBIDDEN", detail: error.message, retryable: false };
+  }
   const detail = describe(error);
   const code = sqlState(error);
 
