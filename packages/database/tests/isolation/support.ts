@@ -1,10 +1,14 @@
 import { Client } from "pg";
 
-import { RUNTIME_DATABASE_ROLES } from "../../src/security";
+import {
+  AUTH_DATABASE_ROLE,
+  RUNTIME_DATABASE_ROLES,
+} from "../../src/security";
 import type { IsolatedTestDatabase } from "../support/test-database";
 
 export const ISOLATION_ROLE_PASSWORDS = {
   app: "isolation-app",
+  auth: "isolation-auth",
   worker: "isolation-worker",
 } as const;
 
@@ -33,7 +37,9 @@ function connectionUrl(
 
 export function runtimeRoleUrl(
   target: IsolatedTestDatabase,
-  role: (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES],
+  role:
+    | (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES]
+    | typeof AUTH_DATABASE_ROLE,
   password: string
 ): string {
   return connectionUrl(
@@ -67,6 +73,9 @@ export async function provisionRuntimeRoleLogins(
     );
     await client.query(
       `alter role ${RUNTIME_DATABASE_ROLES.worker} with login password ${sqlLiteral(ISOLATION_ROLE_PASSWORDS.worker)}`
+    );
+    await client.query(
+      `alter role ${AUTH_DATABASE_ROLE} with login password ${sqlLiteral(ISOLATION_ROLE_PASSWORDS.auth)}`
     );
   });
 }

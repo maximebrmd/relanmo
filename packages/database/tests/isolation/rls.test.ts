@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { applyDatabaseMigrations } from "../../src/schema/apply-migrations";
 import {
   applyTrustedSqlContext,
+  AUTH_DATABASE_ROLE,
   AUTH_SECRET_TABLES,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
@@ -87,12 +88,21 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
              from pg_roles
             where rolname = any($1::text[])
             order by rolname`,
-          [[RUNTIME_DATABASE_ROLES.app, RUNTIME_DATABASE_ROLES.worker]]
+          [[
+            RUNTIME_DATABASE_ROLES.app,
+            AUTH_DATABASE_ROLE,
+            RUNTIME_DATABASE_ROLES.worker,
+          ]]
         );
         expect(roles.rows).toEqual([
           {
             rolbypassrls: false,
             rolname: RUNTIME_DATABASE_ROLES.app,
+            rolsuper: false,
+          },
+          {
+            rolbypassrls: false,
+            rolname: AUTH_DATABASE_ROLE,
             rolsuper: false,
           },
           {
@@ -112,8 +122,13 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
         );
         for (const row of owners.rows) {
           expect(row.owner).not.toBe(RUNTIME_DATABASE_ROLES.app);
+          expect(row.owner).not.toBe(AUTH_DATABASE_ROLE);
           expect(row.owner).not.toBe(RUNTIME_DATABASE_ROLES.worker);
         }
+
+        await owner.query(
+          "create table _unreviewed_tenant_rows (id text primary key, tenant_id text not null)"
+        );
       });
 
       await withClient(
@@ -136,6 +151,9 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           });
           await expect(
             app.query("alter table campaigns disable row level security")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            app.query("select * from _unreviewed_tenant_rows")
           ).rejects.toMatchObject({ code: "42501" });
         }
       );
@@ -220,39 +238,70 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
             ).rejects.toMatchObject({ code: "42501" });
             await app.query("rollback to savepoint no_context_write");
 
+            await expect(
+              app.query("select token from session where id = $1", [
+                "session-a",
+              ])
+            ).rejects.toMatchObject({ code: "42501" });
+            await app.query("rollback to savepoint no_context_write");
+
             await applyTrustedSqlContext(
               app,
               mintAuthPreSessionAccess({ userId: null })
             );
-            const sessions = await app.query<{ token: string }>(
-              "select token from session where id = $1",
-              ["session-a"]
-            );
-            expect(sessions.rows[0]?.token).toBe("session-token-a");
+            await app.query("savepoint auth_secret_denial");
+            await expect(
+              app.query("select token from session where id = $1", [
+                "session-a",
+              ])
+            ).rejects.toMatchObject({ code: "42501" });
+            await app.query("rollback to savepoint auth_secret_denial");
             const tenantSetting = await app.query<{
               tenant_id: string | null;
             }>(`select current_setting($1, true) as tenant_id`, [
               TENANT_CONTEXT_GUC,
             ]);
             expect(tenantSetting.rows[0]?.tenant_id).toBe("");
+          } finally {
+            await app.query("rollback");
+          }
+        }
+      );
 
+      await withClient(
+        runtimeRoleUrl(
+          database,
+          AUTH_DATABASE_ROLE,
+          ISOLATION_ROLE_PASSWORDS.auth
+        ),
+        async (auth) => {
+          const sessions = await auth.query<{ token: string }>(
+            "select token from session where id = $1",
+            ["session-a"]
+          );
+          expect(sessions.rows[0]?.token).toBe("session-token-a");
+          await auth.query("begin");
+          try {
             await applyTrustedSqlContext(
-              app,
+              auth,
               mintAuthPreSessionAccess({ userId: parseUserId(USER_A) })
             );
-            const memberships = await app.query<{ tenant_id: string }>(
+            const memberships = await auth.query<{ tenant_id: string }>(
               "select tenant_id from memberships order by tenant_id"
             );
             expect(memberships.rows.map((row) => row.tenant_id)).toEqual([
               TENANT_A,
             ]);
-            const tenants = await app.query<{ id: string }>(
+            const tenants = await auth.query<{ id: string }>(
               "select id from tenants order by id"
             );
             expect(tenants.rows.map((row) => row.id)).toEqual([TENANT_A]);
           } finally {
-            await app.query("rollback");
+            await auth.query("rollback");
           }
+          await expect(
+            auth.query("select id from campaigns")
+          ).rejects.toMatchObject({ code: "42501" });
         }
       );
     },
@@ -283,6 +332,21 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           /* oxlint-enable no-await-in-loop */
           await expect(
             worker.query("select * from rate_limit")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query('select * from "user"')
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query("delete from audit_events where false")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query("delete from billing_entitlements where false")
+          ).rejects.toMatchObject({ code: "42501" });
+          await expect(
+            worker.query(
+              "insert into campaigns (id, tenant_id) values ($1, $2)",
+              ["worker-campaign", TENANT_A]
+            )
           ).rejects.toMatchObject({ code: "42501" });
 
           await worker.query("begin");

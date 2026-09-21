@@ -15,6 +15,7 @@ import type { IsolatedTestDatabase } from "../../tests/support/test-database";
 import { createIsolatedTestDatabase } from "../../tests/support/test-database";
 import { createDatabaseRuntimeClient } from "../client";
 import type { DatabaseEnv, DatabaseRuntimeClient } from "../client";
+import { mintTrustedTenantAccess } from "../security";
 import type { TransactionExecutor } from "./registry";
 import { resolveTransactionExecutor } from "./registry";
 import { createPersistenceTransactionRunner } from "./runner";
@@ -87,7 +88,7 @@ describe("persistence transaction runner (live local Postgres)", () => {
       const runner = createPersistenceTransactionRunner(client.db);
 
       const first = await runner.run({
-        scope: scopeFor("tenant-a"),
+        access: mintTrustedTenantAccess(scopeFor("tenant-a")),
         work: async (tx) => {
           const seenInsideTx = await readTenantSetting(
             resolveTransactionExecutor(tx)
@@ -124,7 +125,7 @@ describe("persistence transaction runner (live local Postgres)", () => {
       const results = await Promise.all(
         tenantIds.map((tenant) =>
           runner.run({
-            scope: scopeFor(tenant),
+            access: mintTrustedTenantAccess(scopeFor(tenant)),
             work: async (tx) => {
               const db = resolveTransactionExecutor(tx);
               const firstRead = await readTenantSetting(db);
@@ -167,7 +168,7 @@ describe("persistence transaction runner (live local Postgres)", () => {
       const marker = randomUUID();
 
       const failed = await runner.run({
-        scope: scopeFor("tenant-rollback"),
+        access: mintTrustedTenantAccess(scopeFor("tenant-rollback")),
         work: async (tx) => {
           const db = resolveTransactionExecutor(tx);
           await db.execute(
@@ -197,7 +198,7 @@ describe("persistence transaction runner (live local Postgres)", () => {
       // Pool max is 1: a second transaction only succeeds promptly if the
       // failed one actually released its connection back to the pool.
       const second = await runner.run({
-        scope: scopeFor("tenant-after-rollback"),
+        access: mintTrustedTenantAccess(scopeFor("tenant-after-rollback")),
         work: () => Promise.resolve({ ok: true as const, value: null }),
       });
       expect(second.ok).toBe(true);
@@ -217,7 +218,7 @@ describe("persistence transaction runner (live local Postgres)", () => {
       let capturedTx: PersistenceTransaction | undefined;
 
       await runner.run({
-        scope: scopeFor("tenant-settled"),
+        access: mintTrustedTenantAccess(scopeFor("tenant-settled")),
         work: (tx) => {
           capturedTx = tx;
           return Promise.resolve({ ok: true as const, value: null });

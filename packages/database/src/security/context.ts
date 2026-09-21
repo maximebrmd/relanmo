@@ -69,6 +69,15 @@ export function mintTrustedTenantAccess(
   };
 }
 
+export function requireTrustedTenantAccess(
+  access: TenantSqlAccess
+): TenantTransactionScope {
+  if (access[trustedSqlAccessBrand] !== true || access.kind !== "tenant") {
+    throw new UntrustedSqlAccessError();
+  }
+  return access.scope;
+}
+
 export function mintAuthPreSessionAccess(
   input: AuthPreSessionInput
 ): AuthPreSessionSqlAccess {

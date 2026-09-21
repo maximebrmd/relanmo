@@ -6,6 +6,7 @@ export {
   applyTrustedSqlContext,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
+  requireTrustedTenantAccess,
 } from "./context";
 export type {
   AuthPreSessionInput,
@@ -15,7 +16,11 @@ export type {
   TrustedSqlSession,
 } from "./context";
 export { UntrustedSqlAccessError } from "./errors";
-export { AUTH_SECRET_TABLES, RUNTIME_DATABASE_ROLES } from "./roles";
+export {
+  AUTH_DATABASE_ROLE,
+  AUTH_SECRET_TABLES,
+  RUNTIME_DATABASE_ROLES,
+} from "./roles";
 export type { RuntimeDatabaseRole } from "./roles";
 
 export const databaseSecuritySurface = "node-portable-server" as const;

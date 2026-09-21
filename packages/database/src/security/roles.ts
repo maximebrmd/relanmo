@@ -3,6 +3,8 @@ export const RUNTIME_DATABASE_ROLES = {
   worker: "relanmo_worker",
 } as const;
 
+export const AUTH_DATABASE_ROLE = "relanmo_auth" as const;
+
 export type RuntimeDatabaseRole =
   (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES];
 

@@ -3,15 +3,21 @@ import type {
   PersistenceWorkerId,
   TenantTransactionScope,
 } from "@relanmo/domain/ports/persistence";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { describe, expect, it } from "vitest";
 
+import { createPersistenceTransactionRunner } from "../transactions/runner";
 import {
   applyTrustedSqlContext,
   mintAuthPreSessionAccess,
   mintTrustedTenantAccess,
   UntrustedSqlAccessError,
 } from "./index";
-import type { TrustedSqlAccess, TrustedSqlSession } from "./index";
+import type {
+  TenantSqlAccess,
+  TrustedSqlAccess,
+  TrustedSqlSession,
+} from "./index";
 
 function memberScope(tenant: string): TenantTransactionScope {
   return {
@@ -66,6 +72,22 @@ describe("trusted SQL access minting", () => {
         // SAFETY: unbranded payload used only to prove the minting gate.
         forged as TrustedSqlAccess
       )
+    ).rejects.toThrow(UntrustedSqlAccessError);
+  });
+
+  it("rejects unbranded access at the production transaction entry", async () => {
+    const runner = createPersistenceTransactionRunner({} as NodePgDatabase);
+    const forged = {
+      kind: "tenant" as const,
+      scope: memberScope("tenant-a"),
+    };
+
+    await expect(
+      runner.run({
+        // SAFETY: unbranded input exercises the runtime production boundary.
+        access: forged as TenantSqlAccess,
+        work: () => Promise.resolve({ ok: true as const, value: null }),
+      })
     ).rejects.toThrow(UntrustedSqlAccessError);
   });
 

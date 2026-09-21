@@ -11,34 +11,42 @@ BEGIN
     CREATE ROLE relanmo_worker
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'relanmo_auth') THEN
+    CREATE ROLE relanmo_auth
+      NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
+  END IF;
 END
 $$;
 --> statement-breakpoint
+ALTER ROLE relanmo_app
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
+--> statement-breakpoint
+ALTER ROLE relanmo_worker
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
+--> statement-breakpoint
+ALTER ROLE relanmo_auth
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
+--> statement-breakpoint
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 --> statement-breakpoint
-GRANT USAGE ON SCHEMA public TO relanmo_app, relanmo_worker;
+GRANT USAGE ON SCHEMA public TO relanmo_app, relanmo_worker, relanmo_auth;
 --> statement-breakpoint
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO relanmo_app;
---> statement-breakpoint
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO relanmo_app, relanmo_worker;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO relanmo_app, relanmo_worker, relanmo_auth;
 --> statement-breakpoint
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO relanmo_app;
+  GRANT USAGE ON TYPES TO relanmo_app, relanmo_worker, relanmo_auth;
 --> statement-breakpoint
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE ON TYPES TO relanmo_app, relanmo_worker;
---> statement-breakpoint
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO relanmo_app, relanmo_worker;
+  GRANT USAGE, SELECT ON SEQUENCES TO relanmo_app, relanmo_worker, relanmo_auth;
 --> statement-breakpoint
 DO $$
 DECLARE
   target record;
 BEGIN
   EXECUTE format(
-    'GRANT CONNECT ON DATABASE %I TO relanmo_app, relanmo_worker',
+    'GRANT CONNECT ON DATABASE %I TO relanmo_app, relanmo_worker, relanmo_auth',
     current_database()
   );
 
@@ -50,7 +58,7 @@ BEGIN
        AND t.typtype = 'e'
   LOOP
     EXECUTE format(
-      'GRANT USAGE ON TYPE %I TO relanmo_app, relanmo_worker',
+      'GRANT USAGE ON TYPE %I TO relanmo_app, relanmo_worker, relanmo_auth',
       target.type_name
     );
   END LOOP;
@@ -62,7 +70,7 @@ BEGIN
        AND column_name = 'tenant_id'
   LOOP
     EXECUTE format(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I TO relanmo_worker',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I TO relanmo_app',
       target.table_name
     );
     EXECUTE format(
@@ -88,7 +96,7 @@ BEGIN
     );
   END LOOP;
 
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE tenants TO relanmo_worker;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE tenants TO relanmo_app;
   ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenants_tenant_isolation ON tenants
     FOR ALL
@@ -104,7 +112,7 @@ BEGIN
 
   CREATE POLICY memberships_auth_pre_session_select ON memberships
     FOR SELECT
-    TO relanmo_app
+    TO relanmo_auth
     USING (
       current_setting('app.access_mode', true) = 'auth_pre_session'
       AND user_id = current_setting('app.user_id', true)
@@ -113,7 +121,7 @@ BEGIN
 
   CREATE POLICY tenants_auth_pre_session_select ON tenants
     FOR SELECT
-    TO relanmo_app
+    TO relanmo_auth
     USING (
       current_setting('app.access_mode', true) = 'auth_pre_session'
       AND EXISTS (
@@ -125,6 +133,67 @@ BEGIN
       )
     );
 
-  EXECUTE 'GRANT SELECT ON TABLE "user" TO relanmo_worker';
+  GRANT SELECT ON TABLE
+    tenants,
+    memberships,
+    freelancer_profiles,
+    campaigns,
+    campaign_versions,
+    style_profiles,
+    style_profile_versions,
+    prompt_overrides,
+    prompt_override_versions,
+    billing_entitlements,
+    provider_accounts,
+    prospects,
+    evidence,
+    conversations,
+    messages,
+    suppression_entries,
+    actions,
+    send_attempts,
+    send_receipts,
+    account_leases,
+    quota_reservations,
+    webhook_events,
+    outbox_events,
+    action_events,
+    usage_events,
+    audit_events
+  TO relanmo_worker;
+
+  GRANT INSERT, UPDATE ON TABLE
+    provider_accounts,
+    prospects,
+    style_profiles,
+    style_profile_versions,
+    conversations,
+    messages,
+    suppression_entries,
+    actions,
+    send_attempts,
+    account_leases,
+    quota_reservations,
+    webhook_events,
+    outbox_events
+  TO relanmo_worker;
+
+  GRANT INSERT ON TABLE
+    evidence,
+    send_receipts,
+    action_events,
+    usage_events,
+    audit_events
+  TO relanmo_worker;
+
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+    "user",
+    session,
+    login_account,
+    verification,
+    rate_limit
+  TO relanmo_auth;
+
+  GRANT SELECT ON TABLE tenants, memberships TO relanmo_auth;
 END
 $$;
