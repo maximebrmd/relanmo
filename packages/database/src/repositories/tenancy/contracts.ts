@@ -1,4 +1,7 @@
-import type { CampaignId } from "@relanmo/domain/contracts";
+import type {
+  CampaignId,
+  PromptVersionRef,
+} from "@relanmo/domain/contracts";
 import type {
   CurrentVersionRepository,
   GetProfileInput,
@@ -10,6 +13,10 @@ import type {
 
 export type CampaignScope = Readonly<{
   campaignId: CampaignId;
+}>;
+
+export type TenancyVersionSources = Readonly<{
+  defaultPromptVersion: () => PromptVersionRef;
 }>;
 
 export type CampaignScopedCurrentVersionRepository = Readonly<{

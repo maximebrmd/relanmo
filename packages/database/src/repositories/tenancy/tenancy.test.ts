@@ -10,10 +10,12 @@ import { createPersistenceTransactionRunner } from "@relanmo/database/transactio
 import {
   parseCampaignId,
   parseProfileVersionId,
+  parsePromptVersionId,
   parseTenantId,
   parseUserId,
   parseUtcTimestamp,
 } from "@relanmo/domain/contracts";
+import type { PromptVersionRef } from "@relanmo/domain/contracts";
 import type {
   PersistenceResult,
   PersistenceTransactionWork,
@@ -49,13 +51,28 @@ const SETUP_TIMEOUT_MS = 60_000;
 const TEST_TIMEOUT_MS = 30_000;
 const SHARED_DISPLAY_NAME = "Atelier Lumière";
 const CREATED_AT = parseUtcTimestamp("2026-09-21T10:00:00.000Z");
+const DEFAULT_PROMPT_V1: PromptVersionRef = {
+  createdAt: CREATED_AT,
+  id: parsePromptVersionId("prompt-default-test-v1"),
+  kind: "PROMPT_DEFAULT",
+  revision: 1,
+};
+const DEFAULT_PROMPT_V2: PromptVersionRef = {
+  createdAt: parseUtcTimestamp("2026-09-21T11:00:00.000Z"),
+  id: parsePromptVersionId("prompt-default-test-v2"),
+  kind: "PROMPT_DEFAULT",
+  revision: 2,
+};
 
 let database: IsolatedTestDatabase | null = null;
 let appEnv: DatabaseEnv | null = null;
 let authEnv: DatabaseEnv | null = null;
 let workerEnv: DatabaseEnv | null = null;
+let activeDefaultPrompt = DEFAULT_PROMPT_V1;
 
-const repos = createTenancyRepositories();
+const repos = createTenancyRepositories({
+  defaultPromptVersion: () => activeDefaultPrompt,
+});
 
 function runtimeEnv(
   target: IsolatedTestDatabase,
@@ -204,7 +221,10 @@ function profileInput(
   tenant: string,
   userId: string,
   profileVersionId: string,
-  expected = emptyCurrentVersionSetFixture
+  expected = {
+    ...emptyCurrentVersionSetFixture,
+    defaultPrompt: activeDefaultPrompt,
+  }
 ): SaveProfileRevisionInput {
   return {
     createdAt: CREATED_AT,
@@ -565,7 +585,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           kind: "CAMPAIGN",
           revision: 1,
         },
-        defaultPrompt: null,
+        defaultPrompt: DEFAULT_PROMPT_V1,
         explicitStyle: {
           id: "style-explicit-a-1",
           kind: "STYLE_EXPLICIT",
@@ -615,6 +635,28 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       );
       expect(tenant.tenant?.currentVersions).toEqual(current.versions);
 
+      activeDefaultPrompt = DEFAULT_PROMPT_V2;
+      const promptStale = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.saveRevision(
+            saveInput(
+              TENANT_A,
+              USER_A,
+              "profile-prompt-drift",
+              current.versions,
+              "campaign-a"
+            ),
+            tx
+          )
+        )
+      );
+      expect(promptStale.outcome).toBe("REVISION_CONFLICT");
+      if (promptStale.outcome !== "REVISION_CONFLICT") {
+        throw new Error("expected default-prompt drift to conflict");
+      }
+      expect(promptStale.actual.campaign).toEqual(current.versions.campaign);
+      expect(promptStale.actual.defaultPrompt).toEqual(DEFAULT_PROMPT_V2);
+
       await withClient(database.migrationUrl, async (client) => {
         await client.query(
           `insert into campaign_versions (
@@ -644,7 +686,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
               TENANT_A,
               USER_A,
               "profile-version-drift",
-              current.versions,
+              promptStale.actual,
               "campaign-a"
             ),
             tx
@@ -656,7 +698,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         throw new Error("expected active-version drift to conflict");
       }
       expect(stale.actual.campaign?.id).toBe("campaign-version-a-1-revised");
-      expect(stale.expected).toEqual(current.versions);
+      expect(stale.expected).toEqual(promptStale.actual);
 
       const updated = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>

@@ -2,6 +2,7 @@ import type {
   CampaignScopedCurrentVersionRepository,
   CampaignScopedProfileRepository,
   CampaignScopedTenantRepository,
+  TenancyVersionSources,
 } from "./contracts";
 import {
   createCurrentVersionRepository,
@@ -21,6 +22,7 @@ export type {
   CampaignScopedProfileRepository,
   CampaignScopedSaveProfileRevisionInput,
   CampaignScopedTenantRepository,
+  TenancyVersionSources,
 } from "./contracts";
 
 export type TenancyRepositories = Readonly<{
@@ -29,10 +31,12 @@ export type TenancyRepositories = Readonly<{
   tenants: CampaignScopedTenantRepository;
 }>;
 
-export function createTenancyRepositories(): TenancyRepositories {
+export function createTenancyRepositories(
+  sources: TenancyVersionSources
+): TenancyRepositories {
   return {
-    currentVersions: createCurrentVersionRepository(),
-    profiles: createProfileRepository(),
-    tenants: createTenantRepository(),
+    currentVersions: createCurrentVersionRepository(sources),
+    profiles: createProfileRepository(sources),
+    tenants: createTenantRepository(sources),
   };
 }

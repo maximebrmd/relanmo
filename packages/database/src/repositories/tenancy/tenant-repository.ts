@@ -3,7 +3,10 @@ import { and, asc, eq, ne } from "drizzle-orm";
 
 import { memberships, tenants } from "../../schema/tenancy";
 import { resolveTransactionExecutor } from "../../transactions/registry";
-import type { CampaignScopedTenantRepository } from "./contracts";
+import type {
+  CampaignScopedTenantRepository,
+  TenancyVersionSources,
+} from "./contracts";
 import {
   catchMappingError,
   mapMembershipRecord,
@@ -15,13 +18,23 @@ import { tenantScopeMismatch } from "./scope";
 async function currentVersionsFor(
   tx: PersistenceTransaction,
   campaignId: Parameters<typeof loadCurrentVersions>[2],
+  sources: TenancyVersionSources,
   lock: boolean
 ) {
-  return (await loadCurrentVersions(tx, tx.scope.tenantId, campaignId, lock))
-    .current;
+  return (
+    await loadCurrentVersions(
+      tx,
+      tx.scope.tenantId,
+      campaignId,
+      sources.defaultPromptVersion(),
+      lock
+    )
+  ).current;
 }
 
-export function createTenantRepository(): CampaignScopedTenantRepository {
+export function createTenantRepository(
+  sources: TenancyVersionSources
+): CampaignScopedTenantRepository {
   return {
     get: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -43,7 +56,7 @@ export function createTenantRepository(): CampaignScopedTenantRepository {
           value: {
             tenant: mapTenantRecord(
               row,
-              await currentVersionsFor(tx, input.campaignId, false)
+              await currentVersionsFor(tx, input.campaignId, sources, false)
             ),
           },
         };

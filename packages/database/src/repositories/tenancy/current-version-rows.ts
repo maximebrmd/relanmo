@@ -1,6 +1,7 @@
 import type {
   CampaignId,
   CurrentVersionSet,
+  PromptVersionRef,
   TenantId,
 } from "@relanmo/domain/contracts";
 import type { PersistenceTransaction } from "@relanmo/domain/ports/persistence";
@@ -35,6 +36,7 @@ export async function loadCurrentVersions(
   tx: PersistenceTransaction,
   tenantId: TenantId,
   campaignId: CampaignId | null,
+  defaultPrompt: PromptVersionRef,
   lock: boolean
 ): Promise<{
   current: CurrentVersionSet;
@@ -136,6 +138,7 @@ export async function loadCurrentVersions(
         ? mapInferredStyleVersionRef(acceptedInferredStyle)
         : null,
       campaign: campaign ? mapCampaignVersionRef(campaign) : null,
+      defaultPrompt,
       explicitStyle: explicitStyle
         ? mapExplicitStyleVersionRef(explicitStyle)
         : null,

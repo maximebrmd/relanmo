@@ -13,6 +13,7 @@ import { resolveTransactionExecutor } from "../../transactions/registry";
 import type {
   CampaignScopedCurrentVersionRepository,
   CampaignScopedProfileRepository,
+  TenancyVersionSources,
 } from "./contracts";
 import {
   catchMappingError,
@@ -27,15 +28,23 @@ import { memberPrincipalOrForbidden, tenantScopeMismatch } from "./scope";
 async function observedVersions(
   tx: PersistenceTransaction,
   campaignId: Parameters<typeof loadCurrentVersions>[2],
+  sources: TenancyVersionSources,
   lock: boolean
 ) {
-  return loadCurrentVersions(tx, tx.scope.tenantId, campaignId, lock);
+  return loadCurrentVersions(
+    tx,
+    tx.scope.tenantId,
+    campaignId,
+    sources.defaultPromptVersion(),
+    lock
+  );
 }
 
 async function writeProfileRevision(
   input: SaveProfileRevisionInput,
   tx: PersistenceTransaction,
   campaignId: CampaignId | null,
+  sources: TenancyVersionSources,
   mode: "INITIALIZE" | "REVISE"
 ): ReturnType<ProfileRepository["saveRevision"]> {
   const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -94,7 +103,7 @@ async function writeProfileRevision(
       }
     }
 
-    const observed = await observedVersions(tx, campaignId, true);
+    const observed = await observedVersions(tx, campaignId, sources, true);
     const currentProfile = observed.profile;
     const actual = observed.current;
     if (
@@ -170,7 +179,9 @@ async function writeProfileRevision(
   }
 }
 
-export function createProfileRepository(): CampaignScopedProfileRepository {
+export function createProfileRepository(
+  sources: TenancyVersionSources
+): CampaignScopedProfileRepository {
   return {
     get: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -178,7 +189,12 @@ export function createProfileRepository(): CampaignScopedProfileRepository {
         return mismatch;
       }
       try {
-        const observed = await observedVersions(tx, input.campaignId, false);
+        const observed = await observedVersions(
+          tx,
+          input.campaignId,
+          sources,
+          false
+        );
         return {
           ok: true,
           value: { current: observed.current, profile: observed.profile },
@@ -188,13 +204,15 @@ export function createProfileRepository(): CampaignScopedProfileRepository {
       }
     },
     initialize: async (input, tx) =>
-      writeProfileRevision(input, tx, null, "INITIALIZE"),
+      writeProfileRevision(input, tx, null, sources, "INITIALIZE"),
     saveRevision: async (input, tx) =>
-      writeProfileRevision(input, tx, input.campaignId, "REVISE"),
+      writeProfileRevision(input, tx, input.campaignId, sources, "REVISE"),
   };
 }
 
-export function createCurrentVersionRepository(): CampaignScopedCurrentVersionRepository {
+export function createCurrentVersionRepository(
+  sources: TenancyVersionSources
+): CampaignScopedCurrentVersionRepository {
   return {
     getCurrent: async (input, tx) => {
       const mismatch = tenantScopeMismatch(input.tenantId, tx);
@@ -202,7 +220,12 @@ export function createCurrentVersionRepository(): CampaignScopedCurrentVersionRe
         return mismatch;
       }
       try {
-        const observed = await observedVersions(tx, input.campaignId, false);
+        const observed = await observedVersions(
+          tx,
+          input.campaignId,
+          sources,
+          false
+        );
         return {
           ok: true,
           value: {
