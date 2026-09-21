@@ -1,11 +1,18 @@
 import type {
+  CampaignVersionRef,
   DirectMessageStep,
   DraftSourceVersions,
   Evidence,
   EvidenceId,
+  ExplicitStyleVersionRef,
+  InferredStyleVersionRef,
+  ModelVersion,
   ProspectId,
+  ProfileVersionRef,
+  PromptVersionRef,
   SequenceStep,
   TenantId,
+  UtcTimestamp,
 } from "@relanmo/domain/contracts";
 import type { WritingOutputBudget } from "@relanmo/domain/ports/providers";
 
@@ -54,6 +61,13 @@ export type CampaignStyleOverride = Readonly<{
   tone?: string | null;
 }>;
 
+export type PromptOverrideVersionRef = Readonly<{
+  createdAt: UtcTimestamp;
+  id: string;
+  kind: "PROMPT_OVERRIDE";
+  revision: number;
+}>;
+
 export type ExplicitStyleLayer = Readonly<{
   closing: string | null;
   examples: readonly string[];
@@ -70,6 +84,34 @@ export type InferredStyleLayer = Readonly<{
   formality: FormalityLevel | null;
   tone: string | null;
 }>;
+
+export type VersionedCampaignStyleOverride = Readonly<{
+  style: CampaignStyleOverride;
+  version: PromptOverrideVersionRef;
+}>;
+
+export type VersionedExplicitStyleLayer = Readonly<{
+  style: ExplicitStyleLayer;
+  version: ExplicitStyleVersionRef;
+}>;
+
+export type VersionedAcceptedInferredStyleLayer = Readonly<{
+  style: InferredStyleLayer;
+  version: InferredStyleVersionRef;
+}>;
+
+export type ComposeBaseSourceVersions = Readonly<{
+  campaign: CampaignVersionRef;
+  defaultPrompt: PromptVersionRef;
+  model: ModelVersion;
+  profile: ProfileVersionRef | null;
+}>;
+
+export type CompositionSourceVersions = Readonly<
+  DraftSourceVersions & {
+    campaignOverride: PromptOverrideVersionRef | null;
+  }
+>;
 
 export type FreelancerProfileFacts = Readonly<{
   availability: string | null;
@@ -96,14 +138,14 @@ export type ProspectGrounding = Readonly<{
 }>;
 
 export type ComposePromptInput = Readonly<{
+  acceptedInferredStyle: VersionedAcceptedInferredStyleLayer | null;
   allowedEvidence: readonly Evidence[];
-  campaignOverride: CampaignStyleOverride | null;
+  campaignOverride: VersionedCampaignStyleOverride | null;
   drafting: SequenceDraftingContext;
-  explicitStyle: ExplicitStyleLayer | null;
-  inferredStyle: InferredStyleLayer | null;
+  explicitStyle: VersionedExplicitStyleLayer | null;
   profile: FreelancerProfileFacts;
   prospect: ProspectGrounding;
-  sourceVersions: DraftSourceVersions;
+  sourceVersions: ComposeBaseSourceVersions;
   step: SequenceStep;
   tenantId: TenantId;
 }>;
@@ -132,7 +174,7 @@ export type ComposeFailureReason = Readonly<{
 
 type ComposeResultBase = Readonly<{
   sendControls: ComposeSendControls;
-  sourceVersions: DraftSourceVersions;
+  sourceVersions: CompositionSourceVersions;
 }>;
 
 export type ComposedPrompt = Readonly<

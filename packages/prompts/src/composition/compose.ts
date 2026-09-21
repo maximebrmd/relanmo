@@ -18,6 +18,7 @@ import type {
   ComposePromptInput,
   ComposePromptResult,
   ComposedPrompt,
+  CompositionSourceVersions,
   ExplicitStyleLayer,
   FormalityLevel,
   GroundedFact,
@@ -53,42 +54,71 @@ function scopedEvidence(input: ComposePromptInput): readonly Evidence[] {
 
 function groundedText(
   fact: GroundedFact | null,
-  allowedIds: ReadonlySet<string>
+  evidenceById: ReadonlyMap<string, Evidence>
 ): string | null {
-  if (fact === null || !allowedIds.has(fact.evidenceId)) {
+  if (fact === null) {
     return null;
   }
-  return optionalText(fact.text);
+  return evidenceSupportedText(fact.text, evidenceById.get(fact.evidenceId));
 }
 
 function followUpValue(
   fact: { evidenceId: string; fact: string; detail: string | null } | null,
   field: "fact" | "detail",
-  allowedIds: ReadonlySet<string>
+  evidenceById: ReadonlyMap<string, Evidence>
 ): string | null {
-  if (fact === null || !allowedIds.has(fact.evidenceId)) {
+  if (fact === null) {
     return null;
   }
-  return optionalText(field === "fact" ? fact.fact : fact.detail);
+  return evidenceSupportedText(
+    field === "fact" ? fact.fact : fact.detail,
+    evidenceById.get(fact.evidenceId)
+  );
+}
+
+function canonicalEvidenceText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replaceAll(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("fr")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replaceAll(/\s+/gu, " ");
+}
+
+function evidenceSupportedText(
+  value: string | null,
+  evidence: Evidence | undefined
+): string | null {
+  const text = optionalText(value);
+  if (text === null || evidence === undefined) {
+    return null;
+  }
+  const claim = canonicalEvidenceText(evidence.normalizedClaim);
+  const candidate = canonicalEvidenceText(text);
+  if (candidate.length === 0 || !` ${claim} `.includes(` ${candidate} `)) {
+    return null;
+  }
+  return text;
 }
 
 function variableValues(
   input: ComposePromptInput,
-  allowedIds: ReadonlySet<string>
+  evidenceById: ReadonlyMap<string, Evidence>
 ): Readonly<Record<AllowedTemplateVariable, string | null>> {
   const { drafting, prospect } = input;
   return Object.freeze({
     company: optionalText(prospect.company),
     craft: optionalText(prospect.craft),
-    dm2Detail: followUpValue(drafting.dm2Fact, "detail", allowedIds),
-    dm2Fact: followUpValue(drafting.dm2Fact, "fact", allowedIds),
-    dm3Detail: followUpValue(drafting.dm3Fact, "detail", allowedIds),
-    dm3Fact: followUpValue(drafting.dm3Fact, "fact", allowedIds),
+    dm2Detail: followUpValue(drafting.dm2Fact, "detail", evidenceById),
+    dm2Fact: followUpValue(drafting.dm2Fact, "fact", evidenceById),
+    dm3Detail: followUpValue(drafting.dm3Fact, "detail", evidenceById),
+    dm3Fact: followUpValue(drafting.dm3Fact, "fact", evidenceById),
     firstName: optionalText(prospect.firstName),
-    hiringRole: groundedText(prospect.hiringRole, allowedIds),
+    hiringRole: groundedText(prospect.hiringRole, evidenceById),
     sharedConnection: optionalText(drafting.verifiedSharedConnection),
-    signalDetail: groundedText(prospect.signalDetail, allowedIds),
-    signalFact: groundedText(prospect.signalFact, allowedIds),
+    signalDetail: groundedText(prospect.signalDetail, evidenceById),
+    signalFact: groundedText(prospect.signalFact, evidenceById),
   });
 }
 
@@ -281,9 +311,9 @@ function resolveMaxCharacters(
 }
 
 function resolveStyle(input: ComposePromptInput): ResolvedStyle {
-  const campaign = input.campaignOverride;
-  const explicit = input.explicitStyle;
-  const inferred = input.inferredStyle;
+  const campaign = input.campaignOverride?.style ?? null;
+  const explicit = input.explicitStyle?.style ?? null;
+  const inferred = input.acceptedInferredStyle?.style ?? null;
   const formality = pickFormality(explicit, inferred);
   const defaultGreeting = FRENCH_WRITING_DEFAULTS.greetings[0] ?? "Salut";
 
@@ -347,7 +377,18 @@ function failed(
     kind: "FAILED",
     reasons,
     sendControls: COMPOSE_SEND_CONTROLS,
-    sourceVersions: input.sourceVersions,
+    sourceVersions: sourceVersionsFor(input),
+  });
+}
+
+function sourceVersionsFor(
+  input: ComposePromptInput
+): CompositionSourceVersions {
+  return Object.freeze({
+    ...input.sourceVersions,
+    acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
+    campaignOverride: input.campaignOverride?.version ?? null,
+    explicitStyle: input.explicitStyle?.version ?? null,
   });
 }
 
@@ -360,7 +401,7 @@ function plannedTemplate(
       kind: "STOPPED",
       reason: "INCOMING_REPLY",
       sendControls: COMPOSE_SEND_CONTROLS,
-      sourceVersions: input.sourceVersions,
+      sourceVersions: sourceVersionsFor(input),
     });
   }
 
@@ -413,23 +454,22 @@ function selectFilledTemplate(
   values: Readonly<Record<AllowedTemplateVariable, string | null>>
 ): FilledTemplate | FillFailure {
   const campaignBody = overrideForStep(
-    input.campaignOverride?.stepOverrides,
+    input.campaignOverride?.style.stepOverrides,
     input.step
   );
   const explicitBody = overrideForStep(
-    input.explicitStyle?.stepOverrides,
+    input.explicitStyle?.style.stepOverrides,
     input.step
   );
 
-  for (const [body, templateId] of [
+  const overrideCandidates = [
     [campaignBody, `campaign-step-override:${input.step}`],
     [explicitBody, `explicit-step-override:${input.step}`],
-    [planned.body, planned.id],
-  ] as const) {
-    if (body === null) {
-      continue;
-    }
-    const filled = fillTemplate(body, values);
+  ] as const;
+  const selectedOverride = overrideCandidates.find(([body]) => body !== null);
+  if (selectedOverride !== undefined) {
+    const [body, templateId] = selectedOverride;
+    const filled = fillTemplate(body ?? "", values);
     if (filled.kind === "FILLED") {
       return Object.freeze({
         hook: planned.hook,
@@ -438,6 +478,17 @@ function selectFilledTemplate(
         usedNeutralFallback: false,
       });
     }
+    return filled;
+  }
+
+  const plannedResult = fillTemplate(planned.body, values);
+  if (plannedResult.kind === "FILLED") {
+    return Object.freeze({
+      hook: planned.hook,
+      templateId: planned.id,
+      text: plannedResult.text,
+      usedNeutralFallback: false,
+    });
   }
 
   const neutral = templateByHook(neutralHookFor(input.step));
@@ -488,7 +539,7 @@ function buildComposedInput(
     text: string;
   }
 ): string {
-  const versions = input.sourceVersions;
+  const versions = sourceVersionsFor(input);
   const examplesFence = fence(
     "CUSTOMER_EXAMPLES",
     style.examples.value.join("\n")
@@ -508,6 +559,7 @@ function buildComposedInput(
     "# Versions",
     `prompt: ${versions.defaultPrompt.id} rev ${String(versions.defaultPrompt.revision)}`,
     `campaign: ${versions.campaign.id} rev ${String(versions.campaign.revision)}`,
+    `campaignOverride: ${versions.campaignOverride?.id ?? "none"}`,
     `explicitStyle: ${versions.explicitStyle?.id ?? "none"}`,
     `inferredStyle: ${versions.acceptedInferredStyle?.id ?? "none"}`,
     `profile: ${versions.profile?.id ?? "none"}`,
@@ -584,8 +636,10 @@ export function composeGroundedPrompt(
   }
 
   const allowed = scopedEvidence(input);
-  const allowedIds = new Set(allowed.map((item) => item.evidenceId));
-  const values = variableValues(input, allowedIds);
+  const evidenceById = new Map<string, Evidence>(
+    allowed.map((item) => [item.evidenceId, item] as const)
+  );
+  const values = variableValues(input, evidenceById);
   const filled = selectFilledTemplate(input, planned, values);
 
   if ("kind" in filled) {
@@ -619,7 +673,7 @@ export function composeGroundedPrompt(
     requiresWriting: input.step !== "INVITATION",
     resolvedStyle,
     sendControls: COMPOSE_SEND_CONTROLS,
-    sourceVersions: input.sourceVersions,
+    sourceVersions: sourceVersionsFor(input),
     step: input.step,
     targetText: filled.text,
     templateId: filled.templateId,

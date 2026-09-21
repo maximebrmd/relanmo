@@ -9,11 +9,13 @@ export {
 export type {
   AddressForm,
   CampaignStyleOverride,
+  ComposeBaseSourceVersions,
   ComposeFailureCode,
   ComposeFailureReason,
   ComposePromptInput,
   ComposePromptResult,
   ComposeSendControls,
+  CompositionSourceVersions,
   ComposedPrompt,
   ExplicitStyleLayer,
   FailedPrompt,
@@ -22,11 +24,15 @@ export type {
   GroundedFact,
   InferredStyleLayer,
   ProspectGrounding,
+  PromptOverrideVersionRef,
   ResolvedStyle,
   ResolvedStyleField,
   StoppedPrompt,
   StylePrecedenceSource,
   StyleStepOverride,
+  VersionedAcceptedInferredStyleLayer,
+  VersionedCampaignStyleOverride,
+  VersionedExplicitStyleLayer,
 } from "./types";
 
 export const promptCompositionSurface = "ENABLED" as const;
