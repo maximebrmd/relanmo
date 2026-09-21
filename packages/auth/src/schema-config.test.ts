@@ -43,12 +43,25 @@ function normalizeDefault(value: unknown) {
   } as const;
 }
 
+function normalizeSql(value: SQL | undefined) {
+  if (!value) {
+    return null;
+  }
+  const query = pgDialect.sqlToQuery(value);
+  return { params: query.params, sql: query.sql };
+}
+
 function normalizeTable(table: AuthTable) {
   const config = getTableConfig(table);
   return {
     columns: sorted(
       config.columns.map((column) => ({
+        columnType: column.columnType,
+        dataType: column.dataType,
         default: normalizeDefault(column.default),
+        enumValues: column.enumValues ?? null,
+        generated: column.generated ?? null,
+        generatedIdentity: column.generatedIdentity ?? null,
         hasDefault: column.hasDefault,
         name: column.name,
         notNull: column.notNull,
@@ -56,31 +69,72 @@ function normalizeTable(table: AuthTable) {
         primary: column.primary,
         type: column.getSQLType(),
         unique: column.isUnique,
+        uniqueType: column.uniqueType ?? null,
       }))
     ),
+    checks: sorted(
+      config.checks.map((check) => ({
+        expression: normalizeSql(check.value),
+        name: check.name,
+      }))
+    ),
+    enableRLS: config.enableRLS,
     foreignKeys: sorted(
-      config.foreignKeys.flatMap((foreignKey) => {
+      config.foreignKeys.map((foreignKey) => {
         const reference = foreignKey.reference();
-        return reference.columns.map((column, index) => ({
-          column: column.name,
-          foreignColumn: reference.foreignColumns[index]?.name,
+        return {
+          columns: reference.columns.map((column) => column.name),
+          foreignColumns: reference.foreignColumns.map((column) => column.name),
           foreignTable: getTableConfig(reference.foreignTable).name,
           onDelete: foreignKey.onDelete ?? "no action",
-        }));
+          onUpdate: foreignKey.onUpdate ?? "no action",
+        };
       })
     ),
     indexes: sorted(
       config.indexes.map((index) => ({
         columns: index.config.columns.map((column) => {
-          if (!("name" in column)) {
-            throw new TypeError("Auth schema indexes must use columns");
+          if (is(column, SQL)) {
+            return { expression: normalizeSql(column), kind: "sql" } as const;
           }
-          return column.name;
+          return {
+            indexConfig: column.indexConfig,
+            kind: "column",
+            name: column.name,
+            type: column.type,
+          } as const;
         }),
+        concurrently: index.config.concurrently === true,
+        method: index.config.method ?? "btree",
+        only: index.config.only,
         unique: index.config.unique,
+        where: normalizeSql(index.config.where),
+        with: index.config.with ?? null,
       }))
     ),
     name: config.name,
+    policies: sorted(
+      config.policies.map((policy) => ({
+        as: policy.as ?? null,
+        for: policy.for ?? null,
+        name: policy.name,
+        to: policy.to ?? null,
+        using: normalizeSql(policy.using),
+        withCheck: normalizeSql(policy.withCheck),
+      }))
+    ),
+    primaryKeys: sorted(
+      config.primaryKeys.map((primaryKey) =>
+        primaryKey.columns.map((column) => column.name)
+      )
+    ),
+    schema: config.schema ?? null,
+    uniqueConstraints: sorted(
+      config.uniqueConstraints.map((constraint) => ({
+        columns: constraint.columns.map((column) => column.name),
+        nullsNotDistinct: constraint.nullsNotDistinct,
+      }))
+    ),
   };
 }
 
