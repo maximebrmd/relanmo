@@ -193,6 +193,7 @@ export type ExplicitStyleSettings = Readonly<{
   forbiddenPhrases: readonly string[];
   formality: "CASUAL" | "NEUTRAL" | "FORMAL";
   greeting: string | null;
+  instructions: string | null;
   maxCharacters: number | null;
   tone: string;
 }>;
@@ -208,7 +209,7 @@ export type ExplicitStyleVersionRecord = Readonly<{
   createdBy: UserId;
   settings: ExplicitStyleSettings;
   tenantId: TenantId;
-  version: PromptOverrideVersionRef;
+  version: ExplicitStyleVersionRef;
 }>;
 
 export type InferredStyleVersionRecord = Readonly<{
@@ -248,7 +249,7 @@ export type StyleOverrideVersionRecord = Readonly<{
   settings: StyleOverrideSettings;
   stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
-  version: ExplicitStyleVersionRef;
+  version: PromptOverrideVersionRef;
 }>;
 
 export type SaveExplicitStyleInput = Readonly<{
@@ -257,7 +258,7 @@ export type SaveExplicitStyleInput = Readonly<{
   expectedCurrent: CurrentVersionGuard;
   settings: ExplicitStyleSettings;
   tenantId: TenantId;
-  versionId: PromptVersionId;
+  versionId: ExplicitStyleVersionId;
 }>;
 
 export type SaveExplicitStyleValue = Readonly<{
@@ -276,7 +277,7 @@ export type SaveStyleOverrideInput = Readonly<{
   settings: StyleOverrideSettings;
   stepOverrides: readonly StyleStepOverride[];
   tenantId: TenantId;
-  versionId: ExplicitStyleVersionId;
+  versionId: PromptVersionId;
 }>;
 
 export type ResetStyleToDefaultsInput = Readonly<{

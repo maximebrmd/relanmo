@@ -1,4 +1,3 @@
-/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof -- Postgres error codes arrive as untyped driver values at this repository boundary. */
 import { randomUUID } from "node:crypto";
 
 import {
@@ -97,15 +96,6 @@ function requireTenantScope(
 
 function toInstant(value: Date): ReturnType<typeof parseUtcTimestamp> {
   return parseUtcTimestamp(value.toISOString());
-}
-
-function isPgCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
 }
 
 async function takeFirst<T>(
@@ -245,6 +235,7 @@ function toExplicitRecord(
         forbiddenPhrases: asStringArray(row.forbiddenPhrases),
         formality: formality.value,
         greeting: row.greeting,
+        instructions: row.instructions,
         maxCharacters: row.maxCharacters,
         tone: tone.value,
       },
@@ -419,7 +410,6 @@ async function assembleCurrent(
   );
   let explicit: ExplicitStyleVersionRef | null = null;
   let acceptedInferred: InferredStyleVersionRef | null = null;
-  let model = null;
   if (explicitRow) {
     const record = toExplicitRecord(explicitRow, profile.tenantId);
     if (!record.ok) {
@@ -432,9 +422,7 @@ async function assembleCurrent(
     if (!record.ok) {
       return record;
     }
-    const { model: inferredModel, version } = record.value;
-    acceptedInferred = version;
-    model = inferredModel;
+    acceptedInferred = record.value.version;
   }
   return {
     ok: true,
@@ -443,7 +431,7 @@ async function assembleCurrent(
       campaign: null,
       defaultPrompt: null,
       explicitStyle: explicit,
-      model,
+      model: null,
       profile: await loadProfileVersion(db, profile.tenantId),
       promptOverride: null,
     },
@@ -472,16 +460,13 @@ async function ensureStyleProfile(
   if (existing) {
     return existing;
   }
-  try {
-    await db.insert(styleProfiles).values({
+  await db
+    .insert(styleProfiles)
+    .values({
       id: randomUUID(),
       tenantId,
-    });
-  } catch (error) {
-    if (!isPgCode(error, "23505")) {
-      throw error;
-    }
-  }
+    })
+    .onConflictDoNothing({ target: styleProfiles.tenantId });
   const created = await loadLockedProfile(db, tenantId);
   if (!created) {
     throw new Error("style profile row was not visible after insert");
@@ -509,17 +494,14 @@ async function ensurePromptOverride(
   if (existing) {
     return existing;
   }
-  try {
-    await db.insert(promptOverrides).values({
+  await db
+    .insert(promptOverrides)
+    .values({
       campaignId,
       id: randomUUID(),
       tenantId,
-    });
-  } catch (error) {
-    if (!isPgCode(error, "23505")) {
-      throw error;
-    }
-  }
+    })
+    .onConflictDoNothing({ target: promptOverrides.campaignId });
   const created = await takeFirst(
     db
       .select()
@@ -595,6 +577,7 @@ type ValidatedExplicitSettings = Readonly<{
   forbiddenPhrases: readonly string[];
   formality: (typeof STYLE_FORMALITY_LEVELS)[number];
   greeting: string | null;
+  instructions: string | null;
   maxCharacters: number | null;
   tone: FrenchTone;
 }>;
@@ -621,6 +604,7 @@ function validateExplicitSettings(
       forbiddenPhrases: settings.forbiddenPhrases,
       formality: formality.value,
       greeting: settings.greeting,
+      instructions: settings.instructions,
       maxCharacters: settings.maxCharacters,
       tone: tone.value,
     },
@@ -681,6 +665,7 @@ async function saveExplicit(
     formality: settings.value.formality,
     greeting: settings.value.greeting,
     id: input.versionId,
+    instructions: settings.value.instructions,
     kind: "STYLE_EXPLICIT",
     maxCharacters: settings.value.maxCharacters,
     revision: nextRevision,

@@ -61,6 +61,7 @@ const EXPLICIT_SETTINGS: ExplicitStyleSettings = {
   forbiddenPhrases: ["j'espère que vous allez bien"],
   formality: "FORMAL",
   greeting: "Bonjour",
+  instructions: "Rester précis, humain et concis.",
   maxCharacters: 280,
   tone: "DIRECT",
 };
@@ -277,6 +278,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         closing: "Cordialement",
         formality: "FORMAL",
         greeting: "Bonjour",
+        instructions: "Rester précis, humain et concis.",
         tone: "DIRECT",
       });
       expect(saved.value.style.version.id).toBe("style-explicit-1");
@@ -393,6 +395,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
       }
       expect(accepted.value.style.version.id).toBe(inferredId);
       expect(accepted.value.current.acceptedInferredStyle?.id).toBe(inferredId);
+      expect(accepted.value.current.model).toBeNull();
 
       const hidden = await runAsMember(TENANT_B, USER_B, (tx) =>
         styles.acceptInferred(
@@ -662,7 +665,7 @@ describe("style and prompt version persistence (live local Postgres)", () => {
         migrationUrl: database.migrationUrl,
         poolConnectionTimeoutMs: 5000,
         poolIdleTimeoutMs: 10_000,
-        poolMax: 1,
+        poolMax: 2,
         runtimeUrl: runtimeRoleUrl(
           database,
           RUNTIME_DATABASE_ROLES.worker,
@@ -671,30 +674,40 @@ describe("style and prompt version persistence (live local Postgres)", () => {
       };
       const workerClient = createDatabaseRuntimeClient(workerEnv);
       try {
-        const workerInference = expectOk(
-          await createPersistenceTransactionRunner(workerClient.db).run({
-            access: mintTrustedWorkerAccess(workerScope(TENANT_B)),
-            work: (tx) =>
-              styles.saveInferred(
-                {
-                  createdAt: CREATED_AT,
-                  model: parseModelVersion("worker-inference-test"),
-                  settings: {
-                    confidence: 0.7,
-                    formality: "NEUTRAL",
-                    tone: "CONCISE",
+        const workerInferences = await Promise.all(
+          ["a", "b"].map((suffix) =>
+            createPersistenceTransactionRunner(workerClient.db).run({
+              access: mintTrustedWorkerAccess(workerScope(TENANT_B)),
+              work: (tx) =>
+                styles.saveInferred(
+                  {
+                    createdAt: CREATED_AT,
+                    model: parseModelVersion("worker-inference-test"),
+                    settings: {
+                      confidence: 0.7,
+                      formality: "NEUTRAL",
+                      tone: "CONCISE",
+                    },
+                    sourceEvidenceIds: [
+                      parseEvidenceId(`worker-evidence-${suffix}`),
+                    ],
+                    tenantId: parseTenantId(TENANT_B),
+                    versionId: parseInferredStyleVersionId(
+                      `worker-inferred-${suffix}`
+                    ),
                   },
-                  sourceEvidenceIds: [parseEvidenceId("worker-evidence-1")],
-                  tenantId: parseTenantId(TENANT_B),
-                  versionId: parseInferredStyleVersionId(
-                    "worker-inferred-first"
-                  ),
-                },
-                tx
-              ),
-          })
+                  tx
+                ),
+            })
+          )
         );
-        expect(workerInference.outcome).toBe("CREATED");
+        const inferenceValues = workerInferences.map((result) =>
+          expectOk(result)
+        );
+        expect(inferenceValues).toHaveLength(2);
+        expect(
+          inferenceValues.every((result) => result.outcome === "CREATED")
+        ).toBe(true);
 
         const tenantId = parseTenantId(TENANT_A);
         const current = expectOk(
