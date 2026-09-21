@@ -52,7 +52,7 @@ bun run --filter @relanmo/domain typecheck
 | Package/export verifier | `bun run verify:exports` | Resolves the published package and subpath exports, checks browser rejection conditions, scans workflow-safe imports, and checks disabled feature bindings. |
 | Boundary smoke | `bun run verify:boundaries` | Builds a temporary Next Client Component and expects a server surface to reject through its browser export condition. |
 | Node worker smoke | `bun run verify:node` | Imports portable server surfaces under Node 24, then compiles the worker TypeScript entry and executes `dist/index.js` with Node. |
-| Baseline tests | `bun run test` | Runs the app/API no-test checks and the 55 merged domain contract tests through Turbo. |
+| Baseline tests | `bun run test` | Runs the app/API no-test checks and the merged package tests through Turbo. |
 
 `typecheck:fresh` removes only generated `.next/`, `.turbo/`, `dist/` and `out/` directories under `apps/*` and `packages/*`, plus the root `.turbo/` cache. It does not remove dependencies or source files. Next.js route helpers are regenerated in `app`, `web`, `api` and `docs` before TypeScript runs, so a successful check does not depend on stale build artifacts.
 
@@ -80,6 +80,23 @@ The runtime declaration exception is deliberate: every workspace that declares `
 The docs build remains on `next build --webpack` as established by P001: Fumadocs' generated Turbopack query rules are not accepted by this pinned Next.js baseline. This is an explicit compatibility exception, not a second build toolchain for the other apps.
 
 The Oxlint config keeps three style-only compatibility overrides for the existing scaffold (`func-style`, React function-component style and `sort-keys`) so this provider migration does not become a broad source rewrite. The observability error normalizer has a separate, targeted exception because it is the explicit boundary for unknown thrown values; the remaining correctness and anti-slop rules stay enabled.
+
+## Database migrations
+
+Generate migration SQL from the merged Drizzle schema while working in the database package, then review and commit the SQL, snapshot and journal together:
+
+```sh
+cd packages/database
+bun x --no-install drizzle-kit generate --name initial
+```
+
+Apply the committed migration journal from the repository root:
+
+```sh
+bun tooling/database/migrate.ts
+```
+
+The apply command requires both `DATABASE_URL` for the pooled runtime connection and `DATABASE_URL_UNPOOLED` for the direct migration connection. It validates that the normalized endpoints and explicit database usernames differ, rejects `host`, `port` and `user` query-parameter overrides, and executes migration SQL only through `DATABASE_URL_UNPOOLED`. Use isolated disposable databases for migration verification; rerunning the command applies no duplicate effects because Drizzle records completed migrations in its journal table.
 
 ## Authored and generated material
 

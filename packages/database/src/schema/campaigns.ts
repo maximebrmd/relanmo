@@ -1,3 +1,4 @@
+/* oxlint-disable no-use-before-define -- Drizzle resolves the intentional campaigns/campaignVersions circular foreign keys lazily. */
 import type { BusinessWindowConfiguration } from "@relanmo/domain/contracts";
 import { CAMPAIGN_STATUSES } from "@relanmo/domain/contracts/product";
 import type {
@@ -6,6 +7,7 @@ import type {
 } from "@relanmo/domain/contracts/product";
 import type { SequenceClosureConfiguration } from "@relanmo/domain/ports/persistence/campaigns";
 import { relations } from "drizzle-orm";
+import type { AnyPgColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import {
   boolean,
   foreignKey,
@@ -52,7 +54,7 @@ export const campaigns = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
     foreignKey({
       columns: [table.draftVersionId, table.id],
       foreignColumns: [campaignVersions.id, campaignVersions.campaignId],
@@ -78,7 +80,7 @@ export const campaignVersions = pgTable(
     id: text("id").primaryKey(),
     campaignId: text("campaign_id")
       .notNull()
-      .references(() => campaigns.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => campaigns.id, { onDelete: "cascade" }),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),

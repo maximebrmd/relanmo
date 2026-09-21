@@ -1,3 +1,4 @@
+/* oxlint-disable no-await-in-loop -- Migration assertions intentionally serialize mutations against one isolated database. */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { stopLocalPostgresAdmin } from "../../tests/support/local-postgres";

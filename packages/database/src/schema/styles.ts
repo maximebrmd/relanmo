@@ -1,8 +1,10 @@
+/* oxlint-disable no-use-before-define -- Drizzle resolves the intentional current-row/version-row circular foreign keys lazily. */
 import type { ModelVersion } from "@relanmo/domain/contracts";
 import { FRENCH_TONES, STYLE_SOURCES } from "@relanmo/domain/contracts/product";
 import type { StyleStepOverride } from "@relanmo/domain/contracts/product";
 import type { StyleOverrideSettings } from "@relanmo/domain/ports/persistence/campaigns";
 import { relations, sql } from "drizzle-orm";
+import type { AnyPgColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import {
   check,
   foreignKey,
@@ -60,7 +62,7 @@ export const styleProfiles = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
     foreignKey({
       columns: [table.explicitVersionId, table.id],
       foreignColumns: [
@@ -100,7 +102,9 @@ export const styleProfileVersions = pgTable(
     id: text("id").primaryKey(),
     styleProfileId: text("style_profile_id")
       .notNull()
-      .references(() => styleProfiles.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => styleProfiles.id, {
+        onDelete: "cascade",
+      }),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
@@ -134,7 +138,7 @@ export const styleProfileVersions = pgTable(
       onDelete: "set null",
     }),
   },
-  (table) => [
+  (table): PgTableExtraConfigValue[] => [
     unique("styleProfileVersions_id_styleProfileId_unique").on(
       table.id,
       table.styleProfileId
@@ -196,7 +200,9 @@ export const promptOverrideVersions = pgTable(
     id: text("id").primaryKey(),
     promptOverrideId: text("prompt_override_id")
       .notNull()
-      .references(() => promptOverrides.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => promptOverrides.id, {
+        onDelete: "cascade",
+      }),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
