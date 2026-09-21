@@ -117,13 +117,36 @@ describe("French prompt defaults", () => {
     });
 
     expect(plan.kind).toBe("SEQUENCE");
-    expect(plan).toMatchObject({
-      kind: "SEQUENCE",
-      recruiterStaffingAngle: true,
-    });
     expect(plan.kind === "SEQUENCE" && plan.steps[0]?.template.hook).toBe(
       "RECRUITMENT"
     );
+  });
+
+  it("excludes solo service companies without an identifiable product", () => {
+    const soloService = qualifyIcp({
+      companyEvidence: {
+        employeeCount: 1,
+        hasIdentifiableProduct: false,
+        kind: "SERVICES",
+      },
+      headline: "CTO & Founder @ Pixel Studio",
+      observedSignalText: null,
+    });
+    const soloProduct = qualifyIcp({
+      companyEvidence: {
+        employeeCount: 1,
+        hasIdentifiableProduct: true,
+        kind: "PRODUCT",
+      },
+      headline: "CTO & Founder @ Lumenor Studio",
+      observedSignalText: null,
+    });
+
+    expect(soloService.eligible).toBe(false);
+    expect(soloService.exclusion).toBe("NOT_ICP");
+    expect(soloService.invitationAllowed).toBe(false);
+    expect(soloProduct.eligible).toBe(true);
+    expect(soloProduct.audience).toBe("DECISION_MAKER");
   });
 
   it("stops automated drafting when a historical reply is present", () => {

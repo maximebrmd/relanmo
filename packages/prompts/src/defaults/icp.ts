@@ -12,8 +12,15 @@ export const ICP_EXCLUSIONS = [
 export type IcpExclusion = (typeof ICP_EXCLUSIONS)[number];
 
 export type IcpProspectFacts = Readonly<{
+  companyEvidence?: IcpCompanyEvidence | null;
   headline: string;
   observedSignalText: string | null;
+}>;
+
+export type IcpCompanyEvidence = Readonly<{
+  employeeCount: number | null;
+  hasIdentifiableProduct: boolean;
+  kind: "PRODUCT" | "SERVICES" | "UNKNOWN";
 }>;
 
 export type IcpQualification =
@@ -203,6 +210,25 @@ function headlineRole(headline: string): string {
   return delimiter?.index === undefined ? lower : lower.slice(0, delimiter.index);
 }
 
+function isExecutiveHeadline(headline: string): boolean {
+  return containsMarker(
+    headlineRole(headline),
+    EXECUTIVE_DECISION_MAKER_MARKERS
+  );
+}
+
+function isSoloServicesWithoutProduct(
+  evidence: IcpCompanyEvidence | null | undefined
+): boolean {
+  return (
+    evidence !== null &&
+    evidence !== undefined &&
+    (evidence.employeeCount === 0 || evidence.employeeCount === 1) &&
+    evidence.kind === "SERVICES" &&
+    !evidence.hasIdentifiableProduct
+  );
+}
+
 /** Explicit on-market freelance-demand wording is a hard ICP exclusion. */
 export function detectOnMarketIntent(signalText: string | null): boolean {
   if (signalText === null || signalText.trim().length === 0) {
@@ -274,6 +300,22 @@ export function qualifyIcp(facts: IcpProspectFacts): IcpQualification {
   }
 
   if (classified === null) {
+    return Object.freeze({
+      audience: null,
+      eligible: false,
+      exclusion: "NOT_ICP",
+      hiringSignalRequired: false,
+      invitationAllowed: false,
+      source: HUNT_ICP_SOURCE,
+    });
+  }
+
+
+  if (
+    classified === "DECISION_MAKER" &&
+    isExecutiveHeadline(facts.headline) &&
+    isSoloServicesWithoutProduct(facts.companyEvidence)
+  ) {
     return Object.freeze({
       audience: null,
       eligible: false,

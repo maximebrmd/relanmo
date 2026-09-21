@@ -9,6 +9,7 @@ export {
 } from "./icp";
 export type {
   IcpAudience,
+  IcpCompanyEvidence,
   IcpExclusion,
   IcpProspectFacts,
   IcpQualification,

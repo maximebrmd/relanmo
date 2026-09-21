@@ -75,7 +75,6 @@ export type FrenchSequencePlan =
       invitation: PlannedStep;
       kind: "SEQUENCE";
       promptVersion: PromptVersionRef;
-      recruiterStaffingAngle: boolean;
       steps: readonly PlannedStep[];
     }>
   | Readonly<{
@@ -265,7 +264,6 @@ export function planFrenchSequence(
   }
 
   const steps = planDirectMessages(context);
-  const dm1Hook = selectDm1Hook(context);
   return Object.freeze({
     continueAutomatedOutreach: true,
     invitation: Object.freeze({
@@ -275,8 +273,6 @@ export function planFrenchSequence(
     }),
     kind: "SEQUENCE",
     promptVersion,
-    recruiterStaffingAngle:
-      context.audience === "RECRUITER_ESN" && dm1Hook === "RECRUITMENT",
     steps,
   });
 }
