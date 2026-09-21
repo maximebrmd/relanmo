@@ -986,6 +986,14 @@ describe("composeGroundedPrompt", () => {
       evidenceId: parseEvidenceId(`evidence_total_${String(index)}`),
       normalizedClaim: "x".repeat(1000),
     }));
+    const tooManyAssertions = {
+      ...hiringEvidence,
+      assertions: Array.from({ length: 21 }, () => ({
+        detail: null,
+        kind: "HIRING_ROLE" as const,
+        value: "frontend",
+      })),
+    } as Evidence;
     const foreignClaims = Array.from({ length: 21 }, (_, index) => ({
       ...foreignEvidence,
       evidenceId: parseEvidenceId(`evidence_foreign_${String(index)}`),
@@ -1002,6 +1010,7 @@ describe("composeGroundedPrompt", () => {
       [oversizedClaim],
       tooManyClaims,
       excessiveTotal,
+      [tooManyAssertions],
     ]) {
       const result = composeGroundedPrompt(composeInput({ allowedEvidence }));
       expect(result.kind).toBe("FAILED");

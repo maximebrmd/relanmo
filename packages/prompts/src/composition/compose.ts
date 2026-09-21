@@ -592,12 +592,14 @@ function invalidEvidenceReason(
     claims.some((claim) => claim.length > EVIDENCE_LIMITS.claimCharacters) ||
     claims.reduce((total, claim) => total + claim.length, 0) >
       EVIDENCE_LIMITS.totalClaimCharacters ||
-    evidence.some((item) =>
-      item.assertions.some(
-        (assertion) =>
-          assertion.value.length > EVIDENCE_LIMITS.claimCharacters ||
-          (assertion.detail?.length ?? 0) > EVIDENCE_LIMITS.claimCharacters
-      )
+    evidence.some(
+      (item) =>
+        item.assertions.length > EVIDENCE_LIMITS.claims ||
+        item.assertions.some(
+          (assertion) =>
+            assertion.value.length > EVIDENCE_LIMITS.claimCharacters ||
+            (assertion.detail?.length ?? 0) > EVIDENCE_LIMITS.claimCharacters
+        )
     );
   return invalid
     ? Object.freeze({
