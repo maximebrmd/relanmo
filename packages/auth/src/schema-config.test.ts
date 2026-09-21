@@ -1,4 +1,13 @@
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
+
+import {
+  loginAccount,
+  rateLimit,
+  session,
+  user,
+  verification,
+} from "@relanmo/database/schema/auth";
 
 import {
   authSchemaConfig,
@@ -6,10 +15,6 @@ import {
   authSchemaTableNames,
 } from "./schema-config";
 
-// Table name literals here must match @relanmo/database/schema/auth's pgTable
-// names; packages/auth cannot import packages/database's schema back (auth
-// already depends on database, so the reverse edge would be circular), so
-// the cross-check lives as parallel literals reviewed together in both files.
 describe("auth schema-config", () => {
   it("renames the login account table away from Better Auth's default and provider_accounts", () => {
     expect(authSchemaConfig.account.modelName).toBe("login_account");
@@ -30,5 +35,15 @@ describe("auth schema-config", () => {
     expect(authSchemaGeneratorVersions.betterAuth).toBe(
       authSchemaGeneratorVersions.drizzleAdapter
     );
+  });
+
+  it("matches the committed Drizzle table names", () => {
+    expect({
+      loginAccount: getTableConfig(loginAccount).name,
+      rateLimit: getTableConfig(rateLimit).name,
+      session: getTableConfig(session).name,
+      user: getTableConfig(user).name,
+      verification: getTableConfig(verification).name,
+    }).toEqual(authSchemaTableNames);
   });
 });
