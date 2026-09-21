@@ -95,11 +95,17 @@ import {
   accountIdsToHoldForInboxEvent,
   validateInboxEventScope,
 } from "./events";
+import {
+  getProfileResultFixture,
+  profileFactsFixture,
+  saveProfileRevisionInputFixture,
+} from "./fixtures";
 import type {
   ClaimBotEligibilityInput,
   ClaimBotEligibilityResult,
   PairOwnershipRecord,
 } from "./prospects";
+import type { ProfileFacts } from "./tenancy";
 
 const timestamp = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const tenantId = parseTenantId("tenant_demo");
@@ -1066,5 +1072,29 @@ describe("port-shape checks", () => {
     expect(authorization.authorized.reservation.state).toBe("HELD");
     expect(secondWorker.outcome).toBe("ALREADY_IN_FLIGHT");
     expect(pair.tenantId).toBe(tenantId);
+  });
+});
+
+describe("ProfileFacts target market contract", () => {
+  it("round-trips targetMarket through saveRevision input and get result", () => {
+    expect(profileFactsFixture.targetMarket).toBe("Éditeurs SaaS B2B");
+    expect(saveProfileRevisionInputFixture.facts).toEqual(profileFactsFixture);
+    expect(getProfileResultFixture.profile?.facts).toEqual(
+      saveProfileRevisionInputFixture.facts
+    );
+    expect(getProfileResultFixture.profile?.facts.targetMarket).toBe(
+      saveProfileRevisionInputFixture.facts.targetMarket
+    );
+  });
+
+  it("keeps targetMarket nullable like other optional profile facts", () => {
+    const facts = {
+      ...profileFactsFixture,
+      offer: null,
+      targetMarket: null,
+    } satisfies ProfileFacts;
+
+    expect(facts.targetMarket).toBeNull();
+    expect(facts.offer).toBeNull();
   });
 });

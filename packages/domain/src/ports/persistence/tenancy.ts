@@ -107,6 +107,7 @@ export type ProfileFacts = Readonly<{
   offer: string | null;
   preferredFrenchTone: string | null;
   skills: readonly string[];
+  targetMarket: string | null;
   writingSamples: readonly string[];
 }>;
 
