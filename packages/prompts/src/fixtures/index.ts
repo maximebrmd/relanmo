@@ -1,1 +1,1 @@
-export const promptFixturesSurface = "DISABLED" as const;
+export * from "../../fixtures";
