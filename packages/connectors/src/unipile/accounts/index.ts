@@ -344,7 +344,9 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
       if (isDeadlineExceeded(failure)) {
         throw failure;
       }
-      throw new Error("account authorization is temporarily unavailable");
+      throw new Error("account authorization is temporarily unavailable", {
+        cause: error,
+      });
     }
     if (!authorized) {
       return providerDefinitiveRefusal(
