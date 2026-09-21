@@ -354,7 +354,7 @@ describe("Unipile LinkedIn accounts adapter", () => {
   });
 
   it("bounds a stalled authorization lookup by the operation deadline", async () => {
-    const stalled = Promise.withResolvers<boolean>().promise;
+    const stalled = Promise.race<boolean>([]);
     const deadlineAt = parseUtcTimestamp("2026-09-17T10:00:00.001Z");
     const { gateway, port } = createPort({
       directory: { isAuthorized: () => stalled },
