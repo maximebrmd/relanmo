@@ -127,13 +127,13 @@ describe("Unipile LinkedIn accounts adapter", () => {
 
     expect(flow.mode).toBe("CONNECT");
     expect(flow.authorizationUrl).toBe(unipileHostedAuthUrl);
-    expect(flow.expiresAt).toBe("2026-09-17T10:15:00.000Z");
+    expect(flow.expiresAt).toBe("2026-09-17T10:20:00.000Z");
     expect(flow.expiresAt).not.toBe(providerOperationContextFixture.deadlineAt);
     expect(flow.flowReference).toBe(linkedInConnectInputFixture.opaqueState);
     expect(gateway.hostedAuthCalls).toEqual([
       {
         api_url: unipileAccountsBaseUrl,
-        expiresOn: "2026-09-17T10:15:00.000Z",
+        expiresOn: "2026-09-17T10:20:00.000Z",
         failure_redirect_url: linkedInConnectInputFixture.callbackUrl,
         name: linkedInConnectInputFixture.opaqueState,
         providers: ["LINKEDIN"],
@@ -151,14 +151,34 @@ describe("Unipile LinkedIn accounts adapter", () => {
 
     expect(flow.mode).toBe("RECONNECT");
     expect(flow.authorizationUrl).toBe(unipileHostedAuthUrl);
-    expect(flow.expiresAt).toBe("2026-09-17T10:20:00.000Z");
+    expect(flow.expiresAt).toBe("2026-09-17T10:25:00.000Z");
     expect(gateway.hostedAuthCalls[0]).toMatchObject({
-      expiresOn: "2026-09-17T10:20:00.000Z",
+      expiresOn: "2026-09-17T10:25:00.000Z",
       reconnect_account: linkedInAccountFixture.providerAccountId,
       type: "reconnect",
       name: linkedInReconnectInputFixture.opaqueState,
     });
     expect(gateway.hostedAuthCalls[0]).not.toHaveProperty("providers");
+  });
+
+  it("keeps hosted link expiration beyond a longer operation deadline", async () => {
+    const { gateway, port } = createPort();
+    const deadlineAt = parseUtcTimestamp("2026-09-17T10:20:00.000Z");
+    const flow = writeValue(
+      await port.createConnectFlow({
+        ...linkedInConnectInputFixture,
+        context: {
+          ...providerOperationContextFixture,
+          deadlineAt,
+        },
+      })
+    );
+
+    expect(flow.expiresAt).toBe("2026-09-17T10:35:00.000Z");
+    expect(Date.parse(flow.expiresAt)).toBeGreaterThan(Date.parse(deadlineAt));
+    expect(gateway.hostedAuthCalls[0]).toMatchObject({
+      expiresOn: flow.expiresAt,
+    });
   });
 
   it("rejects an expired hosted flow before calling Unipile", async () => {

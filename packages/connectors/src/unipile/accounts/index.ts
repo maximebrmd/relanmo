@@ -201,7 +201,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     if (expired) {
       return expired;
     }
-    const expiresAt = this.#hostedFlowExpiresAt();
+    const expiresAt = this.#hostedFlowExpiresAt(input.context.deadlineAt);
     return await this.#createFlow({
       context: input.context,
       expiresAt,
@@ -249,7 +249,7 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
         "account authorization is temporarily unavailable"
       );
     }
-    const expiresAt = this.#hostedFlowExpiresAt();
+    const expiresAt = this.#hostedFlowExpiresAt(input.context.deadlineAt);
     return await this.#createFlow({
       context: input.context,
       expiresAt,
@@ -446,9 +446,11 @@ class UnipileLinkedInAccounts implements LinkedInAccountsPort {
     return null;
   }
 
-  #hostedFlowExpiresAt(): LinkedInHostedFlow["expiresAt"] {
+  #hostedFlowExpiresAt(
+    deadlineAt: ProviderOperationContext["deadlineAt"]
+  ): LinkedInHostedFlow["expiresAt"] {
     return parseUtcTimestamp(
-      new Date(this.#clock().getTime() + this.#hostedFlowTtlMs).toISOString()
+      new Date(Date.parse(deadlineAt) + this.#hostedFlowTtlMs).toISOString()
     );
   }
 
