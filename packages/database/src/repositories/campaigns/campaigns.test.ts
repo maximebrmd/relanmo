@@ -64,6 +64,7 @@ const CREATED_AT = parseUtcTimestamp("2026-09-17T10:00:00.000Z");
 const PAUSED_AT = parseUtcTimestamp("2026-09-17T11:00:00.000Z");
 const ACTIVATED_AT = parseUtcTimestamp("2026-09-17T10:30:00.000Z");
 const EDITED_AT = parseUtcTimestamp("2026-09-17T12:00:00.000Z");
+const REACTIVATED_AT = parseUtcTimestamp("2026-09-17T12:30:00.000Z");
 
 const definition = {
   businessWindow: DEFAULT_BUSINESS_WINDOW_CONFIGURATION,
@@ -214,7 +215,7 @@ describe("campaign version persistence", () => {
       const input = createInput(TENANT_A, `create_${randomUUID().slice(0, 8)}`);
       try {
         const created = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: (tx) => campaigns.create(input, tx),
         });
         expect(created.ok).toBe(true);
@@ -250,6 +251,219 @@ describe("campaign version persistence", () => {
   );
 
   it(
+    "binds immutable version authors to the member principal",
+    async (ctx) => {
+      if (!database) {
+        ctx.skip();
+        return;
+      }
+      const client = makeClient(database);
+      const campaigns = createCampaignRepository();
+      const runner = createPersistenceTransactionRunner(client.db);
+      const access = await establishMemberAccess(database, TENANT_A, USER_A);
+      const suffix = randomUUID().slice(0, 8);
+      const spoofedCreate = {
+        ...createInput(TENANT_A, `author_spoof_${suffix}`),
+        createdBy: parseUserId(USER_B),
+      };
+      try {
+        const rejectedCreate = await runner.run({
+          access,
+          work: (tx) => campaigns.create(spoofedCreate, tx),
+        });
+        expect(rejectedCreate).toEqual({
+          error: {
+            code: "FORBIDDEN",
+            detail: "CAMPAIGN_VERSION_AUTHOR_MISMATCH",
+            retryable: false,
+          },
+          ok: false,
+        });
+
+        const input = createInput(TENANT_A, `author_${suffix}`);
+        const created = await runner.run({
+          access,
+          work: (tx) => campaigns.create(input, tx),
+        });
+        if (!created.ok || created.value.outcome !== "CREATED") {
+          throw new Error("expected CREATED campaign");
+        }
+
+        const rejectedSave = await runner.run({
+          access,
+          work: (tx) =>
+            campaigns.saveVersion(
+              {
+                campaignId: input.campaignId,
+                createdAt: EDITED_AT,
+                createdBy: parseUserId(USER_B),
+                definition,
+                expectedCurrent: guardFor(created.value.campaign),
+                tenantId: input.tenantId,
+                versionId: parseCampaignVersionId(
+                  `campaign_version_author_${suffix}_2`
+                ),
+              },
+              tx
+            ),
+        });
+        expect(rejectedSave).toEqual({
+          error: {
+            code: "FORBIDDEN",
+            detail: "CAMPAIGN_VERSION_AUTHOR_MISMATCH",
+            retryable: false,
+          },
+          ok: false,
+        });
+
+        const rejectedWorkerSave = await runner.run({
+          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          work: (tx) =>
+            campaigns.saveVersion(
+              {
+                campaignId: input.campaignId,
+                createdAt: EDITED_AT,
+                createdBy: parseUserId(USER_A),
+                definition,
+                expectedCurrent: guardFor(created.value.campaign),
+                tenantId: input.tenantId,
+                versionId: parseCampaignVersionId(
+                  `campaign_version_worker_${suffix}_2`
+                ),
+              },
+              tx
+            ),
+        });
+        expect(rejectedWorkerSave).toEqual({
+          error: {
+            code: "FORBIDDEN",
+            detail: "CAMPAIGN_VERSION_AUTHOR_MISMATCH",
+            retryable: false,
+          },
+          ok: false,
+        });
+
+        const persisted = await client.pool.query<{ count: string }>(
+          "select count(*)::text as count from campaign_versions where campaign_id = $1",
+          [input.campaignId]
+        );
+        expect(persisted.rows[0]?.count).toBe("1");
+      } finally {
+        await client.close();
+      }
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
+    "records the activated immutable version in each start event",
+    async (ctx) => {
+      if (!database) {
+        ctx.skip();
+        return;
+      }
+      const client = makeClient(database);
+      const campaigns = createCampaignRepository();
+      const runner = createPersistenceTransactionRunner(client.db);
+      const access = await establishMemberAccess(database, TENANT_A, USER_A);
+      const suffix = randomUUID().slice(0, 8);
+      const input = createInput(TENANT_A, `activation_${suffix}`);
+      const secondVersionId = parseCampaignVersionId(
+        `campaign_version_activation_${suffix}_2`
+      );
+      try {
+        const created = await runner.run({
+          access,
+          work: (tx) => campaigns.create(input, tx),
+        });
+        if (!created.ok || created.value.outcome !== "CREATED") {
+          throw new Error("expected CREATED campaign");
+        }
+        const firstActivation = await runner.run({
+          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          work: (tx) =>
+            campaigns.activate(
+              {
+                campaignId: input.campaignId,
+                expectedCurrent: guardFor(created.value.campaign),
+                requestedAt: ACTIVATED_AT,
+                tenantId: input.tenantId,
+                versionId: input.initialVersionId,
+              },
+              tx
+            ),
+        });
+        if (
+          !firstActivation.ok ||
+          firstActivation.value.outcome !== "UPDATED"
+        ) {
+          throw new Error("expected first activation");
+        }
+
+        const saved = await runner.run({
+          access,
+          work: (tx) =>
+            campaigns.saveVersion(
+              {
+                campaignId: input.campaignId,
+                createdAt: EDITED_AT,
+                createdBy: parseUserId(USER_A),
+                definition: {
+                  ...definition,
+                  name: "Campagne SaaS France v2",
+                },
+                expectedCurrent: {
+                  expected: firstActivation.value.value.current,
+                },
+                tenantId: input.tenantId,
+                versionId: secondVersionId,
+              },
+              tx
+            ),
+        });
+        if (!saved.ok || saved.value.outcome !== "UPDATED") {
+          throw new Error("expected saved second version");
+        }
+
+        const secondActivation = await runner.run({
+          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          work: (tx) =>
+            campaigns.activate(
+              {
+                campaignId: input.campaignId,
+                expectedCurrent: { expected: saved.value.value.current },
+                requestedAt: REACTIVATED_AT,
+                tenantId: input.tenantId,
+                versionId: secondVersionId,
+              },
+              tx
+            ),
+        });
+        expect(secondActivation.ok).toBe(true);
+
+        const events = await client.pool.query<{
+          campaign_version_id: string;
+        }>(
+          `select payload->>'campaignVersionId' as campaign_version_id
+             from outbox_events
+            where tenant_id = $1
+              and payload->>'type' = 'START_WORKFLOW'
+              and dedupe_key like $2
+            order by created_at`,
+          [TENANT_A, `campaign:${input.campaignId}:%`]
+        );
+        expect(events.rows).toEqual([
+          { campaign_version_id: input.initialVersionId },
+          { campaign_version_id: secondVersionId },
+        ]);
+      } finally {
+        await client.close();
+      }
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
     "rejects a stale version guard and rolls back so no outbox row is written",
     async (ctx) => {
       if (!database) {
@@ -265,7 +479,7 @@ describe("campaign version persistence", () => {
       );
       try {
         const created = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: (tx) => campaigns.create(input, tx),
         });
         if (!created.ok) {
@@ -348,7 +562,7 @@ describe("campaign version persistence", () => {
       const input = createInput(TENANT_A, `pause_${randomUUID().slice(0, 8)}`);
       try {
         const created = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: (tx) => campaigns.create(input, tx),
         });
         if (!created.ok) {
@@ -448,7 +662,7 @@ describe("campaign version persistence", () => {
       const prospectId = parseProspectId(`prospect_${suffix}`);
       try {
         const created = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: (tx) => campaigns.create(input, tx),
         });
         if (!created.ok) {
@@ -460,7 +674,7 @@ describe("campaign version persistence", () => {
         const createdCampaign = created.value.campaign;
 
         const saved = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: async (tx) => {
             const db = resolveTransactionExecutor(tx);
             await db.insert(providerAccounts).values([
@@ -609,7 +823,7 @@ describe("campaign version persistence", () => {
       const input = createInput(TENANT_A, `scope_${randomUUID().slice(0, 8)}`);
       try {
         const created = await runner.run({
-          access: mintTrustedWorkerAccess(workerScope(TENANT_A)),
+          access: await establishMemberAccess(database, TENANT_A, USER_A),
           work: (tx) => campaigns.create(input, tx),
         });
         expect(created.ok).toBe(true);

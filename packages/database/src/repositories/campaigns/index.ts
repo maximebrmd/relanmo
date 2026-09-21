@@ -64,6 +64,26 @@ function mismatchIfNeeded(
   return null;
 }
 
+function authorMismatchIfNeeded(
+  createdBy: CreateCampaignInput["createdBy"],
+  tx: PersistenceTransaction
+): PersistenceResult<never> | null {
+  if (
+    tx.scope.principal.kind !== "MEMBER" ||
+    createdBy !== tx.scope.principal.userId
+  ) {
+    return {
+      error: {
+        code: "FORBIDDEN",
+        detail: "CAMPAIGN_VERSION_AUTHOR_MISMATCH",
+        retryable: false,
+      },
+      ok: false,
+    };
+  }
+  return null;
+}
+
 function asUtcTimestamp(value: Date): UtcTimestamp {
   return parseUtcTimestamp(value.toISOString());
 }
@@ -237,10 +257,15 @@ async function enqueueOutbox(
   input: {
     availableAt: UtcTimestamp;
     campaignId: CreateCampaignInput["campaignId"];
-    kind: "PAUSE_WORKFLOW" | "START_WORKFLOW";
     revision: number;
     tenantId: CreateCampaignInput["tenantId"];
-  }
+  } & (
+    | {
+        campaignVersionId: ActivateCampaignInput["versionId"];
+        kind: "START_WORKFLOW";
+      }
+    | { kind: "PAUSE_WORKFLOW" }
+  )
 ): Promise<void> {
   const workflowId = coordinatorWorkflowId(input.tenantId, input.campaignId);
   const payload =
@@ -253,6 +278,7 @@ async function enqueueOutbox(
           type: "PAUSE_WORKFLOW" as const,
         }
       : {
+          campaignVersionId: input.campaignVersionId,
           targetWorkflowId: workflowId,
           tenantId: input.tenantId,
           type: "START_WORKFLOW" as const,
@@ -278,6 +304,10 @@ async function createCampaign(
   const mismatch = mismatchIfNeeded(input.tenantId, tx);
   if (mismatch) {
     return mismatch;
+  }
+  const authorMismatch = authorMismatchIfNeeded(input.createdBy, tx);
+  if (authorMismatch) {
+    return authorMismatch;
   }
   const db = resolveTransactionExecutor(tx);
   const existing = await db
@@ -431,6 +461,10 @@ async function saveCampaignVersion(
   const mismatch = mismatchIfNeeded(input.tenantId, tx);
   if (mismatch) {
     return mismatch;
+  }
+  const authorMismatch = authorMismatchIfNeeded(input.createdBy, tx);
+  if (authorMismatch) {
+    return authorMismatch;
   }
   const db = resolveTransactionExecutor(tx);
   const locked = await lockCampaign(db, input.campaignId, input.tenantId);
@@ -632,6 +666,7 @@ async function activateCampaign(
   await enqueueOutbox(db, {
     availableAt: input.requestedAt,
     campaignId: input.campaignId,
+    campaignVersionId: input.versionId,
     kind: "START_WORKFLOW",
     revision: nextRevision,
     tenantId: input.tenantId,
