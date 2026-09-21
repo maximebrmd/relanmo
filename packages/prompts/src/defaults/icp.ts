@@ -112,6 +112,8 @@ const FUNCTIONAL_LEADERSHIP_MARKERS = [
   "vp",
 ] as const;
 
+const APPROVED_FUNCTIONAL_ROLE_MARKERS = ["eng manager"] as const;
+
 const TARGET_FUNCTION_MARKERS = [
   "data",
   "design",
@@ -143,9 +145,11 @@ const COMPANY_EVIDENCE_FILLERS = new Set([
 const COMPANY_STATUS_PATTERNS = [
   /^a la recherche\b/u,
   /^available(?: for work| immediately| now)?$/u,
+  /^(?:building|creating|developing|launching|making|working on)\b/u,
   /^disponible(?: immediatement| maintenant)?$/u,
   /^en recherche\b/u,
   /^looking for (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
+  /^(?:my|our) (?:next )?(?:company|product|project|startup|venture)\b/u,
   /^open (?:for|to) (?:new )?(?:opportunities|opportunity|work)\b/u,
   /^seeking (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
 ] as const;
@@ -165,18 +169,22 @@ function containsMarker(haystack: string, markers: readonly string[]): boolean {
 }
 
 function headlineCompany(headline: string): string | null {
-  const lower = folded(headline);
-  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(lower);
+  const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(headline);
   if (delimiter?.index === undefined) {
     return null;
   }
 
-  const company = lower.slice(delimiter.index + delimiter[0].length).trim();
-  const normalized = company.replaceAll(/[^a-z0-9]+/gu, " ").trim();
+  const company = headline.slice(delimiter.index + delimiter[0].length).trim();
+  const normalized = folded(company).replaceAll(/[^a-z0-9]+/gu, " ").trim();
+  const hasProperNameLikeToken =
+    /(?:^|[^\p{L}\p{N}])(?:\p{Lu}[\p{Ll}\p{M}][\p{L}\p{M}\p{N}.'’_-]*|[A-Z0-9]{2,})(?=$|[^\p{L}\p{N}])/u.test(
+      company
+    );
   if (
     normalized.length === 0 ||
     COMPANY_EVIDENCE_FILLERS.has(normalized) ||
-    COMPANY_STATUS_PATTERNS.some((pattern) => pattern.test(normalized))
+    COMPANY_STATUS_PATTERNS.some((pattern) => pattern.test(normalized)) ||
+    !hasProperNameLikeToken
   ) {
     return null;
   }
@@ -222,6 +230,7 @@ export function classifyIcpAudience(
   const isExecutive = containsMarker(role, EXECUTIVE_DECISION_MAKER_MARKERS);
   if (
     (isExecutive && headlineCompany(headline) !== null) ||
+    containsMarker(role, APPROVED_FUNCTIONAL_ROLE_MARKERS) ||
     (containsMarker(role, FUNCTIONAL_LEADERSHIP_MARKERS) &&
       containsMarker(role, TARGET_FUNCTION_MARKERS))
   ) {

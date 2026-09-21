@@ -193,6 +193,7 @@ describe("French prompt defaults", () => {
       "CEO @ ",
       "Founder @ Open to work",
       "Founder @ Open to new opportunities",
+      "Founder @ Building my next venture",
       "CTO | Looking for opportunities",
       "CEO · Available",
       "Founder — En recherche",
@@ -211,6 +212,12 @@ describe("French prompt defaults", () => {
     expect(
       qualifyIcp({
         headline: "Founder @ Lumenor Studio",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
+    expect(
+      qualifyIcp({
+        headline: "Eng Manager @ Lumenor Studio",
         observedSignalText: null,
       }).audience
     ).toBe("DECISION_MAKER");
