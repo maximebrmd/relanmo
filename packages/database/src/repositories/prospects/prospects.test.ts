@@ -167,6 +167,7 @@ describe("prospect candidate, evidence and suppression persistence", () => {
         const listed = await prospects.list(
           {
             accountId: ACCOUNT_A,
+            cursor: null,
             includeArchived: false,
             limit: 20,
             tenantId: TENANT_A,
@@ -342,6 +343,7 @@ describe("prospect candidate, evidence and suppression persistence", () => {
         const listed = await prospects.list(
           {
             accountId: ACCOUNT_A,
+            cursor: null,
             includeArchived: false,
             limit: 50,
             tenantId: TENANT_A,
@@ -466,6 +468,7 @@ describe("prospect candidate, evidence and suppression persistence", () => {
         const listed = await prospects.list(
           {
             accountId: ACCOUNT_A,
+            cursor: null,
             includeArchived: false,
             limit: 50,
             tenantId: TENANT_A,
@@ -478,6 +481,7 @@ describe("prospect candidate, evidence and suppression persistence", () => {
         const firstPage = await prospects.list(
           {
             accountId: ACCOUNT_A,
+            cursor: null,
             includeArchived: false,
             limit: 1,
             tenantId: TENANT_A,

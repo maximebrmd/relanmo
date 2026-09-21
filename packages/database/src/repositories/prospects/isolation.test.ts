@@ -153,6 +153,7 @@ describe("prospect persistence tenant isolation", () => {
           const listed = await prospects.list(
             {
               accountId: ACCOUNT_A,
+              cursor: null,
               includeArchived: true,
               limit: 50,
               tenantId: TENANT_A,
@@ -266,6 +267,7 @@ describe("prospect persistence tenant isolation", () => {
             const listed = await prospects.list(
               {
                 accountId: ACCOUNT_B,
+                cursor: null,
                 includeArchived: true,
                 limit: 20,
                 tenantId: TENANT_A,

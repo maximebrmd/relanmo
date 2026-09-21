@@ -21,13 +21,14 @@ import type {
   AddSuppressionResult,
   EvidenceRepository,
   GetProspectInput,
-  ListProspectsInput,
+  ListProspectsInput as BaseListProspectsInput,
+  ListProspectsResult,
   PersistenceFailure,
   PersistenceResult,
   PersistenceTransaction,
   ProspectProfileSnapshot,
   ProspectRecord,
-  ProspectRepository,
+  ProspectRepository as BaseProspectRepository,
   ProspectStatus,
   SuppressionRepository,
   UpsertEvidenceInput,
@@ -56,6 +57,17 @@ import type { TransactionExecutor } from "../../transactions/registry";
 export const prospectsRepositorySurface = "node-portable-server" as const;
 
 const MAX_PAGE_SIZE = 100;
+
+export type ListProspectsInput = BaseListProspectsInput &
+  Readonly<{ cursor: string | null }>;
+
+export type ProspectRepository = Omit<BaseProspectRepository, "list"> &
+  Readonly<{
+    list: (
+      input: ListProspectsInput,
+      tx: PersistenceTransaction
+    ) => Promise<PersistenceResult<ListProspectsResult>>;
+  }>;
 
 type ProspectRow = typeof prospectsTable.$inferSelect;
 type EvidenceRow = typeof evidenceTable.$inferSelect;
@@ -118,19 +130,6 @@ function decodeCursor(
   } catch {
     return null;
   }
-}
-
-function readCursor(input: ListProspectsInput): string | null {
-  if (!("cursor" in input)) {
-    return null;
-  }
-  // SAFETY: C3 ListProspectsInput freezes the first-page fields; discovery
-  // pagination continues by echoing `nextCursor` on this optional extra field.
-  const { cursor } = input as ListProspectsInput & { cursor?: unknown };
-  if (typeof cursor !== "string" || cursor.length === 0) {
-    return null;
-  }
-  return cursor;
 }
 
 function profileFromRow(row: ProspectRow): ProspectProfileSnapshot {
@@ -346,7 +345,7 @@ const prospectRepository: ProspectRepository = {
     ) {
       return validation("limit must be an integer from 1 to 100");
     }
-    const cursorValue = readCursor(input);
+    const cursorValue = input.cursor;
     const cursor = cursorValue === null ? null : decodeCursor(cursorValue);
     if (cursorValue !== null && cursor === null) {
       return validation("cursor is invalid");
