@@ -26,10 +26,12 @@ import type {
 } from "../defaults";
 import type {
   CampaignStyleOverride,
+  CampaignOverrideGroundingProvenance,
   ComposeFailureReason,
   ComposePromptInput,
   ComposePromptResult,
   ComposedPrompt,
+  CompositionHook,
   ExplicitStyleLayer,
   GroundedFact,
   InferredStyleLayer,
@@ -291,7 +293,8 @@ type FillFailure = Readonly<{
 type FillResult = FillSuccess | FillFailure;
 
 type FilledTemplate = Readonly<{
-  hook: MessageHook;
+  campaignOverrideGrounding: CampaignOverrideGroundingProvenance | null;
+  hook: CompositionHook;
   templateId: string;
   text: string;
   usedNeutralFallback: boolean;
@@ -694,7 +697,8 @@ function sourceVersionsFor(input: ComposePromptInput): DraftSourceVersions {
     style.formality.source === "INFERRED_ACCEPTED" ||
     style.tone.source === "INFERRED_ACCEPTED";
   return Object.freeze({
-    ...input.sourceVersions,
+    campaign: input.sourceVersions.campaign.version,
+    model: input.sourceVersions.model,
     acceptedInferredStyle: inferredStyleContributes
       ? (input.acceptedInferredStyle?.version ?? null)
       : null,
@@ -717,9 +721,12 @@ function invalidOwnershipReason(
     (input.campaignOverride !== null &&
       input.campaignOverride.tenantId !== input.tenantId);
   const campaignMismatch =
-    input.campaignOverride !== null &&
-    input.campaignOverride.campaignId !== input.campaignId;
-  if (!tenantMismatch && !campaignMismatch) {
+    input.sourceVersions.campaign.campaignId !== input.campaignId ||
+    (input.campaignOverride !== null &&
+      input.campaignOverride.campaignId !== input.campaignId);
+  const campaignTenantMismatch =
+    input.sourceVersions.campaign.tenantId !== input.tenantId;
+  if (!tenantMismatch && !campaignMismatch && !campaignTenantMismatch) {
     return null;
   }
   return Object.freeze({
@@ -874,10 +881,10 @@ function assertionMatches(
   );
 }
 
-function overrideHasEvidence(
+function overrideGroundingProvenance(
   override: StyleStepOverride,
   evidence: readonly Evidence[]
-): boolean {
+): CampaignOverrideGroundingProvenance | null {
   const grounding = (override as { grounding?: unknown }).grounding;
   if (
     typeof grounding !== "object" ||
@@ -885,7 +892,7 @@ function overrideHasEvidence(
     !("kind" in grounding) ||
     !("certification" in grounding)
   ) {
-    return false;
+    return null;
   }
   const certification = grounding.certification;
   if (
@@ -904,34 +911,60 @@ function overrideHasEvidence(
     !("step" in certification) ||
     certification.step !== override.step
   ) {
-    return false;
+    return null;
   }
-  const certified =
-    grounding.kind === "CERTIFIED_NEUTRAL" ||
-    (grounding.kind === "ASSERTIONS" &&
-      "assertions" in grounding &&
-      Array.isArray(grounding.assertions) &&
-      grounding.assertions.length > 0 &&
-      grounding.assertions.every(
-        (expected) =>
-          typeof expected === "object" &&
-          expected !== null &&
-          "kind" in expected &&
-          typeof expected.kind === "string" &&
-          EVIDENCE_ASSERTION_KINDS.includes(
-            expected.kind as EvidenceAssertionKind
-          ) &&
-          "value" in expected &&
-          typeof expected.value === "string" &&
-          "detail" in expected &&
-          (expected.detail === null || typeof expected.detail === "string") &&
-          evidence.some((item) =>
-            item.assertions.some((actual) =>
-              assertionMatches(expected as EvidenceAssertion, actual)
-            )
-          )
-      ));
-  return certified;
+  if (grounding.kind === "CERTIFIED_NEUTRAL") {
+    return Object.freeze({
+      assertionKinds: Object.freeze([]),
+      evidenceIds: Object.freeze([]),
+    });
+  }
+  if (
+    grounding.kind !== "ASSERTIONS" ||
+    !("assertions" in grounding) ||
+    !Array.isArray(grounding.assertions) ||
+    grounding.assertions.length === 0
+  ) {
+    return null;
+  }
+  const assertionKinds: EvidenceAssertionKind[] = [];
+  const evidenceIds: Evidence["evidenceId"][] = [];
+  for (const expected of grounding.assertions) {
+    if (
+      typeof expected !== "object" ||
+      expected === null ||
+      !("kind" in expected) ||
+      typeof expected.kind !== "string" ||
+      !EVIDENCE_ASSERTION_KINDS.includes(
+        expected.kind as EvidenceAssertionKind
+      ) ||
+      !("value" in expected) ||
+      typeof expected.value !== "string" ||
+      !("detail" in expected) ||
+      (expected.detail !== null && typeof expected.detail !== "string")
+    ) {
+      return null;
+    }
+    const matchedEvidence = evidence.find((item) =>
+      item.assertions.some((actual) =>
+        assertionMatches(expected as EvidenceAssertion, actual)
+      )
+    );
+    if (matchedEvidence === undefined) {
+      return null;
+    }
+    const kind = expected.kind as EvidenceAssertionKind;
+    if (!assertionKinds.includes(kind)) {
+      assertionKinds.push(kind);
+    }
+    if (!evidenceIds.includes(matchedEvidence.evidenceId)) {
+      evidenceIds.push(matchedEvidence.evidenceId);
+    }
+  }
+  return Object.freeze({
+    assertionKinds: Object.freeze(assertionKinds),
+    evidenceIds: Object.freeze(evidenceIds),
+  });
 }
 
 function selectFilledTemplate(
@@ -944,19 +977,21 @@ function selectFilledTemplate(
     input.campaignOverride?.style.stepOverrides,
     input.step
   );
+  const campaignOverrideGrounding =
+    campaignOverride === null
+      ? null
+      : overrideGroundingProvenance(campaignOverride, evidence);
   if (
     campaignOverride !== null &&
-    overrideHasEvidence(campaignOverride, evidence)
+    campaignOverrideGrounding !== null
   ) {
     const body = campaignOverride.text;
     const templateId = `campaign-step-override:${input.step}`;
     const filled = fillTemplate(body, values);
     if (filled.kind === "FILLED") {
       return Object.freeze({
-        hook:
-          campaignOverride.grounding.kind === "CERTIFIED_NEUTRAL"
-            ? neutralHookFor(input.step)
-            : planned.hook,
+        campaignOverrideGrounding,
+        hook: "CAMPAIGN_OVERRIDE",
         templateId,
         text: filled.text,
         usedNeutralFallback: false,
@@ -970,6 +1005,7 @@ function selectFilledTemplate(
     const fallback = fillTemplate(neutral.body, values);
     return fallback.kind === "FILLED"
       ? Object.freeze({
+          campaignOverrideGrounding: null,
           hook: neutral.hook,
           templateId: neutral.id,
           text: fallback.text,
@@ -986,6 +1022,7 @@ function selectFilledTemplate(
   const plannedResult = fillTemplate(evidenceSafeTemplate.body, values);
   if (plannedResult.kind === "FILLED") {
     return Object.freeze({
+      campaignOverrideGrounding: null,
       hook: evidenceSafeTemplate.hook,
       templateId: evidenceSafeTemplate.id,
       text: plannedResult.text,
@@ -997,6 +1034,7 @@ function selectFilledTemplate(
   const fallback = fillTemplate(neutral.body, values);
   if (fallback.kind === "FILLED") {
     return Object.freeze({
+      campaignOverrideGrounding: null,
       hook: neutral.hook,
       templateId: neutral.id,
       text: fallback.text,
@@ -1037,7 +1075,7 @@ function buildComposedInput(
   style: ResolvedStyle,
   allowed: readonly Evidence[],
   filled: {
-    hook: MessageHook;
+    hook: CompositionHook;
     templateId: string;
     text: string;
   }
@@ -1216,6 +1254,7 @@ export function composeGroundedPrompt(
     profileAdaptation: "PROFILE_FACTS_ONLY",
     provenance: Object.freeze({
       allowedEvidenceIds: Object.freeze(allowed.map((item) => item.evidenceId)),
+      campaignOverrideGrounding: filled.campaignOverrideGrounding,
       drafting,
       prospectContext: contextSnapshot,
       sourceVersions: sourceVersionsFor(input),

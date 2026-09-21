@@ -10,10 +10,12 @@ export {
 } from "./types";
 export type {
   CampaignStyleOverride,
+  CampaignOverrideGroundingProvenance,
   ComposeBaseSourceVersions,
   ComposeFailureCode,
   ComposeFailureReason,
   CompositionProvenance,
+  CompositionHook,
   ComposePromptInput,
   ComposePromptResult,
   ComposeSendControls,
@@ -32,6 +34,7 @@ export type {
   StyleStepOverride,
   VersionedAcceptedInferredStyleLayer,
   VersionedCampaignStyleOverride,
+  VersionedCampaignSource,
   VersionedExplicitStyleLayer,
   VersionedFreelancerProfile,
 } from "./types";

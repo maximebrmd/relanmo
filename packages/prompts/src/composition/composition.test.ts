@@ -179,7 +179,11 @@ const PROFILE_VERSION = requiredVersion(VERSION_REFS.profile);
 
 function sourceVersions() {
   return Object.freeze({
-    campaign: VERSION_REFS.campaign,
+    campaign: Object.freeze({
+      campaignId: CAMPAIGN,
+      tenantId: TENANT,
+      version: VERSION_REFS.campaign,
+    }),
     model: VERSION_REFS.model,
   });
 }
@@ -557,7 +561,6 @@ describe("composeGroundedPrompt", () => {
       composeInput({
         allowedEvidence: [fundingEvidence],
         campaignOverride: override,
-        drafting: { ...hiringDrafting, signalKind: "FUNDING" },
       })
     );
 
@@ -568,8 +571,13 @@ describe("composeGroundedPrompt", () => {
     }
     expect(withEvidence.kind).toBe("COMPOSED");
     if (withEvidence.kind === "COMPOSED") {
+      expect(withEvidence.hook).toBe("CAMPAIGN_OVERRIDE");
       expect(withEvidence.templateId).toBe("campaign-step-override:DM1");
       expect(withEvidence.targetText).toContain("50 M€");
+      expect(withEvidence.provenance.campaignOverrideGrounding).toEqual({
+        assertionKinds: ["FUNDING"],
+        evidenceIds: [fundingEvidence.evidenceId],
+      });
     }
   });
 
@@ -591,6 +599,11 @@ describe("composeGroundedPrompt", () => {
 
     expect(result.kind).toBe("COMPOSED");
     if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("CAMPAIGN_OVERRIDE");
+      expect(result.provenance.campaignOverrideGrounding).toEqual({
+        assertionKinds: [],
+        evidenceIds: [],
+      });
       expect(result.templateId).toBe("campaign-step-override:DM1");
       expect(result.targetText).toContain("Bonjour Camille");
     }
@@ -943,7 +956,8 @@ describe("composeGroundedPrompt", () => {
       return;
     }
     expect(result.sourceVersions).toEqual({
-      ...versions,
+      campaign: versions.campaign.version,
+      model: versions.model,
       acceptedInferredStyle: null,
       defaultPrompt: frenchDefaultPromptVersion(),
       explicitStyle: EXPLICIT_STYLE_VERSION,
@@ -954,7 +968,7 @@ describe("composeGroundedPrompt", () => {
       result.sourceVersions
     );
     expect(result.composedInput).toContain(frenchDefaultPromptVersion().id);
-    expect(result.composedInput).toContain(versions.campaign.id);
+    expect(result.composedInput).toContain(versions.campaign.version.id);
     expect(result.composedInput).toContain(campaignOverride.version.id);
     expect(result.composedInput).toContain(EXPLICIT_STYLE_VERSION.id);
     expect(result.composedInput).not.toContain(INFERRED_STYLE_VERSION.id);
@@ -965,6 +979,7 @@ describe("composeGroundedPrompt", () => {
     expect(result.composedInput).not.toContain("evidence_foreign_1");
     expect(result.provenance).toEqual({
       allowedEvidenceIds: [HIRING_EVIDENCE_ID],
+      campaignOverrideGrounding: null,
       drafting: hiringDrafting,
       prospectContext: {
         company: "Nordwave SaaS",
@@ -1111,6 +1126,24 @@ describe("composeGroundedPrompt", () => {
         campaignOverride: {
           ...campaignLayer({ tone: "WARM" }),
           campaignId: OTHER_CAMPAIGN,
+        },
+      }),
+      composeInput({
+        sourceVersions: {
+          ...sourceVersions(),
+          campaign: {
+            ...sourceVersions().campaign,
+            campaignId: OTHER_CAMPAIGN,
+          },
+        },
+      }),
+      composeInput({
+        sourceVersions: {
+          ...sourceVersions(),
+          campaign: {
+            ...sourceVersions().campaign,
+            tenantId: OTHER_TENANT,
+          },
         },
       }),
     ];

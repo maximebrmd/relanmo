@@ -3,6 +3,7 @@ import type {
   CampaignVersionRef,
   DraftSourceVersions,
   Evidence,
+  EvidenceAssertionKind,
   EvidenceId,
   ExplicitStyleVersionRef,
   InferredStyleVersionRef,
@@ -86,8 +87,14 @@ export type VersionedAcceptedInferredStyleLayer = Readonly<{
   version: InferredStyleVersionRef;
 }>;
 
+export type VersionedCampaignSource = Readonly<{
+  campaignId: CampaignId;
+  tenantId: TenantId;
+  version: CampaignVersionRef;
+}>;
+
 export type ComposeBaseSourceVersions = Readonly<{
-  campaign: CampaignVersionRef;
+  campaign: VersionedCampaignSource;
   model: ModelVersion;
 }>;
 
@@ -133,8 +140,14 @@ export type ProspectContextSnapshot = Readonly<{
   signalFact: GroundedFact | null;
 }>;
 
+export type CampaignOverrideGroundingProvenance = Readonly<{
+  assertionKinds: readonly EvidenceAssertionKind[];
+  evidenceIds: readonly EvidenceId[];
+}>;
+
 export type CompositionProvenance = Readonly<{
   allowedEvidenceIds: readonly EvidenceId[];
+  campaignOverrideGrounding: CampaignOverrideGroundingProvenance | null;
   drafting: SequenceDraftingContext;
   prospectContext: ProspectContextSnapshot;
   sourceVersions: DraftSourceVersions;
@@ -158,6 +171,8 @@ export type ResolvedStyleField<Value> = Readonly<{
   source: StylePrecedenceSource;
   value: Value;
 }>;
+
+export type CompositionHook = MessageHook | "CAMPAIGN_OVERRIDE";
 
 export type ResolvedStyle = Readonly<{
   addressForm: ResolvedStyleField<AddressForm>;
@@ -185,7 +200,7 @@ export type ComposedPrompt = Readonly<
   ComposeResultBase & {
     allowedEvidenceIds: readonly EvidenceId[];
     composedInput: string;
-    hook: MessageHook;
+    hook: CompositionHook;
     kind: "COMPOSED";
     outputBudget: WritingOutputBudget;
     profileAdaptation: "PROFILE_FACTS_ONLY";
