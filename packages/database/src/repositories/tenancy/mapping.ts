@@ -70,14 +70,16 @@ export function catchMappingError(error: unknown): PersistenceFailure {
 }
 
 export function emptyCurrentVersions(): CurrentVersionSet {
-  return {
+  const current = {
     acceptedInferredStyle: null,
     campaign: null,
     defaultPrompt: null,
     explicitStyle: null,
     model: null,
     profile: null,
+    promptOverride: null,
   };
+  return current;
 }
 
 export function currentVersionsWithProfile(
