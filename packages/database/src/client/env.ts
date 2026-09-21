@@ -68,6 +68,11 @@ function parseConnectionUrl(value: string, key: string): ParsedConnectionUrl {
       `${key} must use the postgres:// or postgresql:// scheme`
     );
   }
+  if (parsed.searchParams.has("user")) {
+    throw new DatabaseConfigError(
+      `${key} must set the database username in the URL authority, not the user query parameter`
+    );
+  }
   if (parsed.username.length === 0) {
     throw new DatabaseConfigError(
       `${key} must include an explicit database username`

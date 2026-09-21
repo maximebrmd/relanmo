@@ -8,6 +8,7 @@ import type { SequenceClosureConfiguration } from "@relanmo/domain/ports/persist
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -15,7 +16,7 @@ import {
   pgTable,
   text,
   timestamp,
-  type AnyPgColumn,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -35,13 +36,9 @@ export const campaigns = pgTable(
       .references(() => tenants.id),
     status: campaignStatus("status").notNull().default("DRAFT"),
     // Head of unactivated edits; diffed against activeVersionId for draft comparison.
-    draftVersionId: text("draft_version_id").references(
-      (): AnyPgColumn => campaignVersions.id
-    ),
+    draftVersionId: text("draft_version_id"),
     // The version currently authorizing the bounded automated sequence.
-    activeVersionId: text("active_version_id").references(
-      (): AnyPgColumn => campaignVersions.id
-    ),
+    activeVersionId: text("active_version_id"),
     outboundPaused: boolean("outbound_paused").notNull().default(false),
     pauseReason: text("pause_reason"),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -56,6 +53,16 @@ export const campaigns = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.draftVersionId, table.id],
+      foreignColumns: [campaignVersions.id, campaignVersions.campaignId],
+      name: "campaigns_draftVersion_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.activeVersionId, table.id],
+      foreignColumns: [campaignVersions.id, campaignVersions.campaignId],
+      name: "campaigns_activeVersion_owner_fk",
+    }),
     index("campaigns_tenantId_idx").on(table.tenantId),
     index("campaigns_draftVersionId_idx").on(table.draftVersionId),
     index("campaigns_activeVersionId_idx").on(table.activeVersionId),
@@ -101,6 +108,10 @@ export const campaignVersions = pgTable(
       .references(() => user.id),
   },
   (table) => [
+    unique("campaignVersions_id_campaignId_unique").on(
+      table.id,
+      table.campaignId
+    ),
     uniqueIndex("campaignVersions_campaignId_revision_idx").on(
       table.campaignId,
       table.revision
@@ -111,13 +122,13 @@ export const campaignVersions = pgTable(
 
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   activeVersion: one(campaignVersions, {
-    fields: [campaigns.activeVersionId],
-    references: [campaignVersions.id],
+    fields: [campaigns.activeVersionId, campaigns.id],
+    references: [campaignVersions.id, campaignVersions.campaignId],
     relationName: "campaignActiveVersion",
   }),
   draftVersion: one(campaignVersions, {
-    fields: [campaigns.draftVersionId],
-    references: [campaignVersions.id],
+    fields: [campaigns.draftVersionId, campaigns.id],
+    references: [campaignVersions.id, campaignVersions.campaignId],
     relationName: "campaignDraftVersion",
   }),
   tenant: one(tenants, {

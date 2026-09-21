@@ -167,7 +167,8 @@ CREATE TABLE "campaign_versions" (
 	"sequence_closure" jsonb NOT NULL,
 	"business_window" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" text NOT NULL
+	"created_by" text NOT NULL,
+	CONSTRAINT "campaignVersions_id_campaignId_unique" UNIQUE("id","campaign_id")
 );
 --> statement-breakpoint
 CREATE TABLE "campaigns" (
@@ -421,7 +422,8 @@ CREATE TABLE "prompt_override_versions" (
 	"settings" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"step_overrides" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" text NOT NULL
+	"created_by" text NOT NULL,
+	CONSTRAINT "promptOverrideVersions_id_promptOverrideId_unique" UNIQUE("id","prompt_override_id")
 );
 --> statement-breakpoint
 CREATE TABLE "prompt_overrides" (
@@ -454,6 +456,7 @@ CREATE TABLE "style_profile_versions" (
 	"evidence_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_by" text,
+	CONSTRAINT "styleProfileVersions_id_styleProfileId_unique" UNIQUE("id","style_profile_id"),
 	CONSTRAINT "styleProfileVersions_explicitRequirements_check" CHECK ("style_profile_versions"."kind" <> 'STYLE_EXPLICIT' OR ("style_profile_versions"."created_by" IS NOT NULL AND "style_profile_versions"."formality" IS NOT NULL AND "style_profile_versions"."tone" IS NOT NULL)),
 	CONSTRAINT "styleProfileVersions_inferredModel_check" CHECK ("style_profile_versions"."kind" <> 'STYLE_INFERRED' OR "style_profile_versions"."model" IS NOT NULL)
 );
@@ -527,8 +530,8 @@ ALTER TABLE "campaign_versions" ADD CONSTRAINT "campaign_versions_campaign_id_ca
 ALTER TABLE "campaign_versions" ADD CONSTRAINT "campaign_versions_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "campaign_versions" ADD CONSTRAINT "campaign_versions_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_draft_version_id_campaign_versions_id_fk" FOREIGN KEY ("draft_version_id") REFERENCES "public"."campaign_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_active_version_id_campaign_versions_id_fk" FOREIGN KEY ("active_version_id") REFERENCES "public"."campaign_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_draftVersion_owner_fk" FOREIGN KEY ("draft_version_id","id") REFERENCES "public"."campaign_versions"("id","campaign_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_activeVersion_owner_fk" FOREIGN KEY ("active_version_id","id") REFERENCES "public"."campaign_versions"("id","campaign_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_leases" ADD CONSTRAINT "account_leases_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_leases" ADD CONSTRAINT "account_leases_account_id_provider_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."provider_accounts"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "action_events" ADD CONSTRAINT "action_events_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -572,14 +575,14 @@ ALTER TABLE "prompt_override_versions" ADD CONSTRAINT "prompt_override_versions_
 ALTER TABLE "prompt_override_versions" ADD CONSTRAINT "prompt_override_versions_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "prompt_overrides" ADD CONSTRAINT "prompt_overrides_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "prompt_overrides" ADD CONSTRAINT "prompt_overrides_campaign_id_campaigns_id_fk" FOREIGN KEY ("campaign_id") REFERENCES "public"."campaigns"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "prompt_overrides" ADD CONSTRAINT "prompt_overrides_active_version_id_prompt_override_versions_id_fk" FOREIGN KEY ("active_version_id") REFERENCES "public"."prompt_override_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "prompt_overrides" ADD CONSTRAINT "promptOverrides_activeVersion_owner_fk" FOREIGN KEY ("active_version_id","id") REFERENCES "public"."prompt_override_versions"("id","prompt_override_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "style_profile_versions" ADD CONSTRAINT "style_profile_versions_style_profile_id_style_profiles_id_fk" FOREIGN KEY ("style_profile_id") REFERENCES "public"."style_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "style_profile_versions" ADD CONSTRAINT "style_profile_versions_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "style_profile_versions" ADD CONSTRAINT "style_profile_versions_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "style_profiles" ADD CONSTRAINT "style_profiles_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "style_profiles" ADD CONSTRAINT "style_profiles_explicit_version_id_style_profile_versions_id_fk" FOREIGN KEY ("explicit_version_id") REFERENCES "public"."style_profile_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "style_profiles" ADD CONSTRAINT "style_profiles_accepted_inferred_version_id_style_profile_versions_id_fk" FOREIGN KEY ("accepted_inferred_version_id") REFERENCES "public"."style_profile_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "style_profiles" ADD CONSTRAINT "style_profiles_suggested_inferred_version_id_style_profile_versions_id_fk" FOREIGN KEY ("suggested_inferred_version_id") REFERENCES "public"."style_profile_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "style_profiles" ADD CONSTRAINT "styleProfiles_explicitVersion_owner_fk" FOREIGN KEY ("explicit_version_id","id") REFERENCES "public"."style_profile_versions"("id","style_profile_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "style_profiles" ADD CONSTRAINT "styleProfiles_acceptedInferredVersion_owner_fk" FOREIGN KEY ("accepted_inferred_version_id","id") REFERENCES "public"."style_profile_versions"("id","style_profile_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "style_profiles" ADD CONSTRAINT "styleProfiles_suggestedInferredVersion_owner_fk" FOREIGN KEY ("suggested_inferred_version_id","id") REFERENCES "public"."style_profile_versions"("id","style_profile_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "freelancer_profiles" ADD CONSTRAINT "freelancer_profiles_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "freelancer_profiles" ADD CONSTRAINT "freelancer_profiles_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "memberships" ADD CONSTRAINT "memberships_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

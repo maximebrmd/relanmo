@@ -5,6 +5,7 @@ import type { StyleOverrideSettings } from "@relanmo/domain/ports/persistence/ca
 import { relations, sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,7 +14,7 @@ import {
   real,
   text,
   timestamp,
-  type AnyPgColumn,
+  unique,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -46,16 +47,10 @@ export const styleProfiles = pgTable(
       .unique()
       .references(() => tenants.id),
     source: styleSource("source").notNull().default("DEFAULT"),
-    explicitVersionId: text("explicit_version_id").references(
-      (): AnyPgColumn => styleProfileVersions.id
-    ),
-    acceptedInferredVersionId: text("accepted_inferred_version_id").references(
-      (): AnyPgColumn => styleProfileVersions.id
-    ),
+    explicitVersionId: text("explicit_version_id"),
+    acceptedInferredVersionId: text("accepted_inferred_version_id"),
     // Set when a bounded inference produced a proposal the customer has not accepted yet.
-    suggestedInferredVersionId: text(
-      "suggested_inferred_version_id"
-    ).references((): AnyPgColumn => styleProfileVersions.id),
+    suggestedInferredVersionId: text("suggested_inferred_version_id"),
     revision: integer("revision").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -66,6 +61,30 @@ export const styleProfiles = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.explicitVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_explicitVersion_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.acceptedInferredVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_acceptedInferredVersion_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.suggestedInferredVersionId, table.id],
+      foreignColumns: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
+      name: "styleProfiles_suggestedInferredVersion_owner_fk",
+    }),
     index("styleProfiles_explicitVersionId_idx").on(table.explicitVersionId),
     index("styleProfiles_acceptedInferredVersionId_idx").on(
       table.acceptedInferredVersionId
@@ -116,6 +135,10 @@ export const styleProfileVersions = pgTable(
     }),
   },
   (table) => [
+    unique("styleProfileVersions_id_styleProfileId_unique").on(
+      table.id,
+      table.styleProfileId
+    ),
     index("styleProfileVersions_styleProfileId_idx").on(table.styleProfileId),
     index("styleProfileVersions_tenantId_idx").on(table.tenantId),
     check(
@@ -142,9 +165,7 @@ export const promptOverrides = pgTable(
       .notNull()
       .unique()
       .references(() => campaigns.id, { onDelete: "cascade" }),
-    activeVersionId: text("active_version_id").references(
-      (): AnyPgColumn => promptOverrideVersions.id
-    ),
+    activeVersionId: text("active_version_id"),
     revision: integer("revision").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -154,7 +175,17 @@ export const promptOverrides = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("promptOverrides_tenantId_idx").on(table.tenantId)]
+  (table) => [
+    foreignKey({
+      columns: [table.activeVersionId, table.id],
+      foreignColumns: [
+        promptOverrideVersions.id,
+        promptOverrideVersions.promptOverrideId,
+      ],
+      name: "promptOverrides_activeVersion_owner_fk",
+    }),
+    index("promptOverrides_tenantId_idx").on(table.tenantId),
+  ]
 );
 
 // Immutable per-save snapshot of style settings and step overrides, reconstructing the
@@ -186,6 +217,10 @@ export const promptOverrideVersions = pgTable(
       .references(() => user.id),
   },
   (table) => [
+    unique("promptOverrideVersions_id_promptOverrideId_unique").on(
+      table.id,
+      table.promptOverrideId
+    ),
     index("promptOverrideVersions_promptOverrideId_idx").on(
       table.promptOverrideId
     ),
@@ -196,18 +231,27 @@ export const styleProfilesRelations = relations(
   styleProfiles,
   ({ many, one }) => ({
     acceptedInferredVersion: one(styleProfileVersions, {
-      fields: [styleProfiles.acceptedInferredVersionId],
-      references: [styleProfileVersions.id],
+      fields: [styleProfiles.acceptedInferredVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
       relationName: "styleProfileAcceptedInferredVersion",
     }),
     explicitVersion: one(styleProfileVersions, {
-      fields: [styleProfiles.explicitVersionId],
-      references: [styleProfileVersions.id],
+      fields: [styleProfiles.explicitVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
       relationName: "styleProfileExplicitVersion",
     }),
     suggestedInferredVersion: one(styleProfileVersions, {
-      fields: [styleProfiles.suggestedInferredVersionId],
-      references: [styleProfileVersions.id],
+      fields: [styleProfiles.suggestedInferredVersionId, styleProfiles.id],
+      references: [
+        styleProfileVersions.id,
+        styleProfileVersions.styleProfileId,
+      ],
       relationName: "styleProfileSuggestedInferredVersion",
     }),
     tenant: one(tenants, {
@@ -252,8 +296,11 @@ export const promptOverridesRelations = relations(
   promptOverrides,
   ({ many, one }) => ({
     activeVersion: one(promptOverrideVersions, {
-      fields: [promptOverrides.activeVersionId],
-      references: [promptOverrideVersions.id],
+      fields: [promptOverrides.activeVersionId, promptOverrides.id],
+      references: [
+        promptOverrideVersions.id,
+        promptOverrideVersions.promptOverrideId,
+      ],
       relationName: "promptOverrideActiveVersion",
     }),
     campaign: one(campaigns, {

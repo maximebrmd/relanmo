@@ -64,7 +64,9 @@ describe("parseDatabaseEnv", () => {
         ...VALID_ENV,
         DATABASE_URL_UNPOOLED: "postgres://direct.example.com:5432/app",
       })
-    ).toThrow("DATABASE_URL_UNPOOLED must include an explicit database username");
+    ).toThrow(
+      "DATABASE_URL_UNPOOLED must include an explicit database username"
+    );
   });
 
   it("rejects an identical runtime and migration URL", () => {
@@ -108,6 +110,18 @@ describe("parseDatabaseEnv", () => {
     );
   });
 
+  it("rejects query parameters that override the database principal", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://runtime:pass@host:5432/app?user=shared",
+        DATABASE_URL_UNPOOLED:
+          "postgres://migration:pass@host:5433/app?user=shared",
+      })
+    ).toThrow(
+      "DATABASE_URL must set the database username in the URL authority"
+    );
+  });
+
   it("rejects the same database principal with percent-encoded characters", () => {
     expect(() =>
       parseDatabaseEnv({
@@ -125,9 +139,7 @@ describe("parseDatabaseEnv", () => {
       DATABASE_URL_UNPOOLED: "postgres://migration:pass@host:5433/app",
     });
     expect(env.runtimeUrl).toBe("postgres://runtime:pass@host:5432/app");
-    expect(env.migrationUrl).toBe(
-      "postgres://migration:pass@host:5433/app"
-    );
+    expect(env.migrationUrl).toBe("postgres://migration:pass@host:5433/app");
   });
 
   it("rejects a non-numeric pool size", () => {

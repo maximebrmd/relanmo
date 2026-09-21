@@ -97,19 +97,27 @@ async function foreignKey(
       foreign_column: string;
       foreign_table: string;
     }>(
-      `select ccu.table_name as foreign_table,
-              ccu.column_name as foreign_column
-         from information_schema.table_constraints as tc
-         join information_schema.key_column_usage as kcu
-           on tc.constraint_name = kcu.constraint_name
-          and tc.table_schema = kcu.table_schema
-         join information_schema.constraint_column_usage as ccu
-           on ccu.constraint_name = tc.constraint_name
-          and ccu.table_schema = tc.table_schema
-        where tc.constraint_type = 'FOREIGN KEY'
-          and tc.table_schema = 'public'
-          and tc.table_name = $1
-          and kcu.column_name = $2`,
+      `select target.relname as foreign_table,
+              target_column.attname as foreign_column
+         from pg_constraint as fk
+         join pg_class as source
+           on source.oid = fk.conrelid
+         join pg_namespace as source_namespace
+           on source_namespace.oid = source.relnamespace
+         join pg_class as target
+           on target.oid = fk.confrelid
+         cross join lateral unnest(fk.conkey, fk.confkey)
+           as mapping(source_attribute_number, target_attribute_number)
+         join pg_attribute as source_column
+           on source_column.attrelid = source.oid
+          and source_column.attnum = mapping.source_attribute_number
+         join pg_attribute as target_column
+           on target_column.attrelid = target.oid
+          and target_column.attnum = mapping.target_attribute_number
+        where fk.contype = 'f'
+          and source_namespace.nspname = 'public'
+          and source.relname = $1
+          and source_column.attname = $2`,
       [tableName, columnName]
     );
     const [row] = result.rows;
@@ -263,6 +271,117 @@ describe("initial Drizzle migration lineage (live local Postgres)", () => {
           "migration-test-tenant",
           "migration-test-campaign",
           "missing-prompt-version",
+        ]
+      );
+      await executeSql(
+        env,
+        `insert into "user" (id, name, email)
+         values ($1, 'Migration test user', 'migration@example.test')`,
+        ["migration-test-user"]
+      );
+      await executeSql(
+        env,
+        `insert into tenants (id, display_name, status)
+         values ($1, 'Other migration test tenant', 'ACTIVE')`,
+        ["migration-test-other-tenant"]
+      );
+      await executeSql(
+        env,
+        `insert into campaigns (id, tenant_id)
+         values ($1, $2)`,
+        ["migration-test-foreign-campaign", "migration-test-tenant"]
+      );
+      await executeSql(
+        env,
+        `insert into campaign_versions
+           (id, campaign_id, tenant_id, revision, name, offer,
+            icp_description, daily_quota, daily_invitation_quota,
+            daily_message_quota, exclusions, targeting, sequence,
+            sequence_closure, business_window, created_by)
+         values
+           ($1, $2, $3, 1, 'Foreign version', 'Offer', 'ICP', 1, 1, 1,
+            '[]'::jsonb, '{}'::jsonb, '[]'::jsonb, '{}'::jsonb,
+            '{}'::jsonb, $4)`,
+        [
+          "migration-test-foreign-campaign-version",
+          "migration-test-foreign-campaign",
+          "migration-test-tenant",
+          "migration-test-user",
+        ]
+      );
+      for (const columnName of [
+        "draft_version_id",
+        "active_version_id",
+      ] as const) {
+        await expectForeignKeyViolation(
+          env,
+          `update campaigns set ${columnName} = $1 where id = $2`,
+          ["migration-test-foreign-campaign-version", "migration-test-campaign"]
+        );
+      }
+      await executeSql(
+        env,
+        `insert into style_profiles (id, tenant_id)
+         values ($1, $2), ($3, $4)`,
+        [
+          "migration-test-style-profile",
+          "migration-test-tenant",
+          "migration-test-other-style-profile",
+          "migration-test-other-tenant",
+        ]
+      );
+      await executeSql(
+        env,
+        `insert into style_profile_versions
+           (id, style_profile_id, tenant_id, kind, revision, model)
+         values ($1, $2, $3, 'STYLE_INFERRED', 1, 'test-model')`,
+        [
+          "migration-test-style-version",
+          "migration-test-style-profile",
+          "migration-test-tenant",
+        ]
+      );
+      for (const columnName of [
+        "explicit_version_id",
+        "accepted_inferred_version_id",
+        "suggested_inferred_version_id",
+      ] as const) {
+        await expectForeignKeyViolation(
+          env,
+          `update style_profiles set ${columnName} = $1 where id = $2`,
+          ["migration-test-style-version", "migration-test-other-style-profile"]
+        );
+      }
+      await executeSql(
+        env,
+        `insert into prompt_overrides (id, tenant_id, campaign_id)
+         values ($1, $2, $3), ($4, $2, $5)`,
+        [
+          "migration-test-prompt-override",
+          "migration-test-tenant",
+          "migration-test-campaign",
+          "migration-test-other-prompt-override",
+          "migration-test-foreign-campaign",
+        ]
+      );
+      await executeSql(
+        env,
+        `insert into prompt_override_versions
+           (id, prompt_override_id, tenant_id, revision, created_by)
+         values ($1, $2, $3, 1, $4)`,
+        [
+          "migration-test-prompt-version",
+          "migration-test-prompt-override",
+          "migration-test-tenant",
+          "migration-test-user",
+        ]
+      );
+      await expectForeignKeyViolation(
+        env,
+        `update prompt_overrides set active_version_id = $1 where id = $2`,
+        [
+          "migration-test-prompt-version",
+          "migration-test-other-prompt-override",
         ]
       );
       const appliedAfterFirst = await appliedMigrationCount(env);

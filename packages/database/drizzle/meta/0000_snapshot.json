@@ -1,5 +1,5 @@
 {
-  "id": "39376b98-a254-432b-9c59-22ad634470ee",
+  "id": "fe2d16d7-3fa3-42ce-b2ba-3994bbd71103",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1278,7 +1278,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "campaignVersions_id_campaignId_unique": {
+          "name": "campaignVersions_id_campaignId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "campaign_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1427,28 +1436,32 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "campaigns_draft_version_id_campaign_versions_id_fk": {
-          "name": "campaigns_draft_version_id_campaign_versions_id_fk",
+        "campaigns_draftVersion_owner_fk": {
+          "name": "campaigns_draftVersion_owner_fk",
           "tableFrom": "campaigns",
           "tableTo": "campaign_versions",
           "columnsFrom": [
-            "draft_version_id"
+            "draft_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "campaign_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "campaigns_active_version_id_campaign_versions_id_fk": {
-          "name": "campaigns_active_version_id_campaign_versions_id_fk",
+        "campaigns_activeVersion_owner_fk": {
+          "name": "campaigns_activeVersion_owner_fk",
           "tableFrom": "campaigns",
           "tableTo": "campaign_versions",
           "columnsFrom": [
-            "active_version_id"
+            "active_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "campaign_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -3718,7 +3731,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "promptOverrideVersions_id_promptOverrideId_unique": {
+          "name": "promptOverrideVersions_id_promptOverrideId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "prompt_override_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3817,15 +3839,17 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "prompt_overrides_active_version_id_prompt_override_versions_id_fk": {
-          "name": "prompt_overrides_active_version_id_prompt_override_versions_id_fk",
+        "promptOverrides_activeVersion_owner_fk": {
+          "name": "promptOverrides_activeVersion_owner_fk",
           "tableFrom": "prompt_overrides",
           "tableTo": "prompt_override_versions",
           "columnsFrom": [
-            "active_version_id"
+            "active_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "prompt_override_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -4039,7 +4063,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "styleProfileVersions_id_styleProfileId_unique": {
+          "name": "styleProfileVersions_id_styleProfileId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "style_profile_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "styleProfileVersions_explicitRequirements_check": {
@@ -4163,41 +4196,47 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "style_profiles_explicit_version_id_style_profile_versions_id_fk": {
-          "name": "style_profiles_explicit_version_id_style_profile_versions_id_fk",
+        "styleProfiles_explicitVersion_owner_fk": {
+          "name": "styleProfiles_explicitVersion_owner_fk",
           "tableFrom": "style_profiles",
           "tableTo": "style_profile_versions",
           "columnsFrom": [
-            "explicit_version_id"
+            "explicit_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "style_profile_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "style_profiles_accepted_inferred_version_id_style_profile_versions_id_fk": {
-          "name": "style_profiles_accepted_inferred_version_id_style_profile_versions_id_fk",
+        "styleProfiles_acceptedInferredVersion_owner_fk": {
+          "name": "styleProfiles_acceptedInferredVersion_owner_fk",
           "tableFrom": "style_profiles",
           "tableTo": "style_profile_versions",
           "columnsFrom": [
-            "accepted_inferred_version_id"
+            "accepted_inferred_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "style_profile_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "style_profiles_suggested_inferred_version_id_style_profile_versions_id_fk": {
-          "name": "style_profiles_suggested_inferred_version_id_style_profile_versions_id_fk",
+        "styleProfiles_suggestedInferredVersion_owner_fk": {
+          "name": "styleProfiles_suggestedInferredVersion_owner_fk",
           "tableFrom": "style_profiles",
           "tableTo": "style_profile_versions",
           "columnsFrom": [
-            "suggested_inferred_version_id"
+            "suggested_inferred_version_id",
+            "id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "style_profile_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
