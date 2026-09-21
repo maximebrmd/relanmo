@@ -30,7 +30,9 @@ type DrizzleColumnDefault = ReturnType<
 type DrizzleSchema = Parameters<typeof extractTablesRelationalConfig>[0];
 
 const pgDialect = new PgDialect();
-const moduleResolver = createRequire(__filename);
+const moduleResolver = createRequire(
+  path.join(process.cwd(), "packages/auth/package.json")
+);
 const logicalAliases = new Map([
   ["login_account", "loginAccount"],
   ["login_accounts", "loginAccounts"],
