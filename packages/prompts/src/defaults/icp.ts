@@ -56,8 +56,8 @@ const ON_MARKET_PHRASES = [
 ] as const;
 
 const ON_MARKET_PATTERNS = [
-  /\brecrut\w*\b(?:\s+\S+){0,3}\s+\bfreelance\b/u,
-  /\brecherch\w*\b(?:\s+(?:activement|actuellement))?\s+(?:(?:un|une|des)\s+|d['’](?:un|une)\s+)?freelance\b/u,
+  /\brecrut\w*\b(?:\s+\S+){0,3}\s+\bfreelances?\b/u,
+  /\brecherch\w*\b(?:\s+(?:activement|actuellement))?\s+(?:(?:un|une|des)\s+|d['’](?:un|une)\s+)?freelances?\b/u,
   /\b(?:besoin|mission)\b(?:\s+\S+){0,4}\s+\basap\b/u,
   /\basap\b(?:\s+\S+){0,4}\s+\b(?:besoin|mission)\b/u,
 ] as const;
@@ -146,7 +146,7 @@ const COMPANY_STATUS_PATTERNS = [
   /^disponible(?: immediatement| maintenant)?$/u,
   /^en recherche\b/u,
   /^looking for (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
-  /^open (?:for|to) (?:opportunities|work)\b/u,
+  /^open (?:for|to) (?:new )?(?:opportunities|opportunity|work)\b/u,
   /^seeking (?:a role|new )?(?:opportunities|opportunity|work)\b/u,
 ] as const;
 

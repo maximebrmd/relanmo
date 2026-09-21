@@ -192,6 +192,7 @@ describe("French prompt defaults", () => {
       "CTO",
       "CEO @ ",
       "Founder @ Open to work",
+      "Founder @ Open to new opportunities",
       "CTO | Looking for opportunities",
       "CEO · Available",
       "Founder — En recherche",
@@ -230,6 +231,7 @@ describe("French prompt defaults", () => {
     for (const observedSignalText of [
       "Nous recherchons un freelance React.",
       "À la recherche d'un freelance React.",
+      "Nous recrutons des développeurs freelances.",
     ]) {
       const qualification = qualifyIcp({
         headline: "CTO @ Nordwave SaaS",
