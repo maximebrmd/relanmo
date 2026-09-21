@@ -21,7 +21,6 @@ import type {
   PersistenceResult,
   PersistenceTransactionWork,
   PersistenceWorkerId,
-  SaveProfileRevisionInput,
   TenantTransactionScope,
 } from "@relanmo/domain/ports/persistence";
 import {
@@ -46,7 +45,10 @@ import type { IsolatedTestDatabase } from "../../../tests/support/test-database"
 import { createIsolatedTestDatabase } from "../../../tests/support/test-database";
 import { applyDatabaseMigrations } from "../../schema/apply-migrations";
 import { createTenancyRepositories } from "./index";
-import type { CampaignScopedSaveProfileRevisionInput } from "./index";
+import type {
+  CampaignScopedSaveProfileRevisionInput,
+  SaveOnboardingProfileRevisionInput,
+} from "./index";
 
 const SETUP_TIMEOUT_MS = 60_000;
 const TEST_TIMEOUT_MS = 30_000;
@@ -222,20 +224,16 @@ async function runAsWorker<Value>(
   }
 }
 
-function profileInput(
+function onboardingInput(
   tenant: string,
   userId: string,
   profileVersionId: string,
-  expected = {
-    ...emptyCurrentVersionSetFixture,
-    defaultPrompt: activeDefaultPrompt,
-    model: activeWritingModel,
-  }
-): SaveProfileRevisionInput {
+  expectedProfile: SaveOnboardingProfileRevisionInput["expectedProfile"] = null
+): SaveOnboardingProfileRevisionInput {
   return {
     createdAt: CREATED_AT,
     createdBy: parseUserId(userId),
-    expectedCurrent: { expected },
+    expectedProfile,
     facts: profileFactsFixture,
     profileVersionId: parseProfileVersionId(profileVersionId),
     tenantId: parseTenantId(tenant),
@@ -250,8 +248,13 @@ function saveInput(
   campaignId: string
 ): CampaignScopedSaveProfileRevisionInput {
   return {
-    ...profileInput(tenant, userId, profileVersionId, expected),
     campaignId: parseCampaignId(campaignId),
+    createdAt: CREATED_AT,
+    createdBy: parseUserId(userId),
+    expectedCurrent: { expected },
+    facts: profileFactsFixture,
+    profileVersionId: parseProfileVersionId(profileVersionId),
+    tenantId: parseTenantId(tenant),
   };
 }
 
@@ -389,16 +392,16 @@ describe("membership and freelancer profile repositories (live local Postgres)",
 
       const savedA = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.initialize(
-            profileInput(TENANT_A, USER_A, "profile-a-1"),
+          repos.profiles.saveForOnboarding(
+            onboardingInput(TENANT_A, USER_A, "profile-a-1"),
             tx
           )
         )
       );
       const savedB = expectOk(
         await runAsMember(TENANT_B, USER_B, (tx) =>
-          repos.profiles.initialize(
-            profileInput(TENANT_B, USER_B, "profile-b-1"),
+          repos.profiles.saveForOnboarding(
+            onboardingInput(TENANT_B, USER_B, "profile-b-1"),
             tx
           )
         )
@@ -415,10 +418,43 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       expect(savedA.value.profile.version.id).toBe("profile-a-1");
       expect(savedB.value.profile.version.id).toBe("profile-b-1");
 
+      const currentA = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.getForOnboarding(
+            { tenantId: parseTenantId(TENANT_A) },
+            tx
+          )
+        )
+      );
+      const revisedA = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.saveForOnboarding(
+            {
+              ...onboardingInput(
+                TENANT_A,
+                USER_A,
+                "profile-a-onboarding-2",
+                currentA.version
+              ),
+              facts: {
+                ...profileFactsFixture,
+                offer: "J’accompagne les équipes produit.",
+              },
+            },
+            tx
+          )
+        )
+      );
+      expect(revisedA.outcome).toBe("UPDATED");
+      if (revisedA.outcome !== "UPDATED") {
+        throw new Error("expected an onboarding profile revision");
+      }
+      expect(revisedA.value.version?.revision).toBe(2);
+
       const stale = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>
-          repos.profiles.initialize(
-            profileInput(TENANT_A, USER_A, "profile-a-stale"),
+          repos.profiles.saveForOnboarding(
+            onboardingInput(TENANT_A, USER_A, "profile-a-stale"),
             tx
           )
         )
@@ -427,8 +463,8 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       if (stale.outcome !== "REVISION_CONFLICT") {
         throw new Error("expected a revision conflict");
       }
-      expect(stale.actual.profile?.id).toBe("profile-a-1");
-      expect(stale.expected.profile).toBeNull();
+      expect(stale.actual?.id).toBe("profile-a-onboarding-2");
+      expect(stale.expected).toBeNull();
     },
     TEST_TIMEOUT_MS
   );
@@ -555,15 +591,15 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         TENANT_A,
         USER_A,
         (tx) =>
-          repos.profiles.initialize(
-            profileInput(TENANT_A, USER_A, "profile-late-initialization"),
+          repos.profiles.saveForOnboarding(
+            onboardingInput(TENANT_A, USER_A, "profile-late-onboarding"),
             tx
           )
       );
       expect(lateInitialization).toEqual({
         error: {
           code: "VALIDATION",
-          detail: "profile initialization requires a tenant without campaigns",
+          detail: "profile onboarding requires a tenant without campaigns",
           retryable: false,
         },
         ok: false,
@@ -735,7 +771,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
               ...saveInput(
                 TENANT_A,
                 USER_A,
-                "profile-a-2",
+                "profile-a-3",
                 stale.actual,
                 "campaign-a"
               ),
@@ -752,8 +788,8 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       if (updated.outcome !== "UPDATED") {
         throw new Error("expected an updated profile");
       }
-      expect(updated.value.profile.version.id).toBe("profile-a-2");
-      expect(updated.value.profile.version.revision).toBe(2);
+      expect(updated.value.profile.version.id).toBe("profile-a-3");
+      expect(updated.value.profile.version.revision).toBe(3);
     },
     TEST_TIMEOUT_MS
   );

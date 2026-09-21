@@ -1,13 +1,16 @@
 import type {
   CampaignId,
   ModelVersion,
+  ProfileVersionRef,
   PromptVersionRef,
 } from "@relanmo/domain/contracts";
 import type {
   CurrentVersionRepository,
   GetProfileInput,
+  PersistenceResult,
   PersistenceTransaction,
   ProfileRepository,
+  ProfileVersionRecord,
   SaveProfileRevisionInput,
   TenantRepository,
 } from "@relanmo/domain/ports/persistence";
@@ -29,19 +32,47 @@ export type CampaignScopedCurrentVersionRepository = Readonly<{
   ) => ReturnType<CurrentVersionRepository["getCurrent"]>;
 }>;
 
+export type OnboardingProfileState = Readonly<{
+  profile: ProfileVersionRecord | null;
+  version: ProfileVersionRef | null;
+}>;
+
+export type SaveOnboardingProfileRevisionInput = Omit<
+  SaveProfileRevisionInput,
+  "expectedCurrent"
+> &
+  Readonly<{
+    expectedProfile: ProfileVersionRef | null;
+  }>;
+
+export type SaveOnboardingProfileRevisionResult =
+  | Readonly<{
+      outcome: "UPDATED";
+      value: OnboardingProfileState;
+    }>
+  | Readonly<{
+      actual: ProfileVersionRef | null;
+      expected: ProfileVersionRef | null;
+      outcome: "REVISION_CONFLICT";
+    }>;
+
 export type CampaignScopedProfileRepository = Readonly<{
   get: (
     input: GetProfileInput & CampaignScope,
     tx: PersistenceTransaction
   ) => ReturnType<ProfileRepository["get"]>;
-  initialize: (
-    input: SaveProfileRevisionInput,
+  getForOnboarding: (
+    input: GetProfileInput,
     tx: PersistenceTransaction
-  ) => ReturnType<ProfileRepository["saveRevision"]>;
+  ) => Promise<PersistenceResult<OnboardingProfileState>>;
   saveRevision: (
     input: SaveProfileRevisionInput & CampaignScope,
     tx: PersistenceTransaction
   ) => ReturnType<ProfileRepository["saveRevision"]>;
+  saveForOnboarding: (
+    input: SaveOnboardingProfileRevisionInput,
+    tx: PersistenceTransaction
+  ) => Promise<PersistenceResult<SaveOnboardingProfileRevisionResult>>;
 }>;
 
 export type CampaignScopedTenantRepository = Readonly<{

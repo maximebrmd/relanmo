@@ -22,6 +22,9 @@ export type {
   CampaignScopedProfileRepository,
   CampaignScopedSaveProfileRevisionInput,
   CampaignScopedTenantRepository,
+  OnboardingProfileState,
+  SaveOnboardingProfileRevisionInput,
+  SaveOnboardingProfileRevisionResult,
   TenancyVersionSources,
 } from "./contracts";
 

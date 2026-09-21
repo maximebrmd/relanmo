@@ -87,7 +87,7 @@ export function currentVersionsWithProfile(
   return { ...current, profile };
 }
 
-function versionRefEqual(
+export function versionRefEqual(
   left: VersionRef | null,
   right: VersionRef | null
 ): boolean {
