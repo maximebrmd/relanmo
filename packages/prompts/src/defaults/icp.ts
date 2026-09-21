@@ -214,15 +214,10 @@ function headlineCompany(headline: string): string | null {
       : remainder.slice(0, nextDelimiter.index)
   ).trim();
   const normalized = normalizedIdentity(company);
-  const hasProperNameLikeToken =
-    /(?:^|[^\p{L}\p{N}])(?:\p{Lu}[\p{Ll}\p{M}][\p{L}\p{M}\p{N}.'’_-]*|[A-Z0-9]{2,})(?=$|[^\p{L}\p{N}])/u.test(
-      company
-    );
   if (
     normalized.length === 0 ||
     COMPANY_EVIDENCE_FILLERS.has(normalized) ||
-    COMPANY_STATUS_PATTERNS.some((pattern) => pattern.test(normalized)) ||
-    !hasProperNameLikeToken
+    COMPANY_STATUS_PATTERNS.some((pattern) => pattern.test(normalized))
   ) {
     return null;
   }

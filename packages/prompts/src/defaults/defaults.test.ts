@@ -281,6 +281,12 @@ describe("French prompt defaults", () => {
     ).toBe("DECISION_MAKER");
     expect(
       qualifyIcp({
+        headline: "CEO @ alan",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
+    expect(
+      qualifyIcp({
         headline: "Eng Manager @ Lumenor Studio",
         observedSignalText: null,
       }).audience
@@ -331,13 +337,15 @@ describe("French prompt defaults", () => {
       audience: "DECISION_MAKER",
       dm2Fact: {
         detail: null,
+        evidenceId: "linkedin:job:offer-data-42",
         fact: "une nouvelle offre data",
         kind: "OFFER",
         relevance: "RELEVANT",
       },
       dm3Fact: {
         detail: null,
-        fact: "une nouvelle offre data",
+        evidenceId: "linkedin:job:offer-data-42",
+        fact: "Une nouvelle offre data.",
         kind: "PRODUCT",
         relevance: "RELEVANT",
       },
@@ -350,12 +358,14 @@ describe("French prompt defaults", () => {
       audience: "DECISION_MAKER",
       dm2Fact: {
         detail: null,
+        evidenceId: "linkedin:job:offer-data-42",
         fact: "une nouvelle offre data",
         kind: "OFFER",
         relevance: "RELEVANT",
       },
       dm3Fact: {
         detail: null,
+        evidenceId: "website:product:migration-page",
         fact: "la page de migration produit",
         kind: "PRODUCT",
         relevance: "RELEVANT",
@@ -382,12 +392,14 @@ describe("French prompt defaults", () => {
       audience: "DECISION_MAKER",
       dm2Fact: {
         detail: null,
+        evidenceId: "linkedin:job:support-role",
         fact: "offre Chargé de Support Client",
         kind: "OFFER",
         relevance: "OFF_DOMAIN",
       },
       dm3Fact: {
         detail: null,
+        evidenceId: "website:product:support-page",
         fact: "page du support client",
         kind: "PRODUCT",
         relevance: "OFF_DOMAIN",

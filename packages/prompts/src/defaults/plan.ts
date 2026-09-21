@@ -39,6 +39,7 @@ type FollowUpFactRelevance = Exclude<SignalRelevance, "ABSENT">;
 
 export type Dm2FollowUpFact = Readonly<{
   detail: string | null;
+  evidenceId: string;
   fact: string;
   kind: Dm2FactKind;
   relevance: FollowUpFactRelevance;
@@ -46,6 +47,7 @@ export type Dm2FollowUpFact = Readonly<{
 
 export type Dm3FollowUpFact = Readonly<{
   detail: string | null;
+  evidenceId: string;
   fact: string;
   kind: Dm3FactKind;
   relevance: FollowUpFactRelevance;
@@ -152,6 +154,7 @@ function selectDm2Hook(context: SequenceDraftingContext) {
   if (
     dm2Fact === null ||
     dm2Fact.relevance !== "RELEVANT" ||
+    !hasFact(dm2Fact.evidenceId) ||
     !hasFact(dm2Fact.fact) ||
     (dm2Fact.kind === "PROSPECT_POST" && !hasFact(dm2Fact.detail))
   ) {
@@ -180,11 +183,11 @@ function selectDm3Hook(context: SequenceDraftingContext) {
   const repeatsDm2Fact =
     dm2Fact !== null &&
     dm3Fact !== null &&
-    dm3Fact.fact.trim().toLocaleLowerCase("fr") ===
-      dm2Fact.fact.trim().toLocaleLowerCase("fr");
+    dm3Fact.evidenceId.trim() === dm2Fact.evidenceId.trim();
   if (
     dm3Fact === null ||
     dm3Fact.relevance !== "RELEVANT" ||
+    !hasFact(dm3Fact.evidenceId) ||
     !hasFact(dm3Fact.fact) ||
     repeatsDm2Fact ||
     (dm3Fact.kind === "SPEAKING" && !hasFact(dm3Fact.detail))
