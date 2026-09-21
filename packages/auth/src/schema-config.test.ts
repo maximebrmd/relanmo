@@ -1,11 +1,15 @@
+/// <reference types="node" />
+
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import * as committedAuthSchema from "@relanmo/database/schema/auth";
-import { type DBAdapter, generateDrizzleSchema } from "auth/api";
+import { generateDrizzleSchema } from "auth/api";
+import type { DBAdapter } from "auth/api";
 import { is, SQL } from "drizzle-orm";
-import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
+import { getTableConfig, IndexedColumn, PgDialect } from "drizzle-orm/pg-core";
 import {
   createTableRelationsHelpers,
   extractTablesRelationalConfig,
@@ -20,25 +24,32 @@ import {
 } from "./schema-config";
 
 type AuthTable = Parameters<typeof getTableConfig>[0];
+type DrizzleColumnDefault = ReturnType<
+  typeof getTableConfig
+>["columns"][number]["default"];
+type DrizzleSchema = Parameters<typeof extractTablesRelationalConfig>[0];
 
 const pgDialect = new PgDialect();
-const logicalAliases: Record<string, string> = {
-  login_account: "loginAccount",
-  login_accounts: "loginAccounts",
-  login_account_userId_idx: "loginAccount_userId_idx",
-};
+const moduleResolver = createRequire(path.join(process.cwd(), "package.json"));
+const logicalAliases = new Map([
+  ["login_account", "loginAccount"],
+  ["login_accounts", "loginAccounts"],
+  ["login_account_userId_idx", "loginAccount_userId_idx"],
+]);
 
 function logicalName(name: string) {
-  return logicalAliases[name] ?? name;
+  return logicalAliases.get(name) ?? name;
 }
 
 function sorted<T>(values: T[]) {
-  return values.sort((left, right) =>
+  const copiedValues = [...values];
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 lacks toSorted(); sorting a copy preserves the caller's array.
+  return copiedValues.sort((left, right) =>
     JSON.stringify(left).localeCompare(JSON.stringify(right))
   );
 }
 
-function normalizeDefault(value: unknown) {
+function normalizeDefault(value: DrizzleColumnDefault) {
   if (value === undefined) {
     return { kind: "none" } as const;
   }
@@ -78,7 +89,7 @@ function normalizeTable(
         logicalName: logicalColumns[column.name],
         name: column.name,
         notNull: column.notNull,
-        onUpdate: typeof column.onUpdateFn === "function",
+        onUpdate: Boolean(column.onUpdateFn),
         primary: column.primary,
         type: column.getSQLType(),
         unique: column.isUnique,
@@ -112,12 +123,15 @@ function normalizeTable(
           if (is(column, SQL)) {
             return { expression: normalizeSql(column), kind: "sql" } as const;
           }
-          return {
-            indexConfig: column.indexConfig,
-            kind: "column",
-            name: column.name,
-            type: column.type,
-          } as const;
+          if (is(column, IndexedColumn)) {
+            return {
+              indexConfig: column.indexConfig,
+              kind: "column",
+              name: column.name,
+              type: column.type,
+            } as const;
+          }
+          throw new TypeError("Unsupported Drizzle index column metadata");
         }),
         concurrently: index.config.concurrently === true,
         method: index.config.method ?? "btree",
@@ -157,24 +171,25 @@ function normalizeTable(
 }
 
 async function installedPackageVersion(specifier: string) {
-  const entry = import.meta.resolve(specifier);
+  const entry = moduleResolver.resolve(specifier);
+  // SAFETY: package manifests are parsed below before their version is used.
   const manifest = JSON.parse(
-    await readFile(new URL("../package.json", entry), "utf8")
-  ) as { version?: unknown };
-  if (typeof manifest.version !== "string") {
+    await readFile(path.join(path.dirname(entry), "../package.json"), "utf-8")
+  ) as { version?: string };
+  if (!manifest.version) {
     throw new TypeError(`${specifier} package has no version`);
   }
   return manifest.version;
 }
 
-function normalizeSchema(schema: Record<string, unknown>) {
+function normalizeSchema(schema: DrizzleSchema) {
   const relationalConfig = extractTablesRelationalConfig(
     schema,
     createTableRelationsHelpers
   );
   return sorted(
     Object.values(relationalConfig.tables).map((table) => {
-      const firstColumn = Object.values(table.columns)[0];
+      const [firstColumn] = Object.values(table.columns);
       if (!firstColumn) {
         throw new TypeError(`Auth table ${table.dbName} has no columns`);
       }
@@ -209,11 +224,17 @@ function normalizeSchema(schema: Record<string, unknown>) {
 }
 
 async function generateSchemaModule() {
+  const authPackageDirectory = path.dirname(
+    moduleResolver.resolve("@relanmo/auth/package.json")
+  );
   const directory = await mkdtemp(
-    path.join(import.meta.dirname, ".auth-schema-generator-")
+    path.join(authPackageDirectory, "src/.auth-schema-generator-")
   );
   try {
     const file = path.join(directory, "schema.mjs");
+    // SAFETY: Better Auth's generator only reads this adapter's documented id,
+    // provider, and file-generation fields; it does not call runtime methods.
+    // @ts-expect-error -- generation does not require a runtime adapter's CRUD methods.
     const adapter = {
       id: "drizzle",
       options: { provider: "pg" },
