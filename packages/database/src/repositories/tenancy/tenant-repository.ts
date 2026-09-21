@@ -8,19 +8,14 @@ import { memberships, tenants } from "../../schema/tenancy";
 import { resolveTransactionExecutor } from "../../transactions/registry";
 import {
   catchMappingError,
-  currentVersionsWithProfile,
   mapMembershipRecord,
-  mapProfileVersion,
   mapTenantRecord,
 } from "./mapping";
-import { loadCurrentProfile } from "./profile-rows";
+import { loadCurrentVersions } from "./current-version-rows";
 import { tenantScopeMismatch } from "./scope";
 
 async function currentVersionsFor(tx: PersistenceTransaction, lock: boolean) {
-  const profile = await loadCurrentProfile(tx, tx.scope.tenantId, lock);
-  return currentVersionsWithProfile(
-    profile === null ? null : mapProfileVersion(profile).version
-  );
+  return (await loadCurrentVersions(tx, tx.scope.tenantId, lock)).current;
 }
 
 export function createTenantRepository(): TenantRepository {

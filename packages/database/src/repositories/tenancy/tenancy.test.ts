@@ -450,6 +450,160 @@ describe("membership and freelancer profile repositories (live local Postgres)",
   );
 
   it(
+    "returns every active version pointer and conflicts when they drift",
+    async (ctx) => {
+      if (!database) {
+        ctx.skip();
+        return;
+      }
+
+      const before = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.currentVersions.getCurrent(
+            { tenantId: parseTenantId(TENANT_A) },
+            tx
+          )
+        )
+      );
+
+      await withClient(database.migrationUrl, async (client) => {
+        await client.query(
+          `insert into campaigns (id, tenant_id, status)
+           values ('campaign-a', $1, 'ACTIVE')`,
+          [TENANT_A]
+        );
+        await client.query(
+          `insert into campaign_versions (
+             id, campaign_id, tenant_id, revision, name, offer,
+             icp_description, daily_quota, daily_invitation_quota,
+             daily_message_quota, exclusions, targeting, sequence,
+             sequence_closure, business_window, created_by
+           ) values (
+             'campaign-version-a-1', 'campaign-a', $1, 1, 'Campagne A',
+             'Offre A', 'ICP A', 10, 5, 5, '[]', '{}', '[]', '{}', '{}', $2
+           )`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update campaigns
+           set active_version_id = 'campaign-version-a-1'
+           where id = 'campaign-a'`,
+          []
+        );
+        await client.query(
+          `insert into style_profiles (id, tenant_id)
+           values ('style-profile-a', $1)`,
+          [TENANT_A]
+        );
+        await client.query(
+          `insert into style_profile_versions (
+             id, style_profile_id, tenant_id, kind, revision, tone,
+             formality, model, created_by
+           ) values
+             ('style-explicit-a-1', 'style-profile-a', $1,
+              'STYLE_EXPLICIT', 1, 'FORMAL', 'FORMAL', null, $2),
+             ('style-inferred-a-1', 'style-profile-a', $1,
+              'STYLE_INFERRED', 2, null, null, 'writer-a-1', null)`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update style_profiles
+           set explicit_version_id = 'style-explicit-a-1',
+               accepted_inferred_version_id = 'style-inferred-a-1'
+           where id = 'style-profile-a'`,
+          []
+        );
+        await client.query(
+          `insert into prompt_overrides (id, tenant_id, campaign_id)
+           values ('prompt-override-a', $1, 'campaign-a')`,
+          [TENANT_A]
+        );
+        await client.query(
+          `insert into prompt_override_versions (
+             id, prompt_override_id, tenant_id, revision, created_by
+           ) values (
+             'prompt-version-a-1', 'prompt-override-a', $1, 1, $2
+           )`,
+          [TENANT_A, USER_A]
+        );
+        await client.query(
+          `update prompt_overrides
+           set active_version_id = 'prompt-version-a-1'
+           where id = 'prompt-override-a'`,
+          []
+        );
+      });
+
+      const current = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.currentVersions.getCurrent(
+            { tenantId: parseTenantId(TENANT_A) },
+            tx
+          )
+        )
+      );
+      expect(current.versions).toMatchObject({
+        acceptedInferredStyle: {
+          id: "style-inferred-a-1",
+          kind: "STYLE_INFERRED",
+          revision: 2,
+        },
+        campaign: {
+          id: "campaign-version-a-1",
+          kind: "CAMPAIGN",
+          revision: 1,
+        },
+        defaultPrompt: {
+          id: "prompt-version-a-1",
+          kind: "PROMPT_DEFAULT",
+          revision: 1,
+        },
+        explicitStyle: {
+          id: "style-explicit-a-1",
+          kind: "STYLE_EXPLICIT",
+          revision: 1,
+        },
+        model: "writer-a-1",
+      });
+
+      const profile = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+        )
+      );
+      expect(profile.current).toEqual(current.versions);
+
+      const tenant = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.tenants.get({ tenantId: parseTenantId(TENANT_A) }, tx)
+        )
+      );
+      expect(tenant.tenant?.currentVersions).toEqual(current.versions);
+
+      const stale = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.saveRevision(
+            saveInput(
+              TENANT_A,
+              USER_A,
+              "profile-version-drift",
+              before.versions
+            ),
+            tx
+          )
+        )
+      );
+      expect(stale.outcome).toBe("REVISION_CONFLICT");
+      if (stale.outcome !== "REVISION_CONFLICT") {
+        throw new Error("expected active-version drift to conflict");
+      }
+      expect(stale.actual).toEqual(current.versions);
+      expect(stale.expected).toEqual(before.versions);
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
     "does not let a worker replace the customer profile",
     async (ctx) => {
       if (!database) {

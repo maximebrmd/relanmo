@@ -15,16 +15,11 @@ import {
   dateFromUtc,
   mapProfileVersion,
 } from "./mapping";
-import { loadCurrentProfile } from "./profile-rows";
+import { loadCurrentVersions } from "./current-version-rows";
 import { memberPrincipalOrForbidden, tenantScopeMismatch } from "./scope";
 
 async function observedVersions(tx: PersistenceTransaction, lock: boolean) {
-  const row = await loadCurrentProfile(tx, tx.scope.tenantId, lock);
-  const profile = row === null ? null : mapProfileVersion(row);
-  return {
-    current: currentVersionsWithProfile(profile?.version ?? null),
-    profile,
-  };
+  return loadCurrentVersions(tx, tx.scope.tenantId, lock);
 }
 
 export function createProfileRepository(): ProfileRepository {
@@ -83,16 +78,9 @@ export function createProfileRepository(): ProfileRepository {
           };
         }
 
-        const currentRow = await loadCurrentProfile(
-          tx,
-          tx.scope.tenantId,
-          true
-        );
-        const currentProfile =
-          currentRow === null ? null : mapProfileVersion(currentRow);
-        const actual = currentVersionsWithProfile(
-          currentProfile?.version ?? null
-        );
+        const observed = await observedVersions(tx, true);
+        const currentProfile = observed.profile;
+        const actual = observed.current;
         if (!currentVersionsEqual(input.expectedCurrent.expected, actual)) {
           return {
             ok: true,
@@ -104,14 +92,14 @@ export function createProfileRepository(): ProfileRepository {
           };
         }
 
-        if (currentRow) {
+        if (currentProfile) {
           await db
             .update(freelancerProfiles)
             .set({ isCurrent: false })
             .where(
               and(
                 eq(freelancerProfiles.tenantId, tx.scope.tenantId),
-                eq(freelancerProfiles.id, currentRow.id)
+                eq(freelancerProfiles.id, currentProfile.version.id)
               )
             );
         }
@@ -129,7 +117,7 @@ export function createProfileRepository(): ProfileRepository {
             isCurrent: true,
             offer: input.facts.offer,
             preferredFrenchTone: input.facts.preferredFrenchTone,
-            revision: (currentRow?.revision ?? 0) + 1,
+            revision: (currentProfile?.version.revision ?? 0) + 1,
             skills: [...input.facts.skills],
             targetMarket: input.facts.targetMarket,
             tenantId: tx.scope.tenantId,
@@ -153,7 +141,7 @@ export function createProfileRepository(): ProfileRepository {
           value: {
             outcome: "UPDATED",
             value: {
-              current: currentVersionsWithProfile(profile.version),
+              current: currentVersionsWithProfile(actual, profile.version),
               profile,
             },
           },
