@@ -139,10 +139,11 @@ export function selectDm1Hook(context: SequenceDraftingContext): Dm1Hook {
     case "PROSPECT_POST": {
       return "PROSPECT_POST";
     }
+    default: {
+      signalKind satisfies never;
+      throw new Error(`unsupported buying signal kind: ${String(signalKind)}`);
+    }
   }
-
-  signalKind satisfies never;
-  throw new Error(`unsupported buying signal kind: ${String(signalKind)}`);
 }
 
 function hasFact(value: string | null): value is string {
@@ -172,10 +173,11 @@ function selectDm2Hook(context: SequenceDraftingContext) {
     case "RELEASE": {
       return "DM2_RELEASE" as const;
     }
+    default: {
+      kind satisfies never;
+      throw new Error(`unsupported DM2 fact kind: ${String(kind)}`);
+    }
   }
-
-  kind satisfies never;
-  throw new Error(`unsupported DM2 fact kind: ${String(kind)}`);
 }
 
 function selectDm3Hook(context: SequenceDraftingContext) {
@@ -203,10 +205,11 @@ function selectDm3Hook(context: SequenceDraftingContext) {
     case "SPEAKING": {
       return "DM3_SPEAKING" as const;
     }
+    default: {
+      kind satisfies never;
+      throw new Error(`unsupported DM3 fact kind: ${String(kind)}`);
+    }
   }
-
-  kind satisfies never;
-  throw new Error(`unsupported DM3 fact kind: ${String(kind)}`);
 }
 
 function planDirectMessages(

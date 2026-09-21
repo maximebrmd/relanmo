@@ -1,7 +1,7 @@
 /**
  * Reviewed lead-agent-skills snapshot the French defaults were ported from.
- * Cadence, invitation-without-note and DM writing rules in architecture.md
- * cite this same revision.
+ * The cadence and invitation-without-note rules in architecture.md cite this
+ * same revision.
  */
 export const LEAD_AGENT_SKILLS_SOURCE = Object.freeze({
   capturedAt: "2026-09-15T08:39:33.000Z",

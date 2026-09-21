@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import { LEAD_AGENT_SKILLS_SOURCE } from "@relanmo/prompts/defaults";
 import {
   EVALUATION_FIXTURES,
   evaluateFixture,
   evaluationFixtureById,
 } from "@relanmo/prompts/fixtures";
+import { describe, expect, it } from "vitest";
 
 const REQUIRED_IDS = [
   "decision-maker-hiring",

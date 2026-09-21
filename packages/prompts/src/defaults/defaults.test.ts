@@ -376,15 +376,15 @@ describe("French prompt defaults", () => {
       verifiedSharedConnection: null,
     });
 
-    expect(repeated.kind === "SEQUENCE" && repeated.steps[1]?.template.hook).toBe(
-      "DM2_OFFER"
-    );
-    expect(repeated.kind === "SEQUENCE" && repeated.steps[2]?.template.hook).toBe(
-      "DM3_NEUTRAL"
-    );
-    expect(distinct.kind === "SEQUENCE" && distinct.steps[2]?.template.hook).toBe(
-      "DM3_PRODUCT"
-    );
+    expect(
+      repeated.kind === "SEQUENCE" && repeated.steps[1]?.template.hook
+    ).toBe("DM2_OFFER");
+    expect(
+      repeated.kind === "SEQUENCE" && repeated.steps[2]?.template.hook
+    ).toBe("DM3_NEUTRAL");
+    expect(
+      distinct.kind === "SEQUENCE" && distinct.steps[2]?.template.hook
+    ).toBe("DM3_PRODUCT");
   });
 
   it("uses neutral follow-ups for off-domain facts", () => {

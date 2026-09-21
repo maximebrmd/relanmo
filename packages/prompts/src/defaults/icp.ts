@@ -191,13 +191,17 @@ function folded(value: string): string {
 
 function containsMarker(haystack: string, markers: readonly string[]): boolean {
   return markers.some((marker) => {
-    const escaped = folded(marker).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(haystack);
+    const escaped = folded(marker).replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, "u").test(
+      haystack
+    );
   });
 }
 
 function normalizedIdentity(value: string): string {
-  return folded(value).replaceAll(/[^a-z0-9]+/gu, " ").trim();
+  return folded(value)
+    .replaceAll(/[^a-z0-9]+/gu, " ")
+    .trim();
 }
 
 function headlineCompany(headline: string): string | null {
@@ -228,7 +232,9 @@ function headlineCompany(headline: string): string | null {
 function headlineRole(headline: string): string {
   const lower = folded(headline);
   const delimiter = HEADLINE_DELIMITER.exec(lower);
-  return delimiter?.index === undefined ? lower : lower.slice(0, delimiter.index);
+  return delimiter?.index === undefined
+    ? lower
+    : lower.slice(0, delimiter.index);
 }
 
 function isExecutiveHeadline(headline: string): boolean {
@@ -256,7 +262,9 @@ function isProspectOwnNameCompany(facts: IcpProspectFacts): boolean {
     facts.prospectName === null || facts.prospectName === undefined
       ? ""
       : normalizedIdentity(facts.prospectName);
-  return company !== null && prospectName.length > 0 && company === prospectName;
+  return (
+    company !== null && prospectName.length > 0 && company === prospectName
+  );
 }
 
 /** Explicit on-market freelance-demand wording is a hard ICP exclusion. */
@@ -342,7 +350,6 @@ export function qualifyIcp(facts: IcpProspectFacts): IcpQualification {
       source: HUNT_ICP_SOURCE,
     });
   }
-
 
   const isDisqualifiedExecutive =
     classified === "DECISION_MAKER" &&
