@@ -7,12 +7,12 @@ import type {
   CampaignScopedTenantRepository,
   TenancyVersionSources,
 } from "./contracts";
+import { loadCurrentVersions } from "./current-version-rows";
 import {
   catchMappingError,
   mapMembershipRecord,
   mapTenantRecord,
 } from "./mapping";
-import { loadCurrentVersions } from "./current-version-rows";
 import { tenantScopeMismatch } from "./scope";
 
 async function currentVersionsFor(
@@ -21,16 +21,15 @@ async function currentVersionsFor(
   sources: TenancyVersionSources,
   lock: boolean
 ) {
-  return (
-    await loadCurrentVersions(
-      tx,
-      tx.scope.tenantId,
-      campaignId,
-      sources.defaultPromptVersion(),
-      sources.writingModelVersion(),
-      lock
-    )
-  ).current;
+  const versions = await loadCurrentVersions(
+    tx,
+    tx.scope.tenantId,
+    campaignId,
+    sources.defaultPromptVersion(),
+    sources.writingModelVersion(),
+    lock
+  );
+  return versions.current;
 }
 
 export function createTenantRepository(

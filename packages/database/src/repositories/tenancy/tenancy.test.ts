@@ -408,7 +408,12 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       );
       expect(savedA.outcome).toBe("UPDATED");
       expect(savedB.outcome).toBe("UPDATED");
-      if (savedA.outcome !== "UPDATED" || savedB.outcome !== "UPDATED") {
+      if (
+        savedA.outcome !== "UPDATED" ||
+        savedB.outcome !== "UPDATED" ||
+        !savedA.value.profile ||
+        !savedB.value.profile
+      ) {
         throw new Error("expected initialized profiles");
       }
       expect(savedA.value.profile.facts).toEqual(profileFactsFixture);
@@ -587,14 +592,11 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         );
       });
 
-      const lateInitialization = await runAsMember(
-        TENANT_A,
-        USER_A,
-        (tx) =>
-          repos.profiles.saveForOnboarding(
-            onboardingInput(TENANT_A, USER_A, "profile-late-onboarding"),
-            tx
-          )
+      const lateInitialization = await runAsMember(TENANT_A, USER_A, (tx) =>
+        repos.profiles.saveForOnboarding(
+          onboardingInput(TENANT_A, USER_A, "profile-late-onboarding"),
+          tx
+        )
       );
       expect(lateInitialization).toEqual({
         error: {
@@ -647,9 +649,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           )
         )
       );
-      expect(secondCampaign.versions.campaign?.id).toBe(
-        "campaign-version-a-2"
-      );
+      expect(secondCampaign.versions.campaign?.id).toBe("campaign-version-a-2");
 
       const profile = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>

@@ -16,6 +16,7 @@ import type {
   SaveOnboardingProfileRevisionInput,
   TenancyVersionSources,
 } from "./contracts";
+import { loadCurrentVersions } from "./current-version-rows";
 import {
   catchMappingError,
   currentVersionsEqual,
@@ -24,11 +25,10 @@ import {
   mapProfileVersion,
   versionRefEqual,
 } from "./mapping";
-import { loadCurrentVersions } from "./current-version-rows";
 import { loadCurrentProfile } from "./profile-rows";
 import { memberPrincipalOrForbidden, tenantScopeMismatch } from "./scope";
 
-async function observedVersions(
+function observedVersions(
   tx: PersistenceTransaction,
   campaignId: Parameters<typeof loadCurrentVersions>[2],
   sources: TenancyVersionSources,
@@ -332,7 +332,7 @@ export function createProfileRepository(
         return catchMappingError(error);
       }
     },
-    saveRevision: async (input, tx) =>
+    saveRevision: (input, tx) =>
       writeProfileRevision(input, tx, input.campaignId, sources),
     saveForOnboarding: saveOnboardingProfileRevision,
   };
