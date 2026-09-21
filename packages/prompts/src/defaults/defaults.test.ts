@@ -158,6 +158,12 @@ describe("French prompt defaults", () => {
     ).toBe(false);
     expect(
       qualifyIcp({
+        headline: "Head of Sales @ Talent Acquisition SaaS",
+        observedSignalText: null,
+      }).eligible
+    ).toBe(false);
+    expect(
+      qualifyIcp({
         headline: "Business Developer @ Product SaaS",
         observedSignalText: null,
       }).eligible
@@ -168,6 +174,12 @@ describe("French prompt defaults", () => {
         observedSignalText: null,
       }).audience
     ).toBe("RECRUITER_ESN");
+    expect(
+      qualifyIcp({
+        headline: "CEO @ Freelance.com",
+        observedSignalText: null,
+      }).audience
+    ).toBe("DECISION_MAKER");
   });
 
   it("does not combine unrelated signal words into on-market intent", () => {
@@ -179,6 +191,21 @@ describe("French prompt defaults", () => {
 
     expect(qualification.eligible).toBe(true);
     expect(qualification.exclusion).toBe(null);
+  });
+
+  it("excludes direct French searches for a freelance", () => {
+    for (const observedSignalText of [
+      "Nous recherchons un freelance React.",
+      "À la recherche d'un freelance React.",
+    ]) {
+      const qualification = qualifyIcp({
+        headline: "CTO @ Nordwave SaaS",
+        observedSignalText,
+      });
+
+      expect(qualification.eligible).toBe(false);
+      expect(qualification.exclusion).toBe("ON_MARKET_INTENT");
+    }
   });
 
   it("requires a distinct step-specific fact for the DM3 angle", () => {

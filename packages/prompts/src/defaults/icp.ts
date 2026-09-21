@@ -57,6 +57,7 @@ const ON_MARKET_PHRASES = [
 
 const ON_MARKET_PATTERNS = [
   /\brecrut\w*\b(?:\s+\S+){0,3}\s+\bfreelance\b/u,
+  /\brecherch\w*\b(?:\s+(?:activement|actuellement))?\s+(?:(?:un|une|des)\s+|d['’](?:un|une)\s+)?freelance\b/u,
   /\b(?:besoin|mission)\b(?:\s+\S+){0,4}\s+\basap\b/u,
   /\basap\b(?:\s+\S+){0,4}\s+\b(?:besoin|mission)\b/u,
 ] as const;
@@ -158,18 +159,18 @@ export function classifyIcpAudience(
 ): IcpAudience | "PEER_NOT_BUYER" | null {
   const lower = folded(headline);
   const role = lower.split(/\s+(?:@|\||·|—)\s+/u, 1)[0] ?? lower;
-  if (containsMarker(lower, PEER_MARKERS)) {
+  if (containsMarker(role, PEER_MARKERS)) {
     return "PEER_NOT_BUYER";
   }
   if (
-    containsMarker(lower, RECRUITER_ROLE_MARKERS) ||
-    (containsMarker(lower, ["business developer"]) &&
+    containsMarker(role, RECRUITER_ROLE_MARKERS) ||
+    (containsMarker(role, ["business developer"]) &&
       containsMarker(lower, RECRUITER_COMPANY_MARKERS))
   ) {
     return "RECRUITER_ESN";
   }
   if (
-    containsMarker(lower, EXECUTIVE_DECISION_MAKER_MARKERS) ||
+    containsMarker(role, EXECUTIVE_DECISION_MAKER_MARKERS) ||
     (containsMarker(role, FUNCTIONAL_LEADERSHIP_MARKERS) &&
       containsMarker(role, TARGET_FUNCTION_MARKERS))
   ) {
