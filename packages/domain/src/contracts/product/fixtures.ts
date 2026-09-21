@@ -252,6 +252,7 @@ export const styleViewFixture: StyleView = parseStyleView({
   source: "EXPLICIT",
   stepOverrides: [
     {
+      grounding: { kind: "NEUTRAL" },
       step: "DM1",
       text: "Bonjour, votre expérience chez {{company}} m’intéresse.",
     },

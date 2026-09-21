@@ -1,6 +1,10 @@
 /* oxlint-disable no-use-before-define -- Drizzle resolves the intentional current-row/version-row circular foreign keys lazily. */
 import type { ModelVersion } from "@relanmo/domain/contracts";
-import { FRENCH_TONES, STYLE_SOURCES } from "@relanmo/domain/contracts/product";
+import {
+  FRENCH_TONES,
+  STYLE_FORMALITY_LEVELS,
+  STYLE_SOURCES,
+} from "@relanmo/domain/contracts/product";
 import type { StyleStepOverride } from "@relanmo/domain/contracts/product";
 import type { StyleOverrideSettings } from "@relanmo/domain/ports/persistence/campaigns";
 import { relations, sql } from "drizzle-orm";
@@ -26,7 +30,6 @@ import { tenants } from "./tenancy";
 export const styleSource = pgEnum("style_source", [...STYLE_SOURCES]);
 export const frenchTone = pgEnum("french_tone", [...FRENCH_TONES]);
 
-const STYLE_FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
 export const styleFormality = pgEnum("style_formality", STYLE_FORMALITY_LEVELS);
 
 const STYLE_PROFILE_VERSION_KINDS = [

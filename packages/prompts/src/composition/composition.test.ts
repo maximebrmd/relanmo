@@ -171,12 +171,12 @@ const INFERRED_STYLE_VERSION = requiredVersion(
   VERSION_REFS.acceptedInferredStyle
 );
 const PROMPT_OVERRIDE_VERSION = requiredVersion(VERSION_REFS.promptOverride);
+const PROFILE_VERSION = requiredVersion(VERSION_REFS.profile);
 
 function sourceVersions() {
   return Object.freeze({
     campaign: VERSION_REFS.campaign,
     model: VERSION_REFS.model,
-    profile: VERSION_REFS.profile,
   });
 }
 
@@ -231,7 +231,7 @@ function composeInput(
     campaignOverride: null,
     drafting: hiringDrafting,
     explicitStyle: null,
-    profile: defaultProfile,
+    profile: Object.freeze({ facts: defaultProfile, version: PROFILE_VERSION }),
     prospect: hiringProspect,
     sourceVersions: sourceVersions(),
     step: "DM1",
@@ -328,6 +328,7 @@ describe("composeGroundedPrompt", () => {
       return;
     }
     expect(result.profileAdaptation).toBe("PROFILE_FACTS_ONLY");
+    expect(result.sourceVersions.profile).toEqual(PROFILE_VERSION);
     expect(result.composedInput).toContain(defaultProfile.offer);
     expect(result.composedInput).toContain("dbt");
     expect(result.composedInput).toMatch(
@@ -352,7 +353,11 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           campaignOverride: campaignLayer({
             stepOverrides: Object.freeze([
-              Object.freeze({ step: "DM1" as const, text: item.text }),
+              Object.freeze({
+                grounding: Object.freeze({ kind: "NEUTRAL" as const }),
+                step: "DM1" as const,
+                text: item.text,
+              }),
             ]),
           }),
         })
@@ -484,6 +489,119 @@ describe("composeGroundedPrompt", () => {
     }
   });
 
+  it("grounds a campaign override against its own assertion requirements", () => {
+    const override = campaignLayer({
+      stepOverrides: [
+        {
+          grounding: {
+            assertions: [
+              { detail: null, kind: "FUNDING", value: "50 M€" },
+            ],
+            kind: "ASSERTIONS",
+          },
+          step: "DM1",
+          text: "J'ai vu votre levée de 50 M€.",
+        },
+      ],
+    });
+    const withoutEvidence = composeGroundedPrompt(
+      composeInput({ campaignOverride: override })
+    );
+    const fundingEvidence = parseEvidence({
+      accountId: null,
+      assertions: [{ detail: null, kind: "FUNDING", value: "50 M€" }],
+      capturedAt: FIXTURE_TIME,
+      contentHash: null,
+      evidenceId: "evidence_funding_1",
+      normalizedClaim: "Levée annoncée de 50 M€.",
+      prospectId: PROSPECT,
+      provenance: "PROVIDER_POST",
+      sourceId: "source_funding_1",
+      sourceUrl: null,
+      tenantId: TENANT,
+    });
+    const withEvidence = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [fundingEvidence],
+        campaignOverride: override,
+        drafting: { ...hiringDrafting, signalKind: "FUNDING" },
+      })
+    );
+
+    expect(withoutEvidence.kind).toBe("COMPOSED");
+    if (withoutEvidence.kind === "COMPOSED") {
+      expect(withoutEvidence.usedNeutralFallback).toBe(true);
+      expect(withoutEvidence.targetText).not.toContain("50 M€");
+    }
+    expect(withEvidence.kind).toBe("COMPOSED");
+    if (withEvidence.kind === "COMPOSED") {
+      expect(withEvidence.templateId).toBe("campaign-step-override:DM1");
+      expect(withEvidence.targetText).toContain("50 M€");
+    }
+  });
+
+  it("applies a neutral override independently of the planned factual hook", () => {
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [],
+        campaignOverride: campaignLayer({
+          stepOverrides: [
+            {
+              grounding: { kind: "NEUTRAL" },
+              step: "DM1",
+              text: "Bonjour {{firstName}}, partant pour échanger ?",
+            },
+          ],
+        }),
+        drafting: { ...hiringDrafting, signalKind: "FUNDING" },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.templateId).toBe("campaign-step-override:DM1");
+      expect(result.targetText).toContain("Bonjour Camille");
+    }
+  });
+
+  it("does not combine signal fields from different evidence assertions", () => {
+    const evidenceA = parseEvidence({
+      ...hiringEvidence,
+      assertions: [
+        { detail: "angle A", kind: "PROSPECT_POST", value: "sujet A" },
+      ],
+      evidenceId: "evidence_post_a",
+      normalizedClaim: "Post A",
+      sourceId: "source_post_a",
+    });
+    const evidenceB = parseEvidence({
+      ...hiringEvidence,
+      assertions: [
+        { detail: "angle B", kind: "PROSPECT_POST", value: "sujet B" },
+      ],
+      evidenceId: "evidence_post_b",
+      normalizedClaim: "Post B",
+      sourceId: "source_post_b",
+    });
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [evidenceA, evidenceB],
+        drafting: { ...hiringDrafting, signalKind: "PROSPECT_POST" },
+        prospect: {
+          ...hiringProspect,
+          signalDetail: { evidenceId: evidenceB.evidenceId, text: "angle B" },
+          signalFact: { evidenceId: evidenceA.evidenceId, text: "sujet A" },
+        },
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.hook).toBe("NEUTRAL");
+      expect(result.targetText).not.toContain("angle B");
+    }
+  });
+
   it("fails when even the neutral template cannot be filled", () => {
     const result = composeGroundedPrompt(
       composeInput({
@@ -581,7 +699,13 @@ describe("composeGroundedPrompt", () => {
       composeGroundedPrompt(
         composeInput({
           campaignOverride: campaignLayer({
-            stepOverrides: [{ step: "DM1", text: "x".repeat(2001) }],
+            stepOverrides: [
+              {
+                grounding: { kind: "NEUTRAL" },
+                step: "DM1",
+                text: "x".repeat(2001),
+              },
+            ],
           }),
         })
       ),
@@ -636,6 +760,7 @@ describe("composeGroundedPrompt", () => {
       acceptedInferredStyle: INFERRED_STYLE_VERSION,
       defaultPrompt: frenchDefaultPromptVersion(),
       explicitStyle: EXPLICIT_STYLE_VERSION,
+      profile: PROFILE_VERSION,
       promptOverride: campaignOverride.version,
     });
     expect(parseDraftSourceVersions(result.sourceVersions)).toEqual(
@@ -646,6 +771,7 @@ describe("composeGroundedPrompt", () => {
     expect(result.composedInput).toContain(campaignOverride.version.id);
     expect(result.composedInput).toContain(EXPLICIT_STYLE_VERSION.id);
     expect(result.composedInput).toContain(INFERRED_STYLE_VERSION.id);
+    expect(result.composedInput).toContain(PROFILE_VERSION.id);
     expect(result.composedInput).toContain(versions.model);
     expect(result.allowedEvidenceIds).toEqual([HIRING_EVIDENCE_ID]);
     expect(result.composedInput).toContain(String(HIRING_EVIDENCE_ID));

@@ -17,7 +17,11 @@ import type {
   ExplicitStyleSettings,
   StyleOverrideSettings,
 } from "@relanmo/domain/ports/persistence/campaigns";
-import type { StyleStepOverride as PersistedStyleStepOverride } from "@relanmo/domain/contracts/product";
+import type {
+  AddressForm,
+  StyleFormality,
+  StyleStepOverride as PersistedStyleStepOverride,
+} from "@relanmo/domain/contracts/product";
 
 import type { MessageHook, SequenceDraftingContext } from "../defaults";
 
@@ -28,12 +32,6 @@ export const STYLE_PRECEDENCE = [
   "DEFAULT",
 ] as const;
 export type StylePrecedenceSource = (typeof STYLE_PRECEDENCE)[number];
-
-export const FORMALITY_LEVELS = ["CASUAL", "NEUTRAL", "FORMAL"] as const;
-export type FormalityLevel = (typeof FORMALITY_LEVELS)[number];
-
-export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
-export type AddressForm = (typeof ADDRESS_FORMS)[number];
 
 export const COMPOSE_FAILURE_CODES = [
   "UNSUPPORTED_VARIABLE",
@@ -64,7 +62,7 @@ export type { PromptOverrideVersionRef };
 export type ExplicitStyleLayer = ExplicitStyleSettings;
 
 export type InferredStyleLayer = Readonly<{
-  formality: FormalityLevel | null;
+  formality: StyleFormality | null;
   tone: string | null;
 }>;
 
@@ -86,7 +84,6 @@ export type VersionedAcceptedInferredStyleLayer = Readonly<{
 export type ComposeBaseSourceVersions = Readonly<{
   campaign: CampaignVersionRef;
   model: ModelVersion;
-  profile: ProfileVersionRef | null;
 }>;
 
 export type FreelancerProfileFacts = Readonly<{
@@ -96,6 +93,11 @@ export type FreelancerProfileFacts = Readonly<{
   offer: string | null;
   skills: readonly string[];
   targetMarket: string | null;
+}>;
+
+export type VersionedFreelancerProfile = Readonly<{
+  facts: FreelancerProfileFacts;
+  version: ProfileVersionRef;
 }>;
 
 export type GroundedFact = Readonly<{
@@ -119,7 +121,7 @@ export type ComposePromptInput = Readonly<{
   campaignOverride: VersionedCampaignStyleOverride | null;
   drafting: SequenceDraftingContext;
   explicitStyle: VersionedExplicitStyleLayer | null;
-  profile: FreelancerProfileFacts;
+  profile: VersionedFreelancerProfile | null;
   prospect: ProspectGrounding;
   sourceVersions: ComposeBaseSourceVersions;
   step: SequenceStep;
@@ -136,7 +138,7 @@ export type ResolvedStyle = Readonly<{
   closing: ResolvedStyleField<string | null>;
   examples: ResolvedStyleField<readonly string[]>;
   forbiddenPhrases: ResolvedStyleField<readonly string[]>;
-  formality: ResolvedStyleField<FormalityLevel>;
+  formality: ResolvedStyleField<StyleFormality>;
   greeting: ResolvedStyleField<string | null>;
   instructions: ResolvedStyleField<string | null>;
   maxCharacters: ResolvedStyleField<number>;

@@ -5,6 +5,7 @@ import type {
   InferredStyleVersionId,
   TenantId,
 } from "../ids";
+import type { EvidenceAssertion } from "../evidence";
 import type { DirectMessageStep, UtcTimestamp } from "../values";
 import type {
   ProductCommandResult,
@@ -22,13 +23,28 @@ export const STYLE_SOURCES = [
 ] as const;
 export type StyleSource = (typeof STYLE_SOURCES)[number];
 
+export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
+export type AddressForm = (typeof ADDRESS_FORMS)[number];
+
+export const STYLE_FORMALITY_LEVELS = [
+  "CASUAL",
+  "NEUTRAL",
+  "FORMAL",
+] as const;
+export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
+
+export type StyleStepOverrideGrounding =
+  | Readonly<{ kind: "NEUTRAL" }>
+  | Readonly<{
+      assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
+      kind: "ASSERTIONS";
+    }>;
+
 export type StyleStepOverride = Readonly<{
+  grounding: StyleStepOverrideGrounding;
   step: DirectMessageStep;
   text: string;
 }>;
-
-export const ADDRESS_FORMS = ["VOUS", "TU"] as const;
-export type AddressForm = (typeof ADDRESS_FORMS)[number];
 
 export type StyleInput = Readonly<{
   addressForm: AddressForm;

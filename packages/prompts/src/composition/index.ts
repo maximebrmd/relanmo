@@ -1,13 +1,14 @@
 export { composeGroundedPrompt } from "./compose";
 export {
   ADDRESS_FORMS,
+  STYLE_FORMALITY_LEVELS,
+} from "@relanmo/domain/contracts/product";
+export {
   COMPOSE_FAILURE_CODES,
   COMPOSE_SEND_CONTROLS,
-  FORMALITY_LEVELS,
   STYLE_PRECEDENCE,
 } from "./types";
 export type {
-  AddressForm,
   CampaignStyleOverride,
   ComposeBaseSourceVersions,
   ComposeFailureCode,
@@ -18,7 +19,6 @@ export type {
   ComposedPrompt,
   ExplicitStyleLayer,
   FailedPrompt,
-  FormalityLevel,
   FreelancerProfileFacts,
   GroundedFact,
   InferredStyleLayer,
@@ -32,6 +32,11 @@ export type {
   VersionedAcceptedInferredStyleLayer,
   VersionedCampaignStyleOverride,
   VersionedExplicitStyleLayer,
+  VersionedFreelancerProfile,
 } from "./types";
+export type {
+  AddressForm,
+  StyleFormality,
+} from "@relanmo/domain/contracts/product";
 
 export const promptCompositionSurface = "ENABLED" as const;

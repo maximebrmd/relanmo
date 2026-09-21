@@ -1,6 +1,7 @@
 import type {
   DraftSourceVersions,
   Evidence,
+  EvidenceAssertion,
   EvidenceAssertionKind,
   SequenceStep,
 } from "@relanmo/domain/contracts";
@@ -25,17 +26,17 @@ import type {
   ComposePromptResult,
   ComposedPrompt,
   ExplicitStyleLayer,
-  FormalityLevel,
   GroundedFact,
   InferredStyleLayer,
   ResolvedStyle,
   ResolvedStyleField,
   StyleStepOverride,
 } from "./types";
+import type { StyleFormality } from "@relanmo/domain/contracts/product";
 import { COMPOSE_SEND_CONTROLS } from "./types";
 
 const DEFAULT_TONE = "CONCISE";
-const DEFAULT_FORMALITY: FormalityLevel = "NEUTRAL";
+const DEFAULT_FORMALITY: StyleFormality = "NEUTRAL";
 const PLACEHOLDER_PATTERN = /\{\{\s*(?<name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/gu;
 const ALLOWED_VARIABLE_NAMES = new Set<string>(ALLOWED_TEMPLATE_VARIABLES);
 const STYLE_LIMITS = Object.freeze({
@@ -67,30 +68,49 @@ function scopedEvidence(input: ComposePromptInput): readonly Evidence[] {
   );
 }
 
-function groundedText(
+function groundedPair(
   fact: GroundedFact | null,
+  detail: GroundedFact | null,
   evidenceById: ReadonlyMap<string, Evidence>,
-  kind: EvidenceAssertionKind,
-  field: "detail" | "value" = "value"
-): string | null {
+  kind: EvidenceAssertionKind
+): Readonly<{ detail: string | null; fact: string | null }> {
   if (fact === null) {
-    return null;
+    return Object.freeze({ detail: null, fact: null });
   }
-  return assertedText(fact.text, evidenceById.get(fact.evidenceId), kind, field);
+  if (detail !== null && detail.evidenceId !== fact.evidenceId) {
+    return Object.freeze({ detail: null, fact: null });
+  }
+  const evidence = evidenceById.get(fact.evidenceId);
+  const factText = optionalText(fact.text);
+  const detailText = optionalText(detail?.text);
+  if (evidence === undefined || factText === null) {
+    return Object.freeze({ detail: null, fact: null });
+  }
+  const matched = evidence.assertions.some(
+    (assertion) =>
+      assertion.kind === kind &&
+      canonicalEvidenceText(assertion.value) ===
+        canonicalEvidenceText(factText) &&
+      (detailText === null ||
+        canonicalEvidenceText(assertion.detail ?? "") ===
+          canonicalEvidenceText(detailText))
+  );
+  return matched
+    ? Object.freeze({ detail: detailText, fact: factText })
+    : Object.freeze({ detail: null, fact: null });
 }
 
-function followUpValue(
+function groundedFollowUp(
   fact: {
     detail: string | null;
     evidenceId: string;
     fact: string;
     kind: "OFFER" | "PRODUCT" | "PROSPECT_POST" | "RELEASE" | "SPEAKING";
   } | null,
-  field: "fact" | "detail",
   evidenceById: ReadonlyMap<string, Evidence>
-): string | null {
+): Readonly<{ detail: string | null; fact: string | null }> {
   if (fact === null) {
-    return null;
+    return Object.freeze({ detail: null, fact: null });
   }
   const kindByFact = {
     OFFER: "OFFER",
@@ -99,11 +119,13 @@ function followUpValue(
     RELEASE: "RELEASE",
     SPEAKING: "SPEAKING",
   } as const;
-  return assertedText(
-    field === "fact" ? fact.fact : fact.detail,
-    evidenceById.get(fact.evidenceId),
-    kindByFact[fact.kind as keyof typeof kindByFact],
-    field === "fact" ? "value" : "detail"
+  return groundedPair(
+    Object.freeze({ evidenceId: fact.evidenceId, text: fact.fact }),
+    fact.detail === null
+      ? null
+      : Object.freeze({ evidenceId: fact.evidenceId, text: fact.detail }),
+    evidenceById,
+    kindByFact[fact.kind as keyof typeof kindByFact]
   );
 }
 
@@ -117,25 +139,6 @@ function canonicalEvidenceText(value: string): string {
     .replaceAll(/\s+/gu, " ");
 }
 
-function assertedText(
-  value: string | null,
-  evidence: Evidence | undefined,
-  kind: EvidenceAssertionKind,
-  field: "detail" | "value"
-): string | null {
-  const text = optionalText(value);
-  if (text === null || evidence === undefined) {
-    return null;
-  }
-  const candidate = canonicalEvidenceText(text);
-  const matched = evidence.assertions.some(
-    (assertion) =>
-      assertion.kind === kind &&
-      canonicalEvidenceText(assertion[field] ?? "") === candidate
-  );
-  return candidate.length > 0 && matched ? text : null;
-}
-
 function variableValues(
   input: ComposePromptInput,
   evidenceById: ReadonlyMap<string, Evidence>
@@ -145,24 +148,35 @@ function variableValues(
     drafting.signalKind === "HIRING" || drafting.signalKind === "NONE"
       ? null
       : drafting.signalKind;
+  const dm2 = groundedFollowUp(drafting.dm2Fact, evidenceById);
+  const dm3 = groundedFollowUp(drafting.dm3Fact, evidenceById);
+  const hiring = groundedPair(
+    prospect.hiringRole,
+    null,
+    evidenceById,
+    "HIRING_ROLE"
+  );
+  const signal =
+    signalKind === null
+      ? Object.freeze({ detail: null, fact: null })
+      : groundedPair(
+          prospect.signalFact,
+          prospect.signalDetail,
+          evidenceById,
+          signalKind
+        );
   return Object.freeze({
     company: optionalText(prospect.company),
     craft: optionalText(prospect.craft),
-    dm2Detail: followUpValue(drafting.dm2Fact, "detail", evidenceById),
-    dm2Fact: followUpValue(drafting.dm2Fact, "fact", evidenceById),
-    dm3Detail: followUpValue(drafting.dm3Fact, "detail", evidenceById),
-    dm3Fact: followUpValue(drafting.dm3Fact, "fact", evidenceById),
+    dm2Detail: dm2.detail,
+    dm2Fact: dm2.fact,
+    dm3Detail: dm3.detail,
+    dm3Fact: dm3.fact,
     firstName: optionalText(prospect.firstName),
-    hiringRole: groundedText(prospect.hiringRole, evidenceById, "HIRING_ROLE"),
+    hiringRole: hiring.fact,
     sharedConnection: optionalText(drafting.verifiedSharedConnection),
-    signalDetail:
-      signalKind === null
-        ? null
-        : groundedText(prospect.signalDetail, evidenceById, signalKind, "detail"),
-    signalFact:
-      signalKind === null
-        ? null
-        : groundedText(prospect.signalFact, evidenceById, signalKind),
+    signalDetail: signal.detail,
+    signalFact: signal.fact,
   });
 }
 
@@ -284,7 +298,7 @@ function pickNullableString(
 function pickFormality(
   explicit: ExplicitStyleLayer | null,
   inferred: InferredStyleLayer | null
-): ResolvedStyleField<FormalityLevel> {
+): ResolvedStyleField<StyleFormality> {
   if (explicit !== null) {
     return Object.freeze({ source: "EXPLICIT", value: explicit.formality });
   }
@@ -407,12 +421,12 @@ function resolveStyle(input: ComposePromptInput): ResolvedStyle {
 function overrideForStep(
   overrides: readonly StyleStepOverride[] | undefined,
   step: SequenceStep
-): string | null {
+): StyleStepOverride | null {
   if (step === "INVITATION" || overrides === undefined) {
     return null;
   }
   const found = overrides.find((item) => item.step === step);
-  return found === undefined ? null : optionalText(found.text);
+  return found === undefined || optionalText(found.text) === null ? null : found;
 }
 
 function exceeds(value: string | null | undefined, max: number): boolean {
@@ -493,6 +507,7 @@ function sourceVersionsFor(
     acceptedInferredStyle: input.acceptedInferredStyle?.version ?? null,
     defaultPrompt: frenchDefaultPromptVersion(),
     explicitStyle: input.explicitStyle?.version ?? null,
+    profile: input.profile?.version ?? null,
     promptOverride: input.campaignOverride?.version ?? null,
   });
 }
@@ -599,24 +614,55 @@ function hookHasEvidence(
   );
 }
 
+function assertionMatches(
+  expected: EvidenceAssertion,
+  actual: EvidenceAssertion
+): boolean {
+  return (
+    expected.kind === actual.kind &&
+    canonicalEvidenceText(expected.value) ===
+      canonicalEvidenceText(actual.value) &&
+    (expected.detail === null
+      ? actual.detail === null
+      : canonicalEvidenceText(expected.detail) ===
+        canonicalEvidenceText(actual.detail ?? ""))
+  );
+}
+
+function overrideHasEvidence(
+  override: StyleStepOverride,
+  evidence: readonly Evidence[]
+): boolean {
+  return (
+    override.grounding.kind === "NEUTRAL" ||
+    override.grounding.assertions.every((expected) =>
+      evidence.some((item) =>
+        item.assertions.some((actual) => assertionMatches(expected, actual))
+      )
+    )
+  );
+}
+
 function selectFilledTemplate(
   input: ComposePromptInput,
   planned: MessageTemplate,
   values: Readonly<Record<AllowedTemplateVariable, string | null>>,
-  allowOverride: boolean,
-  forcedNeutral: boolean
+  evidence: readonly Evidence[]
 ): FilledTemplate | FillFailure {
-  const campaignBody = overrideForStep(
+  const campaignOverride = overrideForStep(
     input.campaignOverride?.style.stepOverrides,
     input.step
   );
-  if (allowOverride && campaignBody !== null) {
-    const body = campaignBody;
+  if (campaignOverride !== null && overrideHasEvidence(campaignOverride, evidence)) {
+    const body = campaignOverride.text;
     const templateId = `campaign-step-override:${input.step}`;
-    const filled = fillTemplate(body ?? "", values);
+    const filled = fillTemplate(body, values);
     if (filled.kind === "FILLED") {
       return Object.freeze({
-        hook: planned.hook,
+        hook:
+          campaignOverride.grounding.kind === "NEUTRAL"
+            ? neutralHookFor(input.step)
+            : planned.hook,
         templateId,
         text: filled.text,
         usedNeutralFallback: false,
@@ -625,13 +671,31 @@ function selectFilledTemplate(
     return filled;
   }
 
-  const plannedResult = fillTemplate(planned.body, values);
+  if (campaignOverride !== null) {
+    const neutral = templateByHook(neutralHookFor(input.step));
+    const fallback = fillTemplate(neutral.body, values);
+    return fallback.kind === "FILLED"
+      ? Object.freeze({
+          hook: neutral.hook,
+          templateId: neutral.id,
+          text: fallback.text,
+          usedNeutralFallback: true,
+        })
+      : fallback;
+  }
+
+  const plannedHasEvidence = hookHasEvidence(planned.hook, evidence);
+  const evidenceSafeTemplate = plannedHasEvidence
+    ? planned
+    : templateByHook(neutralHookFor(input.step));
+
+  const plannedResult = fillTemplate(evidenceSafeTemplate.body, values);
   if (plannedResult.kind === "FILLED") {
     return Object.freeze({
-      hook: planned.hook,
-      templateId: planned.id,
+      hook: evidenceSafeTemplate.hook,
+      templateId: evidenceSafeTemplate.id,
       text: plannedResult.text,
-      usedNeutralFallback: forcedNeutral,
+      usedNeutralFallback: !plannedHasEvidence,
     });
   }
 
@@ -642,7 +706,7 @@ function selectFilledTemplate(
       hook: neutral.hook,
       templateId: neutral.id,
       text: fallback.text,
-      usedNeutralFallback: forcedNeutral || neutral.id !== planned.id,
+      usedNeutralFallback: !plannedHasEvidence || neutral.id !== planned.id,
     });
   }
   return fallback;
@@ -720,12 +784,12 @@ function buildComposedInput(
     "",
     "# Faits du profil freelance",
     "Ces faits adaptent le sujet et le vocabulaire. Ils n'établissent pas une voix d'écriture personnelle.",
-    `offre: ${optionalText(input.profile.offer) ?? "(absente)"}`,
-    `competences: ${formatList(input.profile.skills)}`,
-    `marche: ${optionalText(input.profile.targetMarket) ?? "(absent)"}`,
-    `geographie: ${optionalText(input.profile.geography) ?? "(absente)"}`,
-    `disponibilite: ${optionalText(input.profile.availability) ?? "(absente)"}`,
-    `exclusions: ${formatList(input.profile.exclusions)}`,
+    `offre: ${optionalText(input.profile?.facts.offer) ?? "(absente)"}`,
+    `competences: ${formatList(input.profile?.facts.skills ?? [])}`,
+    `marche: ${optionalText(input.profile?.facts.targetMarket) ?? "(absent)"}`,
+    `geographie: ${optionalText(input.profile?.facts.geography) ?? "(absente)"}`,
+    `disponibilite: ${optionalText(input.profile?.facts.availability) ?? "(absente)"}`,
+    `exclusions: ${formatList(input.profile?.facts.exclusions ?? [])}`,
     "",
     "# Preuves autorisées",
   ];
@@ -789,16 +853,11 @@ export function composeGroundedPrompt(
     allowed.map((item) => [item.evidenceId, item] as const)
   );
   const values = variableValues(input, evidenceById);
-  const plannedHasEvidence = hookHasEvidence(planned.hook, allowed);
-  const evidenceSafeTemplate = plannedHasEvidence
-    ? planned
-    : templateByHook(neutralHookFor(input.step));
   const filled = selectFilledTemplate(
     input,
-    evidenceSafeTemplate,
+    planned,
     values,
-    plannedHasEvidence,
-    !plannedHasEvidence
+    allowed
   );
 
   if ("kind" in filled) {

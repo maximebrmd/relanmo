@@ -23,6 +23,10 @@ import type {
   PromptOverrideVersionRef,
 } from "../../contracts/versions";
 import type {
+  AddressForm,
+  StyleFormality,
+} from "../../contracts/product/style";
+import type {
   CurrentVersionGuard,
   PersistenceResult,
   PersistenceTransaction,
@@ -188,11 +192,11 @@ export interface CampaignRepository {
 }
 
 export type ExplicitStyleSettings = Readonly<{
-  addressForm: "VOUS" | "TU";
+  addressForm: AddressForm;
   closing: string | null;
   examples: readonly string[];
   forbiddenPhrases: readonly string[];
-  formality: "CASUAL" | "NEUTRAL" | "FORMAL";
+  formality: StyleFormality;
   greeting: string | null;
   instructions: string | null;
   maxCharacters: number | null;
@@ -201,7 +205,7 @@ export type ExplicitStyleSettings = Readonly<{
 
 export type InferredStyleSettings = Readonly<{
   confidence: number | null;
-  formality: "CASUAL" | "NEUTRAL" | "FORMAL" | null;
+  formality: StyleFormality | null;
   tone: string | null;
 }>;
 
