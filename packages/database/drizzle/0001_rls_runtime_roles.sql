@@ -3,18 +3,24 @@
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'relanmo_app') THEN
+  BEGIN
     CREATE ROLE relanmo_app
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'relanmo_worker') THEN
+  EXCEPTION
+    WHEN duplicate_object OR unique_violation THEN NULL;
+  END;
+  BEGIN
     CREATE ROLE relanmo_worker
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'relanmo_auth') THEN
+  EXCEPTION
+    WHEN duplicate_object OR unique_violation THEN NULL;
+  END;
+  BEGIN
     CREATE ROLE relanmo_auth
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS NOLOGIN;
-  END IF;
+  EXCEPTION
+    WHEN duplicate_object OR unique_violation THEN NULL;
+  END;
 END
 $$;
 --> statement-breakpoint
