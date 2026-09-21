@@ -37,6 +37,7 @@ export const COMPOSE_FAILURE_CODES = [
   "UNSUPPORTED_VARIABLE",
   "MISSING_EVIDENCE",
   "INVALID_STYLE_INPUT",
+  "INVALID_EVIDENCE_INPUT",
   "STEP_NOT_IN_PLAN",
 ] as const;
 export type ComposeFailureCode = (typeof COMPOSE_FAILURE_CODES)[number];
@@ -111,8 +112,23 @@ export type ProspectGrounding = Readonly<{
   firstName: string | null;
   hiringRole: GroundedFact | null;
   prospectId: ProspectId;
+  sharedConnection: GroundedFact | null;
   signalDetail: GroundedFact | null;
   signalFact: GroundedFact | null;
+}>;
+
+export type ProspectContextSnapshot = Readonly<{
+  company: string | null;
+  craft: string | null;
+  firstName: string | null;
+  prospectId: ProspectId;
+  sharedConnection: GroundedFact | null;
+}>;
+
+export type CompositionProvenance = Readonly<{
+  allowedEvidenceIds: readonly EvidenceId[];
+  prospectContext: ProspectContextSnapshot;
+  sourceVersions: DraftSourceVersions;
 }>;
 
 export type ComposePromptInput = Readonly<{
@@ -163,6 +179,7 @@ export type ComposedPrompt = Readonly<
     kind: "COMPOSED";
     outputBudget: WritingOutputBudget;
     profileAdaptation: "PROFILE_FACTS_ONLY";
+    provenance: CompositionProvenance;
     requiresWriting: boolean;
     resolvedStyle: ResolvedStyle;
     step: SequenceStep;

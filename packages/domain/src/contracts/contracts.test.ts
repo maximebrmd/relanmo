@@ -172,6 +172,34 @@ describe("domain contract fixtures", () => {
     ).toThrow();
   });
 
+  it("bounds persisted evidence claim and assertion text", () => {
+    const base = {
+      accountId: "account_demo",
+      assertions: [],
+      capturedAt: timestamp,
+      contentHash: null,
+      evidenceId: "evidence_bounded_1",
+      normalizedClaim: "Claim",
+      prospectId: "prospect_demo",
+      provenance: "PROVIDER_PROFILE",
+      sourceId: "provider_profile_demo",
+      sourceUrl: null,
+      tenantId: "tenant_demo",
+    } as const;
+
+    expect(() =>
+      parseEvidence({ ...base, normalizedClaim: "x".repeat(1001) })
+    ).toThrow();
+    expect(() =>
+      parseEvidence({
+        ...base,
+        assertions: [
+          { detail: null, kind: "OFFER", value: "x".repeat(1001) },
+        ],
+      })
+    ).toThrow();
+  });
+
   it("requires stable reasons for held or denied eligibility", () => {
     const allowed = parseEligibilityResult({
       accountId: "account_demo",

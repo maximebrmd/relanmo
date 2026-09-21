@@ -21,6 +21,7 @@ export const EVIDENCE_ASSERTION_KINDS = [
   "PROSPECT_POST",
   "RELEASE",
   "ROLE_CHANGE",
+  "SHARED_CONNECTION",
   "SPEAKING",
 ] as const;
 export type EvidenceAssertionKind = (typeof EVIDENCE_ASSERTION_KINDS)[number];

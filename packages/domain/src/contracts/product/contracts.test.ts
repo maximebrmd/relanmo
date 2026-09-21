@@ -349,8 +349,8 @@ describe("product DTO invalid cases", () => {
           examples: [],
           instructions: null,
           stepOverrides: [
-            { grounding: { kind: "NEUTRAL" }, step: "DM1", text: "Un" },
-            { grounding: { kind: "NEUTRAL" }, step: "DM1", text: "Deux" },
+            { step: "DM1", text: "Un" },
+            { step: "DM1", text: "Deux" },
           ],
           tone: "DIRECT",
         },

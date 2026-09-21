@@ -33,10 +33,22 @@ export const STYLE_FORMALITY_LEVELS = [
 ] as const;
 export type StyleFormality = (typeof STYLE_FORMALITY_LEVELS)[number];
 
+export type StyleOverrideCertification = Readonly<{
+  authority: "APPLICATION_POLICY";
+  certifiedAt: UtcTimestamp;
+  certifiedText: string;
+  certificationId: string;
+  step: DirectMessageStep;
+}>;
+
 export type StyleStepOverrideGrounding =
-  | Readonly<{ kind: "NEUTRAL" }>
+  | Readonly<{
+      certification: StyleOverrideCertification;
+      kind: "CERTIFIED_NEUTRAL";
+    }>
   | Readonly<{
       assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
+      certification: StyleOverrideCertification;
       kind: "ASSERTIONS";
     }>;
 
@@ -46,11 +58,16 @@ export type StyleStepOverride = Readonly<{
   text: string;
 }>;
 
+export type StyleStepOverrideInput = Readonly<{
+  step: DirectMessageStep;
+  text: string;
+}>;
+
 export type StyleInput = Readonly<{
   addressForm: AddressForm;
   examples: readonly string[];
   instructions: string | null;
-  stepOverrides: readonly StyleStepOverride[];
+  stepOverrides: readonly StyleStepOverrideInput[];
   tone: FrenchTone;
 }>;
 

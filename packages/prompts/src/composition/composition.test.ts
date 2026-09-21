@@ -115,6 +115,7 @@ const hiringProspect: ProspectGrounding = Object.freeze({
     text: "frontend",
   }),
   prospectId: PROSPECT,
+  sharedConnection: null,
   signalDetail: null,
   signalFact: null,
 });
@@ -186,6 +187,27 @@ function campaignLayer(
   return Object.freeze({
     style: Object.freeze(style),
     version: PROMPT_OVERRIDE_VERSION,
+  });
+}
+
+function overrideCertification(step: "DM1", text: string) {
+  return Object.freeze({
+    authority: "APPLICATION_POLICY" as const,
+    certifiedAt: FIXTURE_TIME,
+    certifiedText: text,
+    certificationId: `certified:${step}:${text.length.toString()}`,
+    step,
+  });
+}
+
+function certifiedNeutralOverride(step: "DM1", text: string) {
+  return Object.freeze({
+    grounding: Object.freeze({
+      certification: overrideCertification(step, text),
+      kind: "CERTIFIED_NEUTRAL" as const,
+    }),
+    step,
+    text,
   });
 }
 
@@ -353,11 +375,7 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           campaignOverride: campaignLayer({
             stepOverrides: Object.freeze([
-              Object.freeze({
-                grounding: Object.freeze({ kind: "NEUTRAL" as const }),
-                step: "DM1" as const,
-                text: item.text,
-              }),
+              certifiedNeutralOverride("DM1", item.text),
             ]),
           }),
         })
@@ -490,6 +508,7 @@ describe("composeGroundedPrompt", () => {
   });
 
   it("grounds a campaign override against its own assertion requirements", () => {
+    const text = "J'ai vu votre levée de 50 M€.";
     const override = campaignLayer({
       stepOverrides: [
         {
@@ -497,10 +516,11 @@ describe("composeGroundedPrompt", () => {
             assertions: [
               { detail: null, kind: "FUNDING", value: "50 M€" },
             ],
+            certification: overrideCertification("DM1", text),
             kind: "ASSERTIONS",
           },
           step: "DM1",
-          text: "J'ai vu votre levée de 50 M€.",
+          text,
         },
       ],
     });
@@ -546,11 +566,10 @@ describe("composeGroundedPrompt", () => {
         allowedEvidence: [],
         campaignOverride: campaignLayer({
           stepOverrides: [
-            {
-              grounding: { kind: "NEUTRAL" },
-              step: "DM1",
-              text: "Bonjour {{firstName}}, partant pour échanger ?",
-            },
+            certifiedNeutralOverride(
+              "DM1",
+              "Bonjour {{firstName}}, partant pour échanger ?"
+            ),
           ],
         }),
         drafting: { ...hiringDrafting, signalKind: "FUNDING" },
@@ -561,6 +580,88 @@ describe("composeGroundedPrompt", () => {
     if (result.kind === "COMPOSED") {
       expect(result.templateId).toBe("campaign-step-override:DM1");
       expect(result.targetText).toContain("Bonjour Camille");
+    }
+  });
+
+  it("rejects customer text that does not match its application certification", () => {
+    const certification = certifiedNeutralOverride(
+      "DM1",
+      "Bonjour {{firstName}}, partant pour échanger ?"
+    );
+    const result = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [],
+        campaignOverride: campaignLayer({
+          stepOverrides: [
+            {
+              ...certification,
+              text: "J'ai vu votre levée de 50 M€.",
+            },
+          ],
+        }),
+        drafting: noSignalDrafting,
+      })
+    );
+
+    expect(result.kind).toBe("COMPOSED");
+    if (result.kind === "COMPOSED") {
+      expect(result.usedNeutralFallback).toBe(true);
+      expect(result.targetText).not.toContain("50 M€");
+    }
+  });
+
+  it("grounds shared connections in typed allowed evidence", () => {
+    const sharedEvidence = parseEvidence({
+      accountId: null,
+      assertions: [
+        {
+          detail: null,
+          kind: "SHARED_CONNECTION",
+          value: "Morgan Dupont",
+        },
+      ],
+      capturedAt: FIXTURE_TIME,
+      contentHash: null,
+      evidenceId: "evidence_shared_connection_1",
+      normalizedClaim: "Morgan Dupont est une relation partagée vérifiée.",
+      prospectId: PROSPECT,
+      provenance: "PROVIDER_PROFILE",
+      sourceId: "source_shared_connection_1",
+      sourceUrl: null,
+      tenantId: TENANT,
+    });
+    const prospect = {
+      ...hiringProspect,
+      hiringRole: null,
+      sharedConnection: {
+        evidenceId: sharedEvidence.evidenceId,
+        text: "Morgan Dupont",
+      },
+    };
+    const withoutEvidence = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [],
+        drafting: noSignalDrafting,
+        prospect,
+      })
+    );
+    const withEvidence = composeGroundedPrompt(
+      composeInput({
+        allowedEvidence: [sharedEvidence],
+        drafting: noSignalDrafting,
+        prospect,
+      })
+    );
+
+    expect(withoutEvidence.kind).toBe("COMPOSED");
+    if (withoutEvidence.kind === "COMPOSED") {
+      expect(withoutEvidence.hook).toBe("NEUTRAL");
+      expect(withoutEvidence.targetText).not.toContain("Morgan Dupont");
+    }
+    expect(withEvidence.kind).toBe("COMPOSED");
+    if (withEvidence.kind === "COMPOSED") {
+      expect(withEvidence.hook).toBe("SHARED_CONNECTION");
+      expect(withEvidence.targetText).toContain("Morgan Dupont");
     }
   });
 
@@ -613,6 +714,7 @@ describe("composeGroundedPrompt", () => {
           firstName: null,
           hiringRole: null,
           prospectId: PROSPECT,
+          sharedConnection: null,
           signalDetail: null,
           signalFact: null,
         }),
@@ -700,11 +802,7 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           campaignOverride: campaignLayer({
             stepOverrides: [
-              {
-                grounding: { kind: "NEUTRAL" },
-                step: "DM1",
-                text: "x".repeat(2001),
-              },
+              certifiedNeutralOverride("DM1", "x".repeat(2001)),
             ],
           }),
         })
@@ -776,6 +874,45 @@ describe("composeGroundedPrompt", () => {
     expect(result.allowedEvidenceIds).toEqual([HIRING_EVIDENCE_ID]);
     expect(result.composedInput).toContain(String(HIRING_EVIDENCE_ID));
     expect(result.composedInput).not.toContain("evidence_foreign_1");
+    expect(result.provenance).toEqual({
+      allowedEvidenceIds: [HIRING_EVIDENCE_ID],
+      prospectContext: {
+        company: "Nordwave SaaS",
+        craft: "frontend",
+        firstName: "Camille",
+        prospectId: PROSPECT,
+        sharedConnection: null,
+      },
+      sourceVersions: result.sourceVersions,
+    });
+  });
+
+  it("rejects oversized direct evidence input before composing", () => {
+    const oversizedClaim = {
+      ...hiringEvidence,
+      normalizedClaim: "x".repeat(1001),
+    } as Evidence;
+    const tooManyClaims = Array.from({ length: 21 }, (_, index) => ({
+      ...hiringEvidence,
+      evidenceId: parseEvidenceId(`evidence_limit_${String(index)}`),
+    }));
+    const excessiveTotal = Array.from({ length: 13 }, (_, index) => ({
+      ...hiringEvidence,
+      evidenceId: parseEvidenceId(`evidence_total_${String(index)}`),
+      normalizedClaim: "x".repeat(1000),
+    }));
+
+    for (const allowedEvidence of [
+      [oversizedClaim],
+      tooManyClaims,
+      excessiveTotal,
+    ]) {
+      const result = composeGroundedPrompt(composeInput({ allowedEvidence }));
+      expect(result.kind).toBe("FAILED");
+      if (result.kind === "FAILED") {
+        expect(result.reasons[0].code).toBe("INVALID_EVIDENCE_INPUT");
+      }
+    }
   });
 
   it("records the actual built-in prompt version when a caller supplies another", () => {
@@ -834,6 +971,7 @@ describe("composeGroundedPrompt", () => {
             text: "frontend",
           }),
           prospectId: PROSPECT,
+          sharedConnection: null,
           signalDetail: null,
           signalFact: null,
         }),

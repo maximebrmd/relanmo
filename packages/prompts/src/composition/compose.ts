@@ -28,6 +28,7 @@ import type {
   ExplicitStyleLayer,
   GroundedFact,
   InferredStyleLayer,
+  ProspectContextSnapshot,
   ResolvedStyle,
   ResolvedStyleField,
   StyleStepOverride,
@@ -49,6 +50,11 @@ const STYLE_LIMITS = Object.freeze({
   stepOverrides: 5,
   stepOverrideCharacters: 2000,
 });
+const EVIDENCE_LIMITS = Object.freeze({
+  claims: 20,
+  claimCharacters: 1000,
+  totalClaimCharacters: 12_000,
+});
 
 function optionalText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) {
@@ -66,6 +72,27 @@ function scopedEvidence(input: ComposePromptInput): readonly Evidence[] {
         item.prospectId === input.prospect.prospectId
     )
   );
+}
+
+function prospectContextSnapshot(
+  input: ComposePromptInput
+): ProspectContextSnapshot {
+  const sharedConnectionText = optionalText(
+    input.prospect.sharedConnection?.text
+  );
+  return Object.freeze({
+    company: optionalText(input.prospect.company),
+    craft: optionalText(input.prospect.craft),
+    firstName: optionalText(input.prospect.firstName),
+    prospectId: input.prospect.prospectId,
+    sharedConnection:
+      input.prospect.sharedConnection === null || sharedConnectionText === null
+        ? null
+        : Object.freeze({
+            evidenceId: input.prospect.sharedConnection.evidenceId,
+            text: sharedConnectionText,
+          }),
+  });
 }
 
 function groundedPair(
@@ -156,6 +183,12 @@ function variableValues(
     evidenceById,
     "HIRING_ROLE"
   );
+  const sharedConnection = groundedPair(
+    prospect.sharedConnection,
+    null,
+    evidenceById,
+    "SHARED_CONNECTION"
+  );
   const signal =
     signalKind === null
       ? Object.freeze({ detail: null, fact: null })
@@ -174,7 +207,7 @@ function variableValues(
     dm3Fact: dm3.fact,
     firstName: optionalText(prospect.firstName),
     hiringRole: hiring.fact,
-    sharedConnection: optionalText(drafting.verifiedSharedConnection),
+    sharedConnection: sharedConnection.fact,
     signalDetail: signal.detail,
     signalFact: signal.fact,
   });
@@ -487,6 +520,30 @@ function invalidStyleReason(input: ComposePromptInput): ComposeFailureReason | n
   });
 }
 
+function invalidEvidenceReason(
+  input: ComposePromptInput
+): ComposeFailureReason | null {
+  const claims = input.allowedEvidence.map((item) => item.normalizedClaim);
+  const invalid =
+    claims.length > EVIDENCE_LIMITS.claims ||
+    claims.some((claim) => claim.length > EVIDENCE_LIMITS.claimCharacters) ||
+    claims.reduce((total, claim) => total + claim.length, 0) >
+      EVIDENCE_LIMITS.totalClaimCharacters ||
+    input.allowedEvidence.some((item) =>
+      item.assertions.some(
+        (assertion) =>
+          assertion.value.length > EVIDENCE_LIMITS.claimCharacters ||
+          (assertion.detail?.length ?? 0) > EVIDENCE_LIMITS.claimCharacters
+      )
+    );
+  return invalid
+    ? Object.freeze({
+        code: "INVALID_EVIDENCE_INPUT",
+        detail: "allowed evidence exceeds composition limits",
+      })
+    : null;
+}
+
 function failed(
   input: ComposePromptInput,
   reasons: readonly [ComposeFailureReason, ...ComposeFailureReason[]]
@@ -515,7 +572,10 @@ function sourceVersionsFor(
 function plannedTemplate(
   input: ComposePromptInput
 ): MessageTemplate | ComposePromptResult {
-  const plan = planFrenchSequence(input.drafting);
+  const plan = planFrenchSequence({
+    ...input.drafting,
+    verifiedSharedConnection: input.prospect.sharedConnection?.text ?? null,
+  });
   if (plan.kind === "STOPPED") {
     return Object.freeze({
       kind: "STOPPED",
@@ -586,6 +646,8 @@ function requiredAssertionForHook(
       return "ROLE_CHANGE";
     case "PROSPECT_POST":
       return "PROSPECT_POST";
+    case "SHARED_CONNECTION":
+      return "SHARED_CONNECTION";
     case "DM2_OFFER":
       return "OFFER";
     case "DM2_PROSPECT_POST":
@@ -633,13 +695,18 @@ function overrideHasEvidence(
   override: StyleStepOverride,
   evidence: readonly Evidence[]
 ): boolean {
+  const certified =
+    override.grounding.certification.authority === "APPLICATION_POLICY" &&
+    override.grounding.certification.step === override.step &&
+    override.grounding.certification.certifiedText === override.text;
   return (
-    override.grounding.kind === "NEUTRAL" ||
-    override.grounding.assertions.every((expected) =>
-      evidence.some((item) =>
-        item.assertions.some((actual) => assertionMatches(expected, actual))
-      )
-    )
+    certified &&
+    (override.grounding.kind === "CERTIFIED_NEUTRAL" ||
+      override.grounding.assertions.every((expected) =>
+        evidence.some((item) =>
+          item.assertions.some((actual) => assertionMatches(expected, actual))
+        )
+      ))
   );
 }
 
@@ -660,7 +727,7 @@ function selectFilledTemplate(
     if (filled.kind === "FILLED") {
       return Object.freeze({
         hook:
-          campaignOverride.grounding.kind === "NEUTRAL"
+          campaignOverride.grounding.kind === "CERTIFIED_NEUTRAL"
             ? neutralHookFor(input.step)
             : planned.hook,
         templateId,
@@ -848,6 +915,11 @@ export function composeGroundedPrompt(
     return failed(input, [styleFailure]);
   }
 
+  const evidenceFailure = invalidEvidenceReason(input);
+  if (evidenceFailure !== null) {
+    return failed(input, [evidenceFailure]);
+  }
+
   const allowed = scopedEvidence(input);
   const evidenceById = new Map<string, Evidence>(
     allowed.map((item) => [item.evidenceId, item] as const)
@@ -874,6 +946,7 @@ export function composeGroundedPrompt(
   }
 
   const resolvedStyle = resolveStyle(input);
+  const contextSnapshot = prospectContextSnapshot(input);
   const composedInput = buildComposedInput(
     input,
     resolvedStyle,
@@ -888,6 +961,13 @@ export function composeGroundedPrompt(
     kind: "COMPOSED",
     outputBudget: outputBudgetFor(resolvedStyle.maxCharacters.value),
     profileAdaptation: "PROFILE_FACTS_ONLY",
+    provenance: Object.freeze({
+      allowedEvidenceIds: Object.freeze(
+        allowed.map((item) => item.evidenceId)
+      ),
+      prospectContext: contextSnapshot,
+      sourceVersions: sourceVersionsFor(input),
+    }),
     requiresWriting: input.step !== "INVITATION",
     resolvedStyle,
     sendControls: COMPOSE_SEND_CONTROLS,

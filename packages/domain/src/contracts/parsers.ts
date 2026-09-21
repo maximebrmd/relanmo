@@ -431,22 +431,42 @@ function parseEvidenceAssertion(
   path: string
 ): EvidenceAssertion {
   const record = expectRecord(value, path);
+  const detail = nullableNonEmptyString(
+    readRequired(record, "detail"),
+    `${path}.detail`
+  );
+  const assertionValue = expectNonEmptyString(
+    readRequired(record, "value"),
+    `${path}.value`
+  );
+  if (detail !== null && detail.length > 1000) {
+    throw new ContractValidationError(`${path}.detail exceeds 1000 characters`);
+  }
+  if (assertionValue.length > 1000) {
+    throw new ContractValidationError(`${path}.value exceeds 1000 characters`);
+  }
   return Object.freeze({
-    detail: nullableNonEmptyString(
-      readRequired(record, "detail"),
-      `${path}.detail`
-    ),
+    detail,
     kind: member(
       readRequired(record, "kind"),
       EVIDENCE_ASSERTION_KINDS,
       `${path}.kind`
     ),
-    value: expectNonEmptyString(readRequired(record, "value"), `${path}.value`),
+    value: assertionValue,
   });
 }
 
 export function parseEvidence(value: unknown): Evidence {
   const record = expectRecord(value, "evidence");
+  const normalizedClaim = expectNonEmptyString(
+    readRequired(record, "normalizedClaim"),
+    "evidence.normalizedClaim"
+  );
+  if (normalizedClaim.length > 1000) {
+    throw new ContractValidationError(
+      "evidence.normalizedClaim exceeds 1000 characters"
+    );
+  }
   return Object.freeze({
     accountId: nullable(readRequired(record, "accountId"), parseAccountId),
     assertions: expectArrayOf(
@@ -461,10 +481,7 @@ export function parseEvidence(value: unknown): Evidence {
       "evidence.contentHash"
     ),
     evidenceId: parseEvidenceId(readRequired(record, "evidenceId")),
-    normalizedClaim: expectNonEmptyString(
-      readRequired(record, "normalizedClaim"),
-      "evidence.normalizedClaim"
-    ),
+    normalizedClaim,
     prospectId: parseProspectId(readRequired(record, "prospectId")),
     provenance: parseEvidenceProvenance(
       readRequired(record, "provenance"),

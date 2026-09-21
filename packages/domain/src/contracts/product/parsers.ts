@@ -129,13 +129,12 @@ import type {
   ProfileInput,
   ProfileView,
 } from "./profile";
-import { EVIDENCE_ASSERTION_KINDS } from "../evidence";
 import { ADDRESS_FORMS, STYLE_COMMAND_KINDS, STYLE_SOURCES } from "./style";
 import type {
   DraftPreviewView,
   StyleCommand,
   StyleInput,
-  StyleStepOverride,
+  StyleStepOverrideInput,
   StyleView,
 } from "./style";
 import { TIMELINE_AUTOMATION_STATES } from "./timeline";
@@ -977,7 +976,7 @@ function parseStyleStepOverride(
   value: unknown,
   path: string,
   seen: Set<string>
-): StyleStepOverride {
+): StyleStepOverrideInput {
   const record = expectRecord(value, path);
   const step = member(
     readRequired(record, "step"),
@@ -988,59 +987,7 @@ function parseStyleStepOverride(
     throw new ContractValidationError(`${path}.step must be unique`);
   }
   seen.add(step);
-  const groundingRecord = expectRecord(
-    readRequired(record, "grounding"),
-    `${path}.grounding`
-  );
-  const groundingKind = member(
-    readRequired(groundingRecord, "kind"),
-    ["NEUTRAL", "ASSERTIONS"] as const,
-    `${path}.grounding.kind`
-  );
-  const grounding =
-    groundingKind === "NEUTRAL"
-      ? Object.freeze({ kind: "NEUTRAL" as const })
-      : (() => {
-          const assertions = expectArrayOf(
-            readRequired(groundingRecord, "assertions"),
-            (item, itemPath) => {
-              const assertion = expectRecord(item, itemPath);
-              return Object.freeze({
-                detail: parseNullableProductText(
-                  readRequired(assertion, "detail"),
-                  `${itemPath}.detail`,
-                  2000
-                ),
-                kind: member(
-                  readRequired(assertion, "kind"),
-                  EVIDENCE_ASSERTION_KINDS,
-                  `${itemPath}.kind`
-                ),
-                value: parseProductText(
-                  readRequired(assertion, "value"),
-                  `${itemPath}.value`,
-                  2000
-                ),
-              });
-            },
-            `${path}.grounding.assertions`,
-            10
-          );
-          if (assertions.length === 0) {
-            throw new ContractValidationError(
-              `${path}.grounding.assertions must not be empty`
-            );
-          }
-          return Object.freeze({
-            assertions: assertions as readonly [
-              (typeof assertions)[number],
-              ...(typeof assertions)[number][],
-            ],
-            kind: "ASSERTIONS" as const,
-          });
-        })();
   return Object.freeze({
-    grounding,
     step,
     text: parseProductText(readRequired(record, "text"), `${path}.text`, 2000),
   });
