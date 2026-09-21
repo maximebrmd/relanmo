@@ -315,6 +315,7 @@ export const providerEventDedupeIdentityFixture: ProviderEventDedupeIdentity =
   Object.freeze({
     dedupeKey: "tenant_demo:account_demo:provider_event_inbound_1",
     eventKind: "INCOMING_MESSAGE",
+    provider: "LINKEDIN",
     providerEventId: "provider_event_inbound_1",
     scope: normalizedIncomingProviderEventFixture.scope,
     source: "PROVIDER_EVENT_ID",

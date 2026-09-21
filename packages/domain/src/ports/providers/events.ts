@@ -6,7 +6,11 @@ import type {
 } from "../../contracts/ids";
 import type { InboundMessage, OutboundMessage } from "../../contracts/message";
 import type { UtcTimestamp } from "../../contracts/values";
-import type { ProviderOperationContext, ProviderReadResult } from "./common";
+import type {
+  ProviderName,
+  ProviderOperationContext,
+  ProviderReadResult,
+} from "./common";
 import type {
   LinkedInCapabilities,
   LinkedInHealth,
@@ -110,6 +114,7 @@ export type ProviderEventDedupeInput = Readonly<{
 export type ProviderEventDedupeIdentity = Readonly<{
   dedupeKey: string;
   eventKind: NormalizedProviderEvent["kind"];
+  provider: ProviderName;
   providerEventId: string | null;
   scope: ProviderEventScope;
   source: "CANONICAL_PAYLOAD" | "PROVIDER_EVENT_ID";
@@ -119,6 +124,8 @@ export type ProviderEventDedupeIdentity = Readonly<{
  * Authentication uses the mechanism the provider documents. This contract
  * intentionally has no invented HMAC header or generic signature algorithm.
  * Normalization returns domain messages, never SDK classes or raw responses.
+ * Dedupe identity includes `provider` so persistence can key webhook rows by
+ * tenant + provider + dedupe key.
  */
 export type ProviderEventPort = Readonly<{
   authenticate: (

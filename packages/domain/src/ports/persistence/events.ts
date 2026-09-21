@@ -13,6 +13,7 @@ import type { InboundMessage, OutboundMessage } from "../../contracts/message";
 import type { OwnershipReason } from "../../contracts/ownership";
 import type { UtcTimestamp } from "../../contracts/values";
 import type { OutboxEventKind } from "../../contracts/workflow";
+import type { ProviderName } from "../providers/common";
 import type { ConfirmedActionRecord, SendAttemptRecord } from "./actions";
 import type {
   AccountProspectKey,
@@ -165,6 +166,28 @@ export type InboxProcessingLease = Readonly<{
   workerId: PersistenceWorkerId;
 }>;
 
+export type InboxEventDedupeIdentity = Readonly<{
+  dedupeKey: string;
+  provider: ProviderName;
+  tenantId: TenantId;
+}>;
+
+/**
+ * Persistence identity for webhook_events: tenant + provider + dedupe key.
+ * Two providers may share a key under one tenant without colliding.
+ */
+export function inboxEventDedupeIdentityFromProvider(identity: {
+  dedupeKey: string;
+  provider: ProviderName;
+  scope: { tenantId: TenantId };
+}): InboxEventDedupeIdentity {
+  return {
+    dedupeKey: identity.dedupeKey,
+    provider: identity.provider,
+    tenantId: identity.scope.tenantId,
+  };
+}
+
 export type InboxEventRecord = Readonly<{
   availableAt: UtcTimestamp;
   dedupeKey: string;
@@ -174,6 +197,7 @@ export type InboxEventRecord = Readonly<{
   lastError: string | null;
   lease: InboxProcessingLease | null;
   processedAt: UtcTimestamp | null;
+  provider: ProviderName;
   quarantinedAt: UtcTimestamp | null;
   receivedAt: UtcTimestamp;
   state: InboxEventState;
@@ -185,6 +209,7 @@ export type RecordInboxEventInput = Readonly<{
   dedupeKey: string;
   event: InboxEventEnvelope;
   eventId: InboxEventId;
+  provider: ProviderName;
   receivedAt: UtcTimestamp;
   tenantId: TenantId;
 }>;
@@ -202,6 +227,7 @@ export type RecordInboxEventResult =
 export type QuarantineInboxEventInput = Readonly<{
   event: InboxEventEnvelope;
   eventId: InboxEventId;
+  provider: ProviderName;
   reason:
     | "IDENTITY_MISMATCH"
     | "MALFORMED"
@@ -290,7 +316,8 @@ export type ListInboxDeadLettersResult = Readonly<{
  * in this port. Implementations validate normalized scope/message identity
  * before state changes and commit quarantine plus a hold for every account in
  * the result's affectedAccountIds atomically. accountIdsToHoldForInboxEvent
- * defines the tenant-filtered candidate set for that result.
+ * defines the tenant-filtered candidate set for that result. Dedupe identity
+ * is tenantId + provider + dedupeKey so two providers cannot collide.
  */
 export interface InboxRepository {
   acknowledge: (
@@ -495,6 +522,7 @@ export interface OutboxRepository {
 export type AtomicReplyStopInput = Readonly<{
   event: InboxIncomingEvent;
   eventId: InboxEventId;
+  provider: ProviderName;
   stoppedAt: UtcTimestamp;
   tenantId: TenantId;
 }>;
@@ -532,6 +560,7 @@ export type AtomicReplyStopResult =
 export type ManualTakeoverInput = Readonly<{
   event: InboxOutgoingEvent;
   eventId: InboxEventId;
+  provider: ProviderName;
   tenantId: TenantId;
 }>;
 
