@@ -1,12 +1,16 @@
-import {
-  loginAccount,
-  rateLimit,
-  session,
-  user,
-  verification,
-} from "@relanmo/database/schema/auth";
-import { type DBFieldAttribute, getSchema } from "better-auth/db";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import * as committedAuthSchema from "@relanmo/database/schema/auth";
+import { type DBAdapter, generateDrizzleSchema } from "auth/api";
+import { is } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
+import {
+  createTableRelationsHelpers,
+  extractTablesRelationalConfig,
+  One,
+} from "drizzle-orm/relations";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,119 +21,13 @@ import {
 
 type AuthTable = Parameters<typeof getTableConfig>[0];
 
-const committedTables = [user, session, loginAccount, verification, rateLimit];
-
-function snakeCase(value: string) {
-  return (
-    value.match(/[\p{Ll}\d]+|\p{Lu}+(?!\p{Ll})|\p{Lu}[\p{Ll}\d]+|\p{Lo}+/gu) ??
-    []
-  )
-    .map((word) => word.toLowerCase())
-    .join("_");
-}
-
-function fieldType(field: DBFieldAttribute) {
-  if (Array.isArray(field.type)) {
-    return "text";
-  }
-  if (field.type === "string[]") {
-    return "text[]";
-  }
-  if (field.type === "number[]") {
-    return field.bigint ? "bigint[]" : "integer[]";
-  }
-  const types = {
-    boolean: "boolean",
-    date: "timestamp",
-    json: "jsonb",
-    number: field.bigint ? "bigint" : "integer",
-    string: "text",
-  } as const;
-  return types[field.type];
-}
-
-function hasDatabaseDefault(field: DBFieldAttribute) {
-  if (field.defaultValue === null || field.defaultValue === undefined) {
-    return false;
-  }
-  return (
-    typeof field.defaultValue !== "function" ||
-    (field.type === "date" &&
-      field.defaultValue.toString().includes("new Date()"))
-  );
-}
-
 function sorted<T>(values: T[]) {
   return values.sort((left, right) =>
     JSON.stringify(left).localeCompare(JSON.stringify(right))
   );
 }
 
-function normalizeGeneratedSchema() {
-  return sorted(
-    Object.entries(getSchema(authSchemaConfig)).map(([modelName, table]) => ({
-      columns: sorted([
-        {
-          databaseDefault: false,
-          hasDefault: false,
-          name: "id",
-          notNull: true,
-          onUpdate: false,
-          primary: true,
-          type: "text",
-          unique: false,
-        },
-        ...Object.entries(table.fields).map(([fieldName, field]) => {
-          const databaseDefault = hasDatabaseDefault(field);
-          const onUpdate = Boolean(field.onUpdate && field.type === "date");
-          return {
-            databaseDefault,
-            hasDefault: databaseDefault || onUpdate,
-            name: snakeCase(field.fieldName ?? fieldName),
-            notNull: field.required !== false,
-            onUpdate,
-            primary: false,
-            type: fieldType(field),
-            unique: field.unique === true,
-          };
-        }),
-      ]),
-      foreignKeys: sorted(
-        Object.entries(table.fields).flatMap(([fieldName, field]) =>
-          field.references
-            ? [
-                {
-                  column: snakeCase(field.fieldName ?? fieldName),
-                  foreignColumn: snakeCase(field.references.field),
-                  foreignTable: snakeCase(field.references.model),
-                  onDelete: field.references.onDelete ?? "cascade",
-                },
-              ]
-            : []
-        )
-      ),
-      indexes: sorted([
-        ...Object.entries(table.fields).flatMap(([fieldName, field]) =>
-          field.index
-            ? [
-                {
-                  columns: [snakeCase(field.fieldName ?? fieldName)],
-                  unique: false,
-                },
-              ]
-            : []
-        ),
-        ...(table.indexes ?? []).map((index) => ({
-          columns: [...index.columns].map(snakeCase),
-          unique: index.unique === true,
-        })),
-      ]),
-      name: snakeCase(modelName),
-    }))
-  );
-}
-
-function normalizeCommittedTable(table: AuthTable) {
+function normalizeTable(table: AuthTable) {
   const config = getTableConfig(table);
   return {
     columns: sorted(
@@ -170,6 +68,67 @@ function normalizeCommittedTable(table: AuthTable) {
   };
 }
 
+function normalizeSchema(schema: Record<string, unknown>) {
+  const relationalConfig = extractTablesRelationalConfig(
+    schema,
+    createTableRelationsHelpers
+  );
+  return sorted(
+    Object.values(relationalConfig.tables).map((table) => {
+      const firstColumn = Object.values(table.columns)[0];
+      if (!firstColumn) {
+        throw new TypeError(`Auth table ${table.dbName} has no columns`);
+      }
+      return {
+        ...normalizeTable(firstColumn.table),
+        relations: sorted(
+          Object.values(table.relations).map((relation) => {
+            const one = is(relation, One);
+            return {
+              fields: one
+                ? (relation.config?.fields.map((field) => field.name) ?? [])
+                : [],
+              kind: one ? "one" : "many",
+              referencedTable: relation.referencedTableName,
+              references: one
+                ? (relation.config?.references.map(
+                    (reference) => reference.name
+                  ) ?? [])
+                : [],
+              relationName: relation.relationName ?? null,
+            };
+          })
+        ),
+      };
+    })
+  );
+}
+
+async function generateSchemaModule() {
+  const directory = await mkdtemp(
+    path.join(import.meta.dirname, ".auth-schema-generator-")
+  );
+  try {
+    const file = path.join(directory, "schema.mjs");
+    const adapter = {
+      id: "drizzle",
+      options: { provider: "pg" },
+    } as DBAdapter;
+    const generated = await generateDrizzleSchema({
+      adapter,
+      file,
+      options: authSchemaConfig,
+    });
+    if (!generated.code) {
+      throw new TypeError("Better Auth generator returned no schema module");
+    }
+    await writeFile(file, generated.code);
+    return await import(pathToFileURL(file).href);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
 describe("auth schema-config", () => {
   it("renames the login account table away from Better Auth's default and provider_accounts", () => {
     expect(authSchemaConfig.account.modelName).toBe("login_account");
@@ -192,9 +151,10 @@ describe("auth schema-config", () => {
     );
   });
 
-  it("matches the generated tables, fields, constraints, references, and indexes", () => {
-    expect(sorted(committedTables.map(normalizeCommittedTable))).toEqual(
-      normalizeGeneratedSchema()
+  it("matches the pinned generator's complete Drizzle schema", async () => {
+    const generatedAuthSchema = await generateSchemaModule();
+    expect(normalizeSchema(committedAuthSchema)).toEqual(
+      normalizeSchema(generatedAuthSchema)
     );
   });
 });
