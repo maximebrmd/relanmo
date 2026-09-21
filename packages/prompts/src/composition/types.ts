@@ -13,7 +13,6 @@ import type {
   PromptOverrideVersionRef,
   SequenceStep,
   TenantId,
-  UtcTimestamp,
 } from "@relanmo/domain/contracts";
 import type {
   ExplicitStyleSettings,
@@ -88,25 +87,11 @@ export type CompositionEvidence = Readonly<
   }
 >;
 
-export type StyleOverrideCertification = Readonly<{
-  authority: "APPLICATION_POLICY";
-  certifiedAt: UtcTimestamp;
-  certifiedText: string;
-  certificationId: string;
-  step: DirectMessageStep;
-}>;
-
 export type StyleStepOverride = Readonly<{
-  grounding:
-    | Readonly<{
-        certification: StyleOverrideCertification;
-        kind: "CERTIFIED_NEUTRAL";
-      }>
-    | Readonly<{
-        assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
-        certification: StyleOverrideCertification;
-        kind: "ASSERTIONS";
-      }>;
+  grounding: Readonly<{
+    assertions: readonly [EvidenceAssertion, ...EvidenceAssertion[]];
+    kind: "ASSERTIONS";
+  }>;
   step: DirectMessageStep;
   text: string;
 }>;

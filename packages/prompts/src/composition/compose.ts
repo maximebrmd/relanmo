@@ -905,35 +905,9 @@ function overrideGroundingProvenance(
   if (
     typeof grounding !== "object" ||
     grounding === null ||
-    !("kind" in grounding) ||
-    !("certification" in grounding)
+    !("kind" in grounding)
   ) {
     return null;
-  }
-  const certification = grounding.certification;
-  if (
-    typeof certification !== "object" ||
-    certification === null ||
-    !("authority" in certification) ||
-    certification.authority !== "APPLICATION_POLICY" ||
-    !("certifiedAt" in certification) ||
-    typeof certification.certifiedAt !== "string" ||
-    certification.certifiedAt.length === 0 ||
-    !("certifiedText" in certification) ||
-    certification.certifiedText !== override.text ||
-    !("certificationId" in certification) ||
-    typeof certification.certificationId !== "string" ||
-    certification.certificationId.length === 0 ||
-    !("step" in certification) ||
-    certification.step !== override.step
-  ) {
-    return null;
-  }
-  if (grounding.kind === "CERTIFIED_NEUTRAL") {
-    return Object.freeze({
-      assertionKinds: Object.freeze([]),
-      evidenceIds: Object.freeze([]),
-    });
   }
   if (
     grounding.kind !== "ASSERTIONS" ||

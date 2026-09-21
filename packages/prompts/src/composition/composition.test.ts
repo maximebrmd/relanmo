@@ -211,21 +211,23 @@ function campaignLayer(
   });
 }
 
-function overrideCertification(step: "DM1", text: string) {
-  return Object.freeze({
-    authority: "APPLICATION_POLICY" as const,
-    certifiedAt: FIXTURE_TIME,
-    certifiedText: text,
-    certificationId: `certified:${step}:${text.length.toString()}`,
-    step,
-  });
-}
-
-function certifiedNeutralOverride(step: "DM1", text: string) {
+function assertionOverride(step: "DM1", text: string) {
   return Object.freeze({
     grounding: Object.freeze({
-      certification: overrideCertification(step, text),
-      kind: "CERTIFIED_NEUTRAL" as const,
+      assertions: Object.freeze([
+        Object.freeze({
+          detail: null,
+          kind: "HIRING_ROLE" as const,
+          value: "frontend",
+        }),
+      ]) as readonly [
+        Readonly<{
+          detail: null;
+          kind: "HIRING_ROLE";
+          value: "frontend";
+        }>,
+      ],
+      kind: "ASSERTIONS" as const,
     }),
     step,
     text,
@@ -404,7 +406,7 @@ describe("composeGroundedPrompt", () => {
         composeInput({
           campaignOverride: campaignLayer({
             stepOverrides: Object.freeze([
-              certifiedNeutralOverride("DM1", item.text),
+              assertionOverride("DM1", item.text),
             ]),
           }),
         })
@@ -545,7 +547,6 @@ describe("composeGroundedPrompt", () => {
         {
           grounding: {
             assertions: [{ detail: null, kind: "FUNDING", value: "50 M€" }],
-            certification: overrideCertification("DM1", text),
             kind: "ASSERTIONS",
           },
           step: "DM1",
@@ -593,16 +594,26 @@ describe("composeGroundedPrompt", () => {
     }
   });
 
-  it("applies a neutral override independently of the planned factual hook", () => {
+  it("does not accept a caller-certified evidence-free override", () => {
     const result = composeGroundedPrompt(
       composeInput({
         allowedEvidence: [],
         campaignOverride: campaignLayer({
           stepOverrides: [
-            certifiedNeutralOverride(
-              "DM1",
-              "Bonjour {{firstName}}, partant pour échanger ?"
-            ),
+            {
+              grounding: {
+                certification: {
+                  authority: "APPLICATION_POLICY",
+                  certifiedAt: FIXTURE_TIME,
+                  certifiedText: "J'ai vu votre levée de 50 M€.",
+                  certificationId: "forged",
+                  step: "DM1",
+                },
+                kind: "CERTIFIED_NEUTRAL",
+              },
+              step: "DM1",
+              text: "J'ai vu votre levée de 50 M€.",
+            } as unknown as StyleStepOverride,
           ],
         }),
         drafting: { ...hiringDrafting, signalKind: "FUNDING" },
@@ -611,39 +622,8 @@ describe("composeGroundedPrompt", () => {
 
     expect(result.kind).toBe("COMPOSED");
     if (result.kind === "COMPOSED") {
-      expect(result.hook).toBe("CAMPAIGN_OVERRIDE");
-      expect(result.provenance.campaignOverrideGrounding).toEqual({
-        assertionKinds: [],
-        evidenceIds: [],
-      });
-      expect(result.templateId).toBe("campaign-step-override:DM1");
-      expect(result.targetText).toContain("Bonjour Camille");
-    }
-  });
-
-  it("rejects customer text that does not match its application certification", () => {
-    const certification = certifiedNeutralOverride(
-      "DM1",
-      "Bonjour {{firstName}}, partant pour échanger ?"
-    );
-    const result = composeGroundedPrompt(
-      composeInput({
-        allowedEvidence: [],
-        campaignOverride: campaignLayer({
-          stepOverrides: [
-            {
-              ...certification,
-              text: "J'ai vu votre levée de 50 M€.",
-            },
-          ],
-        }),
-        drafting: noSignalDrafting,
-      })
-    );
-
-    expect(result.kind).toBe("COMPOSED");
-    if (result.kind === "COMPOSED") {
       expect(result.usedNeutralFallback).toBe(true);
+      expect(result.provenance.campaignOverrideGrounding).toBeNull();
       expect(result.targetText).not.toContain("50 M€");
     }
   });
@@ -652,7 +632,7 @@ describe("composeGroundedPrompt", () => {
     const legacyOverrides = [
       { step: "DM1", text: "J'ai vu votre levée de 50 M€." },
       {
-        grounding: { kind: "CERTIFIED_NEUTRAL" },
+        grounding: { assertions: [], kind: "ASSERTIONS" },
         step: "DM1",
         text: "J'ai vu votre levée de 50 M€.",
       },
@@ -953,7 +933,7 @@ describe("composeGroundedPrompt", () => {
       composeGroundedPrompt(
         composeInput({
           campaignOverride: campaignLayer({
-            stepOverrides: [certifiedNeutralOverride("DM1", "x".repeat(2001))],
+            stepOverrides: [assertionOverride("DM1", "x".repeat(2001))],
           }),
         })
       ),
