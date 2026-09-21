@@ -5,7 +5,10 @@ import type {
   EvidenceAssertionKind,
   SequenceStep,
 } from "@relanmo/domain/contracts";
-import { COMPOSITION_CONTEXT_LIMITS } from "@relanmo/domain/contracts";
+import {
+  COMPOSITION_CONTEXT_LIMITS,
+  EVIDENCE_ASSERTION_KINDS,
+} from "@relanmo/domain/contracts";
 import type { StyleFormality } from "@relanmo/domain/contracts/product";
 
 import {
@@ -844,19 +847,60 @@ function overrideHasEvidence(
   override: StyleStepOverride,
   evidence: readonly Evidence[]
 ): boolean {
+  const grounding = (override as { grounding?: unknown }).grounding;
+  if (
+    typeof grounding !== "object" ||
+    grounding === null ||
+    !("kind" in grounding) ||
+    !("certification" in grounding)
+  ) {
+    return false;
+  }
+  const certification = grounding.certification;
+  if (
+    typeof certification !== "object" ||
+    certification === null ||
+    !("authority" in certification) ||
+    certification.authority !== "APPLICATION_POLICY" ||
+    !("certifiedAt" in certification) ||
+    typeof certification.certifiedAt !== "string" ||
+    certification.certifiedAt.length === 0 ||
+    !("certifiedText" in certification) ||
+    certification.certifiedText !== override.text ||
+    !("certificationId" in certification) ||
+    typeof certification.certificationId !== "string" ||
+    certification.certificationId.length === 0 ||
+    !("step" in certification) ||
+    certification.step !== override.step
+  ) {
+    return false;
+  }
   const certified =
-    override.grounding.certification.authority === "APPLICATION_POLICY" &&
-    override.grounding.certification.step === override.step &&
-    override.grounding.certification.certifiedText === override.text;
-  return (
-    certified &&
-    (override.grounding.kind === "CERTIFIED_NEUTRAL" ||
-      override.grounding.assertions.every((expected) =>
-        evidence.some((item) =>
-          item.assertions.some((actual) => assertionMatches(expected, actual))
-        )
-      ))
-  );
+    grounding.kind === "CERTIFIED_NEUTRAL" ||
+    (grounding.kind === "ASSERTIONS" &&
+      "assertions" in grounding &&
+      Array.isArray(grounding.assertions) &&
+      grounding.assertions.length > 0 &&
+      grounding.assertions.every(
+        (expected) =>
+          typeof expected === "object" &&
+          expected !== null &&
+          "kind" in expected &&
+          typeof expected.kind === "string" &&
+          EVIDENCE_ASSERTION_KINDS.includes(
+            expected.kind as EvidenceAssertionKind
+          ) &&
+          "value" in expected &&
+          typeof expected.value === "string" &&
+          "detail" in expected &&
+          (expected.detail === null || typeof expected.detail === "string") &&
+          evidence.some((item) =>
+            item.assertions.some((actual) =>
+              assertionMatches(expected as EvidenceAssertion, actual)
+            )
+          )
+      ));
+  return certified;
 }
 
 function selectFilledTemplate(

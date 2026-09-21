@@ -22,6 +22,7 @@ import type {
   FreelancerProfileFacts,
   InferredStyleLayer,
   ProspectGrounding,
+  StyleStepOverride,
   VersionedAcceptedInferredStyleLayer,
   VersionedCampaignStyleOverride,
   VersionedExplicitStyleLayer,
@@ -606,6 +607,37 @@ describe("composeGroundedPrompt", () => {
     if (result.kind === "COMPOSED") {
       expect(result.usedNeutralFallback).toBe(true);
       expect(result.targetText).not.toContain("50 M€");
+    }
+  });
+
+  it("falls back safely for legacy or invalid persisted override grounding", () => {
+    const legacyOverrides = [
+      { step: "DM1", text: "J'ai vu votre levée de 50 M€." },
+      {
+        grounding: { kind: "CERTIFIED_NEUTRAL" },
+        step: "DM1",
+        text: "J'ai vu votre levée de 50 M€.",
+      },
+    ] as const;
+
+    for (const legacyOverride of legacyOverrides) {
+      const result = composeGroundedPrompt(
+        composeInput({
+          allowedEvidence: [],
+          campaignOverride: campaignLayer({
+            stepOverrides: [
+              legacyOverride as unknown as StyleStepOverride,
+            ],
+          }),
+          drafting: noSignalDrafting,
+        })
+      );
+
+      expect(result.kind).toBe("COMPOSED");
+      if (result.kind === "COMPOSED") {
+        expect(result.usedNeutralFallback).toBe(true);
+        expect(result.targetText).not.toContain("50 M€");
+      }
     }
   });
 
