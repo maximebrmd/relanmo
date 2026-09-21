@@ -50,7 +50,9 @@ function membershipPool(rowCount?: number): TrustedSqlPool {
     connect: () =>
       Promise.resolve({
         query: () => Promise.resolve({ rowCount }),
-        release: () => undefined,
+        release: () => {
+          // The synthetic session has no connection to release.
+        },
       }),
   };
 }
@@ -94,6 +96,7 @@ describe("trusted SQL access minting", () => {
   });
 
   it("rejects unbranded access at the production transaction entry", async () => {
+    // SAFETY: the database is never reached because access validation fails first.
     const runner = createPersistenceTransactionRunner({} as NodePgDatabase);
     const forged = {
       kind: "tenant" as const,

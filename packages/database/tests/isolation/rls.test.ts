@@ -1,7 +1,5 @@
-import {
-  createDatabaseRuntimeClient,
-  type DatabaseEnv,
-} from "@relanmo/database/client";
+import { createDatabaseRuntimeClient } from "@relanmo/database/client";
+import type { DatabaseEnv } from "@relanmo/database/client";
 import {
   applyTrustedSqlContext,
   AUTH_DATABASE_ROLE,
@@ -118,6 +116,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
         ctx.skip();
         return;
       }
+      const target = database;
 
       await withClient(database.migrationUrl, async (owner) => {
         const roles = await owner.query<{
@@ -193,10 +192,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
                     (select rolbypassrls from pg_roles where rolname = current_user) as rolbypassrls`
           );
           expect(identity.rows[0]).toEqual({
-            current_user: runtimeLoginName(
-              database,
-              RUNTIME_DATABASE_ROLES.app
-            ),
+            current_user: runtimeLoginName(target, RUNTIME_DATABASE_ROLES.app),
             rolbypassrls: false,
           });
           await expect(
@@ -207,7 +203,6 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ).rejects.toMatchObject({ code: "42501" });
         }
       );
-
     },
     TEST_TIMEOUT_MS
   );
@@ -219,6 +214,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
         ctx.skip();
         return;
       }
+      const target = database;
 
       await withClient(
         runtimeRoleUrl(
@@ -227,7 +223,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
           ISOLATION_ROLE_PASSWORDS.app
         ),
         async (app) => {
-          const access = await establishMemberAccess(database, TENANT_A);
+          const access = await establishMemberAccess(target, TENANT_A);
           await expect(
             app.query("update campaign_versions set name = name where false")
           ).rejects.toMatchObject({ code: "42501" });
@@ -626,11 +622,7 @@ describe("tenant isolation with runtime database roles (live local Postgres)", (
                   'isolation-worker',
                   '{"kind":"INVITATION_WITHOUT_NOTE","note":null,"step":"INVITATION"}',
                   '{}', 'quota-a', now(), now() + interval '1 hour')`,
-              [
-                "send-attempt-same-tenant",
-                TENANT_A,
-                "request-same-tenant",
-              ]
+              ["send-attempt-same-tenant", TENANT_A, "request-same-tenant"]
             );
             expect(sameTenantAttempt.rowCount).toBe(1);
 

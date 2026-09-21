@@ -2,10 +2,7 @@ import { createHash } from "node:crypto";
 
 import { Client } from "pg";
 
-import {
-  AUTH_DATABASE_ROLE,
-  RUNTIME_DATABASE_ROLES,
-} from "../../src/security";
+import { AUTH_DATABASE_ROLE, RUNTIME_DATABASE_ROLES } from "../../src/security";
 import type { IsolatedTestDatabase } from "../support/test-database";
 
 export const ISOLATION_ROLE_PASSWORDS = {
@@ -41,6 +38,19 @@ function connectionUrl(
   return url.toString();
 }
 
+export function runtimeLoginName(
+  target: IsolatedTestDatabase,
+  role:
+    | (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES]
+    | typeof AUTH_DATABASE_ROLE
+): string {
+  const databaseHash = createHash("sha256")
+    .update(target.databaseName)
+    .digest("hex")
+    .slice(0, 12);
+  return `${role}_test_${databaseHash}`;
+}
+
 export function runtimeRoleUrl(
   target: IsolatedTestDatabase,
   role:
@@ -54,19 +64,6 @@ export function runtimeRoleUrl(
     runtimeLoginName(target, role),
     password
   );
-}
-
-export function runtimeLoginName(
-  target: IsolatedTestDatabase,
-  role:
-    | (typeof RUNTIME_DATABASE_ROLES)[keyof typeof RUNTIME_DATABASE_ROLES]
-    | typeof AUTH_DATABASE_ROLE
-): string {
-  const databaseHash = createHash("sha256")
-    .update(target.databaseName)
-    .digest("hex")
-    .slice(0, 12);
-  return `${role}_test_${databaseHash}`;
 }
 
 export async function withClient<Value>(

@@ -11,10 +11,8 @@ import type {
 import { sql, TransactionRollbackError } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
-import {
-  requireTrustedTenantAccess,
-  type TenantSqlAccess,
-} from "../security/context";
+import { requireTrustedTenantAccess } from "../security/context";
+import type { TenantSqlAccess } from "../security/context";
 import { UntrustedSqlAccessError } from "../security/errors";
 import { setTenantContext } from "./context";
 import { mapUnexpectedError } from "./errors";
@@ -113,9 +111,10 @@ async function runTransaction<Value>(
 }
 
 /**
- * The concrete PersistenceTransactionRunner: one checked-out pg connection
- * per `run` call, tenant context set transaction-locally right after BEGIN,
- * and rollback on either a thrown error or an `ok: false` work result.
+ * The trusted database transaction runner: one checked-out pg connection per
+ * `run` call, tenant context set transaction-locally right after BEGIN, active
+ * member access revalidated under lock, and rollback on either a thrown error
+ * or an `ok: false` work result.
  */
 export function createPersistenceTransactionRunner(
   db: NodePgDatabase

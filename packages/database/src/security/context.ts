@@ -62,6 +62,14 @@ function requireMemberPrincipal(scope: TenantTransactionScope): UserId {
   );
 }
 
+async function setLocalConfig(
+  session: TrustedSqlSession,
+  name: string,
+  value: string
+): Promise<void> {
+  await session.query("select set_config($1, $2, true)", [name, value]);
+}
+
 export async function mintTrustedTenantAccess(
   pool: TrustedSqlPool,
   scope: TenantTransactionScope
@@ -155,14 +163,6 @@ export function mintAuthPreSessionAccess(
     kind: "auth_pre_session",
     userId,
   };
-}
-
-async function setLocalConfig(
-  session: TrustedSqlSession,
-  name: string,
-  value: string
-): Promise<void> {
-  await session.query("select set_config($1, $2, true)", [name, value]);
 }
 
 export async function applyTrustedSqlContext(
