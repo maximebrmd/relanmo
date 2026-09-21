@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { LEAD_AGENT_SKILLS_SOURCE } from "../src/defaults/source";
-import { EVALUATION_FIXTURES, evaluationFixtureById } from "./cases";
-import { evaluateFixture } from "./evaluate";
+import { LEAD_AGENT_SKILLS_SOURCE } from "@relanmo/prompts/defaults";
+import {
+  EVALUATION_FIXTURES,
+  evaluateFixture,
+  evaluationFixtureById,
+} from "@relanmo/prompts/fixtures";
 
 const REQUIRED_IDS = [
   "decision-maker-hiring",
@@ -34,7 +37,7 @@ describe("French message evaluation fixtures", () => {
   it("lets a no-signal ICP complete the sequence", () => {
     const actual = evaluateFixture(evaluationFixtureById("no-signal"));
     expect(actual.icpEligible).toBe(true);
-    expect(actual.dm1Hook).toBe("SHARED_CONNECTION");
+    expect(actual.dm1Hook).toBe("NEUTRAL");
     expect(actual.sequenceSteps).toEqual([
       "INVITATION",
       "DM1",

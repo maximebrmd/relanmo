@@ -29,10 +29,12 @@ export type SignalRelevance = (typeof SIGNAL_RELEVANCE)[number];
 
 export type SequenceDraftingContext = Readonly<{
   audience: IcpAudience;
-  hasNewFollowUpFact: boolean;
+  dm2NewFact: string | null;
+  dm3DifferentAngleFact: string | null;
   incomingReplyPresent: boolean;
   signalKind: BuyingSignalKind;
   signalRelevance: SignalRelevance;
+  verifiedSharedConnection: string | null;
 }>;
 
 export type PlannedStep = Readonly<{
@@ -71,18 +73,25 @@ export function frenchDefaultPromptVersion(): PromptVersionRef {
 }
 
 /**
- * A hiring signal is used only to choose the DM1 angle. Off-domain or
- * missing signals fall back to the shared-connection opener so the full
- * DM1–DM5 sequence still has templates.
+ * A hiring signal is used only to choose the DM1 angle. Shared-connection
+ * wording requires a verified mutual; otherwise the full sequence uses a
+ * fact-safe neutral opener.
  */
 export function selectDm1Hook(context: SequenceDraftingContext): Dm1Hook {
+  const neutralHook =
+    context.verifiedSharedConnection === null ||
+    context.verifiedSharedConnection.trim().length === 0
+      ? "NEUTRAL"
+      : "SHARED_CONNECTION";
+
   if (context.signalRelevance !== "RELEVANT") {
-    return "SHARED_CONNECTION";
+    return neutralHook;
   }
 
-  switch (context.signalKind) {
+  const { signalKind } = context;
+  switch (signalKind) {
     case "NONE": {
-      return "SHARED_CONNECTION";
+      return neutralHook;
     }
     case "HIRING": {
       return "RECRUITMENT";
@@ -99,10 +108,14 @@ export function selectDm1Hook(context: SequenceDraftingContext): Dm1Hook {
     case "PROSPECT_POST": {
       return "PROSPECT_POST";
     }
-    default: {
-      return "SHARED_CONNECTION";
-    }
   }
+
+  signalKind satisfies never;
+  throw new Error(`unsupported buying signal kind: ${String(signalKind)}`);
+}
+
+function hasFact(value: string | null): value is string {
+  return value !== null && value.trim().length > 0;
 }
 
 function planDirectMessages(
@@ -110,10 +123,15 @@ function planDirectMessages(
 ): readonly PlannedStep[] {
   const dm1 = templateByHook(selectDm1Hook(context));
   const dm2 = templateByHook(
-    context.hasNewFollowUpFact ? "DM2_NEW_FACT" : "DM2_NEUTRAL"
+    hasFact(context.dm2NewFact) ? "DM2_NEW_FACT" : "DM2_NEUTRAL"
   );
+  const dm3HasDistinctFact =
+    hasFact(context.dm3DifferentAngleFact) &&
+    (!hasFact(context.dm2NewFact) ||
+      context.dm3DifferentAngleFact.trim().toLocaleLowerCase("fr") !==
+        context.dm2NewFact.trim().toLocaleLowerCase("fr"));
   const dm3 = templateByHook(
-    context.hasNewFollowUpFact ? "DM3_DIFFERENT_ANGLE" : "DM3_NEUTRAL"
+    dm3HasDistinctFact ? "DM3_DIFFERENT_ANGLE" : "DM3_NEUTRAL"
   );
 
   return Object.freeze([

@@ -21,9 +21,11 @@ export type FixtureProspect = Readonly<{
 
 export type FixtureDrafting = Readonly<{
   audience: IcpAudience;
-  hasNewFollowUpFact: boolean;
+  dm2NewFact: string | null;
+  dm3DifferentAngleFact: string | null;
   signalKind: BuyingSignalKind;
   signalRelevance: SignalRelevance;
+  verifiedSharedConnection: string | null;
 }>;
 
 export type FixtureExpectedOutcome = Readonly<{
@@ -61,9 +63,11 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
+      verifiedSharedConnection: null,
     }),
     expected: Object.freeze({
       continueAutomatedOutreach: true,
@@ -92,9 +96,11 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "RECRUITER_ESN",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
+      verifiedSharedConnection: null,
     }),
     expected: Object.freeze({
       continueAutomatedOutreach: true,
@@ -123,13 +129,15 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
     }),
     expected: Object.freeze({
       continueAutomatedOutreach: true,
-      dm1Hook: "SHARED_CONNECTION",
+      dm1Hook: "NEUTRAL",
       hiringSignalRequired: false,
       icpEligible: true,
       icpExclusion: null,
@@ -148,14 +156,16 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
     }),
     source: ruleSource("hunt", "skills/hunt/references/scoring-detail.md"),
     summary:
-      "ICP match with no buying signal: invitation still allowed, DM1 uses the shared-connection opener.",
+      "ICP match with no buying signal or verified mutual: invitation still allowed, DM1 uses a fact-safe neutral opener.",
   }),
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
+      verifiedSharedConnection: null,
     }),
     expected: Object.freeze({
       continueAutomatedOutreach: false,

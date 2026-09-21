@@ -9,6 +9,8 @@ import type { LeadAgentRuleSource } from "./source";
 export const ALLOWED_TEMPLATE_VARIABLES = [
   "company",
   "craft",
+  "dm2Fact",
+  "dm3Fact",
   "firstName",
   "hiringRole",
   "priorFact",
@@ -23,6 +25,7 @@ export const DM1_HOOKS = [
   "RECRUITMENT",
   "FUNDING",
   "MIGRATION",
+  "NEUTRAL",
   "SHARED_CONNECTION",
   "ROLE_CHANGE",
   "PROSPECT_POST",
@@ -116,6 +119,14 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM1",
   }),
   Object.freeze({
+    body: "Salut {{firstName}} ! Tu travailles sur quoi côté {{craft}} chez {{company}} ?",
+    hook: "NEUTRAL",
+    id: "dm1-neutral",
+    maxCharacters: 300,
+    source: PROFILE_TEMPLATES,
+    step: "DM1",
+  }),
+  Object.freeze({
     body: "Salut {{firstName}} ! On a {{sharedConnection}} en commun côté {{craft}}. Tu travailles sur quoi chez {{company}} ?",
     hook: "SHARED_CONNECTION",
     id: "dm1-shared-connection",
@@ -140,7 +151,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM1",
   }),
   Object.freeze({
-    body: "Salut {{firstName}}, j'ai vu {{signalFact}} chez {{company}}. C'est lié au chantier {{priorFact}} ?",
+    body: "Salut {{firstName}}, j'ai vu {{dm2Fact}} chez {{company}}. C'est lié au chantier {{priorFact}} ?",
     hook: "DM2_NEW_FACT",
     id: "dm2-new-fact",
     maxCharacters: 300,
@@ -156,7 +167,7 @@ export const MESSAGE_TEMPLATES: readonly MessageTemplate[] = Object.freeze([
     step: "DM2",
   }),
   Object.freeze({
-    body: "Hello {{firstName}}, j'ai regardé {{signalFact}}. C'est aussi un sujet côté {{craft}} chez {{company}} ?",
+    body: "Hello {{firstName}}, j'ai regardé {{dm3Fact}}. C'est aussi un sujet côté {{craft}} chez {{company}} ?",
     hook: "DM3_DIFFERENT_ANGLE",
     id: "dm3-different-angle",
     maxCharacters: 300,

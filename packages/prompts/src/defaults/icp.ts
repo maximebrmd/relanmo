@@ -55,11 +55,8 @@ const ON_MARKET_PHRASES = [
   "qui connaît un freelance",
 ] as const;
 
-const RECRUITER_MARKERS = [
-  "business developer",
-  "esn",
+const RECRUITER_ROLE_MARKERS = [
   "it recruiter",
-  "portage",
   "recruiter",
   "recruteur",
   "staffing",
@@ -67,6 +64,8 @@ const RECRUITER_MARKERS = [
   "talent partner",
   "talent sourcer",
 ] as const;
+
+const RECRUITER_COMPANY_MARKERS = ["esn", "portage"] as const;
 
 const PEER_MARKERS = [
   "as a service",
@@ -83,7 +82,7 @@ const PEER_MARKERS = [
   "on demand",
 ] as const;
 
-const DECISION_MAKER_MARKERS = [
+const EXECUTIVE_DECISION_MAKER_MARKERS = [
   "ceo",
   "co-founder",
   "cofounder",
@@ -91,16 +90,33 @@ const DECISION_MAKER_MARKERS = [
   "cpo",
   "cpto",
   "cto",
-  "director",
-  "engineering manager",
   "fondateur",
   "founder",
+] as const;
+
+const FUNCTIONAL_LEADERSHIP_MARKERS = [
+  "director",
+  "directeur",
+  "directrice",
   "head of",
-  "lead dev",
-  "lead engineer",
-  "tech lead",
-  "vp eng",
-  "vp engineering",
+  "lead",
+  "manager",
+  "vice president",
+  "vp",
+] as const;
+
+const TARGET_FUNCTION_MARKERS = [
+  "data",
+  "design",
+  "dev",
+  "digital",
+  "engineering",
+  "growth",
+  "produit",
+  "product",
+  "software",
+  "tech",
+  "technology",
 ] as const;
 
 function folded(value: string): string {
@@ -111,7 +127,10 @@ function folded(value: string): string {
 }
 
 function containsMarker(haystack: string, markers: readonly string[]): boolean {
-  return markers.some((marker) => haystack.includes(folded(marker)));
+  return markers.some((marker) => {
+    const escaped = folded(marker).replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(haystack);
+  });
 }
 
 /** Explicit on-market freelance-demand wording is a hard ICP exclusion. */
@@ -144,10 +163,18 @@ export function classifyIcpAudience(
   if (containsMarker(lower, PEER_MARKERS)) {
     return "PEER_NOT_BUYER";
   }
-  if (containsMarker(lower, RECRUITER_MARKERS)) {
+  if (
+    containsMarker(lower, RECRUITER_ROLE_MARKERS) ||
+    (containsMarker(lower, ["business developer"]) &&
+      containsMarker(lower, RECRUITER_COMPANY_MARKERS))
+  ) {
     return "RECRUITER_ESN";
   }
-  if (containsMarker(lower, DECISION_MAKER_MARKERS)) {
+  if (
+    containsMarker(lower, EXECUTIVE_DECISION_MAKER_MARKERS) ||
+    (containsMarker(lower, FUNCTIONAL_LEADERSHIP_MARKERS) &&
+      containsMarker(lower, TARGET_FUNCTION_MARKERS))
+  ) {
     return "DECISION_MAKER";
   }
   return null;

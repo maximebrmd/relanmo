@@ -14,10 +14,12 @@ describe("French prompt defaults", () => {
   it("records the reviewed lead-agent-skills revision on the versioned defaults", () => {
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
     });
 
     expect(LEAD_AGENT_SKILLS_SOURCE.revision).toBe(
@@ -37,10 +39,12 @@ describe("French prompt defaults", () => {
     });
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
     });
 
     expect(qualification.eligible).toBe(true);
@@ -59,22 +63,40 @@ describe("French prompt defaults", () => {
     expect(
       selectDm1Hook({
         audience: "DECISION_MAKER",
-        hasNewFollowUpFact: false,
+        dm2NewFact: null,
+        dm3DifferentAngleFact: null,
         incomingReplyPresent: false,
         signalKind: "NONE",
         signalRelevance: "ABSENT",
+        verifiedSharedConnection: null,
       })
-    ).toBe("SHARED_CONNECTION");
+    ).toBe("NEUTRAL");
   });
 
   it("keeps an off-domain hiring signal from becoming the DM1 hook", () => {
     expect(
       selectDm1Hook({
         audience: "DECISION_MAKER",
-        hasNewFollowUpFact: false,
+        dm2NewFact: null,
+        dm3DifferentAngleFact: null,
         incomingReplyPresent: false,
         signalKind: "HIRING",
         signalRelevance: "OFF_DOMAIN",
+        verifiedSharedConnection: null,
+      })
+    ).toBe("NEUTRAL");
+  });
+
+  it("uses a shared-connection opener only when the mutual is verified", () => {
+    expect(
+      selectDm1Hook({
+        audience: "DECISION_MAKER",
+        dm2NewFact: null,
+        dm3DifferentAngleFact: null,
+        incomingReplyPresent: false,
+        signalKind: "NONE",
+        signalRelevance: "ABSENT",
+        verifiedSharedConnection: "Morgan Dupont",
       })
     ).toBe("SHARED_CONNECTION");
   });
@@ -82,10 +104,12 @@ describe("French prompt defaults", () => {
   it("uses the recruitment hook for a recruiter staffing an in-domain role", () => {
     const plan = planFrenchSequence({
       audience: "RECRUITER_ESN",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       incomingReplyPresent: false,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
+      verifiedSharedConnection: null,
     });
 
     expect(plan.kind).toBe("SEQUENCE");
@@ -101,10 +125,12 @@ describe("French prompt defaults", () => {
   it("stops automated drafting when a historical reply is present", () => {
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      hasNewFollowUpFact: false,
+      dm2NewFact: null,
+      dm3DifferentAngleFact: null,
       incomingReplyPresent: true,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
+      verifiedSharedConnection: null,
     });
 
     expect(plan.kind).toBe("STOPPED");
@@ -121,6 +147,55 @@ describe("French prompt defaults", () => {
     expect(qualification.eligible).toBe(false);
     expect(qualification.exclusion).toBe("ON_MARKET_INTENT");
     expect(qualification.invitationAllowed).toBe(false);
+  });
+
+  it("keeps broad commercial titles outside the scoped ICP", () => {
+    expect(
+      qualifyIcp({ headline: "Head of Sales", observedSignalText: null }).eligible
+    ).toBe(false);
+    expect(
+      qualifyIcp({
+        headline: "Business Developer @ Product SaaS",
+        observedSignalText: null,
+      }).eligible
+    ).toBe(false);
+    expect(
+      qualifyIcp({
+        headline: "Business Developer @ Conseil ESN",
+        observedSignalText: null,
+      }).audience
+    ).toBe("RECRUITER_ESN");
+  });
+
+  it("requires a distinct step-specific fact for the DM3 angle", () => {
+    const repeated = planFrenchSequence({
+      audience: "DECISION_MAKER",
+      dm2NewFact: "une nouvelle offre data",
+      dm3DifferentAngleFact: "une nouvelle offre data",
+      incomingReplyPresent: false,
+      signalKind: "NONE",
+      signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
+    });
+    const distinct = planFrenchSequence({
+      audience: "DECISION_MAKER",
+      dm2NewFact: "une nouvelle offre data",
+      dm3DifferentAngleFact: "la page de migration produit",
+      incomingReplyPresent: false,
+      signalKind: "NONE",
+      signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
+    });
+
+    expect(repeated.kind === "SEQUENCE" && repeated.steps[1]?.template.hook).toBe(
+      "DM2_NEW_FACT"
+    );
+    expect(repeated.kind === "SEQUENCE" && repeated.steps[2]?.template.hook).toBe(
+      "DM3_NEUTRAL"
+    );
+    expect(distinct.kind === "SEQUENCE" && distinct.steps[2]?.template.hook).toBe(
+      "DM3_DIFFERENT_ANGLE"
+    );
   });
 
   it("keeps reusable templates free of browser and Excel operations", () => {

@@ -22,10 +22,12 @@ export function evaluateFixture(
   const incomingReplyPresent = fixture.prospect.incomingReply !== null;
   const plan = planFrenchSequence({
     audience: fixture.drafting.audience,
-    hasNewFollowUpFact: fixture.drafting.hasNewFollowUpFact,
+    dm2NewFact: fixture.drafting.dm2NewFact,
+    dm3DifferentAngleFact: fixture.drafting.dm3DifferentAngleFact,
     incomingReplyPresent,
     signalKind: fixture.drafting.signalKind,
     signalRelevance: fixture.drafting.signalRelevance,
+    verifiedSharedConnection: fixture.drafting.verifiedSharedConnection,
   });
 
   return Object.freeze({
