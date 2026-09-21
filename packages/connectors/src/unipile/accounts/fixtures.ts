@@ -62,10 +62,21 @@ export const unipileDisconnectedAccountFixture = Object.freeze({
   ],
 });
 
+export const unipileErroredAccountFixture = Object.freeze({
+  ...unipileConnectedAccountFixture,
+  sources: [
+    Object.freeze({
+      id: "source_messaging",
+      status: "ERROR" as const,
+    }),
+  ],
+});
+
 export type UnipileAccountFixture =
   | typeof unipileChallengeAccountFixture
   | typeof unipileConnectedAccountFixture
   | typeof unipileDisconnectedAccountFixture
+  | typeof unipileErroredAccountFixture
   | typeof unipileRestrictedAccountFixture;
 
 export const otherTenantId = parseTenantId("tenant_other");

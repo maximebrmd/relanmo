@@ -92,7 +92,7 @@ export function normalizeAccountHealth(
     });
   }
 
-  if (sourceStatus === "PERMISSIONS" || sourceStatus === "ERROR") {
+  if (sourceStatus === "PERMISSIONS") {
     return Object.freeze({
       capabilities: inactiveCapabilities,
       health: Object.freeze({
@@ -102,7 +102,7 @@ export function normalizeAccountHealth(
     });
   }
 
-  if (sourceStatus === "STOPPED") {
+  if (sourceStatus === "STOPPED" || sourceStatus === "ERROR") {
     return Object.freeze({
       capabilities: inactiveCapabilities,
       health: Object.freeze({

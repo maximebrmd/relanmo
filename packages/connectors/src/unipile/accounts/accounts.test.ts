@@ -19,6 +19,7 @@ import {
   unipileChallengeAccountFixture,
   unipileConnectedAccountFixture,
   unipileDisconnectedAccountFixture,
+  unipileErroredAccountFixture,
   unipileHostedAuthUrl,
   unipileRestrictedAccountFixture,
 } from "./fixtures";
@@ -254,6 +255,18 @@ describe("Unipile LinkedIn accounts adapter", () => {
     );
     expect(disconnected.health.status).toBe("DISCONNECTED");
     expect(disconnected.health.reason).toBe("DISCONNECTED");
+
+    const errored = readValue(
+      await createPort({
+        fixture: unipileErroredAccountFixture,
+      }).port.readAccountStatus({
+        account: linkedInAccountFixture,
+        context: providerOperationContextFixture,
+      })
+    );
+    expect(errored.health.status).toBe("DISCONNECTED");
+    expect(errored.health.reason).toBe("DISCONNECTED");
+    expect(errored.capabilities.canSendMessages).toBe(false);
   });
 
   it("refuses a provider account owned by another tenant", async () => {

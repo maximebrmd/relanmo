@@ -42,6 +42,7 @@ export {
   unipileChallengeAccountFixture,
   unipileConnectedAccountFixture,
   unipileDisconnectedAccountFixture,
+  unipileErroredAccountFixture,
   unipileHostedAuthUrl,
   unipileRestrictedAccountFixture,
 } from "./fixtures";
