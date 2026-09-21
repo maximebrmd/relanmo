@@ -22,8 +22,8 @@ export function evaluateFixture(
   const incomingReplyPresent = fixture.prospect.incomingReply !== null;
   const plan = planFrenchSequence({
     audience: fixture.drafting.audience,
-    dm2NewFact: fixture.drafting.dm2NewFact,
-    dm3DifferentAngleFact: fixture.drafting.dm3DifferentAngleFact,
+    dm2Fact: fixture.drafting.dm2Fact,
+    dm3Fact: fixture.drafting.dm3Fact,
     incomingReplyPresent,
     signalKind: fixture.drafting.signalKind,
     signalRelevance: fixture.drafting.signalRelevance,

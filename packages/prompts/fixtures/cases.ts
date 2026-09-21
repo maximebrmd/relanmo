@@ -2,6 +2,8 @@ import type { SequenceStep } from "@relanmo/domain/contracts";
 
 import type {
   BuyingSignalKind,
+  Dm2FollowUpFact,
+  Dm3FollowUpFact,
   Dm1Hook,
   IcpAudience,
   IcpExclusion,
@@ -21,8 +23,8 @@ export type FixtureProspect = Readonly<{
 
 export type FixtureDrafting = Readonly<{
   audience: IcpAudience;
-  dm2NewFact: string | null;
-  dm3DifferentAngleFact: string | null;
+  dm2Fact: Dm2FollowUpFact | null;
+  dm3Fact: Dm3FollowUpFact | null;
   signalKind: BuyingSignalKind;
   signalRelevance: SignalRelevance;
   verifiedSharedConnection: string | null;
@@ -63,8 +65,8 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
       verifiedSharedConnection: null,
@@ -96,8 +98,8 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "RECRUITER_ESN",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
       verifiedSharedConnection: null,
@@ -129,8 +131,8 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
       verifiedSharedConnection: null,
@@ -161,8 +163,8 @@ export const EVALUATION_FIXTURES: readonly EvaluationFixture[] = Object.freeze([
   Object.freeze({
     drafting: Object.freeze({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
       verifiedSharedConnection: null,

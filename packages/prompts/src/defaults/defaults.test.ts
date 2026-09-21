@@ -8,14 +8,18 @@ import {
   selectDm1Hook,
 } from "./plan";
 import { LEAD_AGENT_SKILLS_SOURCE } from "./source";
-import { FRENCH_WRITING_DEFAULTS, MESSAGE_TEMPLATES } from "./templates";
+import {
+  FRENCH_WRITING_DEFAULTS,
+  MESSAGE_TEMPLATES,
+  templateByHook,
+} from "./templates";
 
 describe("French prompt defaults", () => {
   it("records the reviewed lead-agent-skills revision on the versioned defaults", () => {
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
@@ -39,8 +43,8 @@ describe("French prompt defaults", () => {
     });
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
@@ -63,8 +67,8 @@ describe("French prompt defaults", () => {
     expect(
       selectDm1Hook({
         audience: "DECISION_MAKER",
-        dm2NewFact: null,
-        dm3DifferentAngleFact: null,
+        dm2Fact: null,
+        dm3Fact: null,
         incomingReplyPresent: false,
         signalKind: "NONE",
         signalRelevance: "ABSENT",
@@ -77,8 +81,8 @@ describe("French prompt defaults", () => {
     expect(
       selectDm1Hook({
         audience: "DECISION_MAKER",
-        dm2NewFact: null,
-        dm3DifferentAngleFact: null,
+        dm2Fact: null,
+        dm3Fact: null,
         incomingReplyPresent: false,
         signalKind: "HIRING",
         signalRelevance: "OFF_DOMAIN",
@@ -91,8 +95,8 @@ describe("French prompt defaults", () => {
     expect(
       selectDm1Hook({
         audience: "DECISION_MAKER",
-        dm2NewFact: null,
-        dm3DifferentAngleFact: null,
+        dm2Fact: null,
+        dm3Fact: null,
         incomingReplyPresent: false,
         signalKind: "NONE",
         signalRelevance: "ABSENT",
@@ -104,8 +108,8 @@ describe("French prompt defaults", () => {
   it("uses the recruitment hook for a recruiter staffing an in-domain role", () => {
     const plan = planFrenchSequence({
       audience: "RECRUITER_ESN",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       incomingReplyPresent: false,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
@@ -125,8 +129,8 @@ describe("French prompt defaults", () => {
   it("stops automated drafting when a historical reply is present", () => {
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
-      dm2NewFact: null,
-      dm3DifferentAngleFact: null,
+      dm2Fact: null,
+      dm3Fact: null,
       incomingReplyPresent: true,
       signalKind: "HIRING",
       signalRelevance: "RELEVANT",
@@ -231,8 +235,18 @@ describe("French prompt defaults", () => {
   it("requires a distinct step-specific fact for the DM3 angle", () => {
     const repeated = planFrenchSequence({
       audience: "DECISION_MAKER",
-      dm2NewFact: "une nouvelle offre data",
-      dm3DifferentAngleFact: "une nouvelle offre data",
+      dm2Fact: {
+        detail: null,
+        fact: "une nouvelle offre data",
+        kind: "OFFER",
+        relevance: "RELEVANT",
+      },
+      dm3Fact: {
+        detail: null,
+        fact: "une nouvelle offre data",
+        kind: "PRODUCT",
+        relevance: "RELEVANT",
+      },
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
@@ -240,8 +254,18 @@ describe("French prompt defaults", () => {
     });
     const distinct = planFrenchSequence({
       audience: "DECISION_MAKER",
-      dm2NewFact: "une nouvelle offre data",
-      dm3DifferentAngleFact: "la page de migration produit",
+      dm2Fact: {
+        detail: null,
+        fact: "une nouvelle offre data",
+        kind: "OFFER",
+        relevance: "RELEVANT",
+      },
+      dm3Fact: {
+        detail: null,
+        fact: "la page de migration produit",
+        kind: "PRODUCT",
+        relevance: "RELEVANT",
+      },
       incomingReplyPresent: false,
       signalKind: "NONE",
       signalRelevance: "ABSENT",
@@ -249,14 +273,54 @@ describe("French prompt defaults", () => {
     });
 
     expect(repeated.kind === "SEQUENCE" && repeated.steps[1]?.template.hook).toBe(
-      "DM2_NEW_FACT"
+      "DM2_OFFER"
     );
     expect(repeated.kind === "SEQUENCE" && repeated.steps[2]?.template.hook).toBe(
       "DM3_NEUTRAL"
     );
     expect(distinct.kind === "SEQUENCE" && distinct.steps[2]?.template.hook).toBe(
-      "DM3_DIFFERENT_ANGLE"
+      "DM3_PRODUCT"
     );
+  });
+
+  it("uses neutral follow-ups for off-domain facts", () => {
+    const plan = planFrenchSequence({
+      audience: "DECISION_MAKER",
+      dm2Fact: {
+        detail: null,
+        fact: "offre Chargé de Support Client",
+        kind: "OFFER",
+        relevance: "OFF_DOMAIN",
+      },
+      dm3Fact: {
+        detail: null,
+        fact: "page du support client",
+        kind: "PRODUCT",
+        relevance: "OFF_DOMAIN",
+      },
+      incomingReplyPresent: false,
+      signalKind: "NONE",
+      signalRelevance: "ABSENT",
+      verifiedSharedConnection: null,
+    });
+
+    expect(plan.kind === "SEQUENCE" && plan.steps[1]?.template.hook).toBe(
+      "DM2_NEUTRAL"
+    );
+    expect(plan.kind === "SEQUENCE" && plan.steps[2]?.template.hook).toBe(
+      "DM3_NEUTRAL"
+    );
+  });
+
+  it("exposes every approved reusable message variant", () => {
+    expect(templateByHook("PROSPECT_POST").body).toContain("{{signalDetail}}");
+    expect(templateByHook("INBOUND_COMMENT").step).toBe("DM1");
+    expect(templateByHook("INBOUND_LIKE").step).toBe("DM1");
+    expect(templateByHook("DM2_OFFER").step).toBe("DM2");
+    expect(templateByHook("DM2_PROSPECT_POST").body).toContain("{{dm2Detail}}");
+    expect(templateByHook("DM2_RELEASE").step).toBe("DM2");
+    expect(templateByHook("DM3_PRODUCT").step).toBe("DM3");
+    expect(templateByHook("DM3_SPEAKING").body).toContain("{{dm3Detail}}");
   });
 
   it("keeps reusable templates free of browser and Excel operations", () => {

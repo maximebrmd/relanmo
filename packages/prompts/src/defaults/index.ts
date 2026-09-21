@@ -20,10 +20,16 @@ export {
   plannedSequenceSteps,
   selectDm1Hook,
   BUYING_SIGNAL_KINDS,
+  DM2_FACT_KINDS,
+  DM3_FACT_KINDS,
   SIGNAL_RELEVANCE,
 } from "./plan";
 export type {
   BuyingSignalKind,
+  Dm2FactKind,
+  Dm2FollowUpFact,
+  Dm3FactKind,
+  Dm3FollowUpFact,
   FrenchSequencePlan,
   PlannedStep,
   SequenceDraftingContext,

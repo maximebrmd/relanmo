@@ -16,6 +16,8 @@ import {
 export const BUYING_SIGNAL_KINDS = [
   "HIRING",
   "FUNDING",
+  "INBOUND_COMMENT",
+  "INBOUND_LIKE",
   "MIGRATION",
   "ROLE_CHANGE",
   "PROSPECT_POST",
@@ -27,10 +29,32 @@ export type BuyingSignalKind = (typeof BUYING_SIGNAL_KINDS)[number];
 export const SIGNAL_RELEVANCE = ["RELEVANT", "OFF_DOMAIN", "ABSENT"] as const;
 export type SignalRelevance = (typeof SIGNAL_RELEVANCE)[number];
 
+export const DM2_FACT_KINDS = ["OFFER", "PROSPECT_POST", "RELEASE"] as const;
+export type Dm2FactKind = (typeof DM2_FACT_KINDS)[number];
+
+export const DM3_FACT_KINDS = ["PRODUCT", "SPEAKING"] as const;
+export type Dm3FactKind = (typeof DM3_FACT_KINDS)[number];
+
+type FollowUpFactRelevance = Exclude<SignalRelevance, "ABSENT">;
+
+export type Dm2FollowUpFact = Readonly<{
+  detail: string | null;
+  fact: string;
+  kind: Dm2FactKind;
+  relevance: FollowUpFactRelevance;
+}>;
+
+export type Dm3FollowUpFact = Readonly<{
+  detail: string | null;
+  fact: string;
+  kind: Dm3FactKind;
+  relevance: FollowUpFactRelevance;
+}>;
+
 export type SequenceDraftingContext = Readonly<{
   audience: IcpAudience;
-  dm2NewFact: string | null;
-  dm3DifferentAngleFact: string | null;
+  dm2Fact: Dm2FollowUpFact | null;
+  dm3Fact: Dm3FollowUpFact | null;
   incomingReplyPresent: boolean;
   signalKind: BuyingSignalKind;
   signalRelevance: SignalRelevance;
@@ -99,6 +123,12 @@ export function selectDm1Hook(context: SequenceDraftingContext): Dm1Hook {
     case "FUNDING": {
       return "FUNDING";
     }
+    case "INBOUND_COMMENT": {
+      return "INBOUND_COMMENT";
+    }
+    case "INBOUND_LIKE": {
+      return "INBOUND_LIKE";
+    }
     case "MIGRATION": {
       return "MIGRATION";
     }
@@ -118,21 +148,71 @@ function hasFact(value: string | null): value is string {
   return value !== null && value.trim().length > 0;
 }
 
+function selectDm2Hook(context: SequenceDraftingContext) {
+  const { dm2Fact } = context;
+  if (
+    dm2Fact === null ||
+    dm2Fact.relevance !== "RELEVANT" ||
+    !hasFact(dm2Fact.fact) ||
+    (dm2Fact.kind === "PROSPECT_POST" && !hasFact(dm2Fact.detail))
+  ) {
+    return "DM2_NEUTRAL" as const;
+  }
+
+  const { kind } = dm2Fact;
+  switch (kind) {
+    case "OFFER": {
+      return "DM2_OFFER" as const;
+    }
+    case "PROSPECT_POST": {
+      return "DM2_PROSPECT_POST" as const;
+    }
+    case "RELEASE": {
+      return "DM2_RELEASE" as const;
+    }
+  }
+
+  kind satisfies never;
+  throw new Error(`unsupported DM2 fact kind: ${String(kind)}`);
+}
+
+function selectDm3Hook(context: SequenceDraftingContext) {
+  const { dm2Fact, dm3Fact } = context;
+  const repeatsDm2Fact =
+    dm2Fact !== null &&
+    dm3Fact !== null &&
+    dm3Fact.fact.trim().toLocaleLowerCase("fr") ===
+      dm2Fact.fact.trim().toLocaleLowerCase("fr");
+  if (
+    dm3Fact === null ||
+    dm3Fact.relevance !== "RELEVANT" ||
+    !hasFact(dm3Fact.fact) ||
+    repeatsDm2Fact ||
+    (dm3Fact.kind === "SPEAKING" && !hasFact(dm3Fact.detail))
+  ) {
+    return "DM3_NEUTRAL" as const;
+  }
+
+  const { kind } = dm3Fact;
+  switch (kind) {
+    case "PRODUCT": {
+      return "DM3_PRODUCT" as const;
+    }
+    case "SPEAKING": {
+      return "DM3_SPEAKING" as const;
+    }
+  }
+
+  kind satisfies never;
+  throw new Error(`unsupported DM3 fact kind: ${String(kind)}`);
+}
+
 function planDirectMessages(
   context: SequenceDraftingContext
 ): readonly PlannedStep[] {
   const dm1 = templateByHook(selectDm1Hook(context));
-  const dm2 = templateByHook(
-    hasFact(context.dm2NewFact) ? "DM2_NEW_FACT" : "DM2_NEUTRAL"
-  );
-  const dm3HasDistinctFact =
-    hasFact(context.dm3DifferentAngleFact) &&
-    (!hasFact(context.dm2NewFact) ||
-      context.dm3DifferentAngleFact.trim().toLocaleLowerCase("fr") !==
-        context.dm2NewFact.trim().toLocaleLowerCase("fr"));
-  const dm3 = templateByHook(
-    dm3HasDistinctFact ? "DM3_DIFFERENT_ANGLE" : "DM3_NEUTRAL"
-  );
+  const dm2 = templateByHook(selectDm2Hook(context));
+  const dm3 = templateByHook(selectDm3Hook(context));
 
   return Object.freeze([
     Object.freeze({
