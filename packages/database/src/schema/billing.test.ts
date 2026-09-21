@@ -7,6 +7,7 @@ import {
   billingEvents,
   subscriptions,
 } from "./billing";
+import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
@@ -20,6 +21,26 @@ describe("billing schema fragment", () => {
       "billing_entitlements"
     );
     expect(getTableConfig(billingEvents).name).toBe("billing_events");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(billingCustomers, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(subscriptions, [
+      "current_period_end",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(billingEntitlements, [
+      "effective_at",
+      "valid_until",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(billingEvents, [
+      "occurred_at",
+      "provider_event_created_at",
+      "applied_at",
+      "effective_at",
+      "valid_until",
+    ]);
   });
 
   it("uniquely maps a tenant to one provider customer", () => {

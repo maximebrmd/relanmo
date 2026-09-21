@@ -54,8 +54,10 @@ export const styleProfiles = pgTable(
     // Set when a bounded inference produced a proposal the customer has not accepted yet.
     suggestedInferredVersionId: text("suggested_inferred_version_id"),
     revision: integer("revision").notNull().default(0),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -101,7 +103,9 @@ export const styleProfileVersions = pgTable(
       .notNull()
       .$type<readonly string[]>()
       .default([]),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdBy: text("created_by"),
   },
   (table) => [
@@ -133,8 +137,10 @@ export const promptOverrides = pgTable(
     // be circular with its promptOverrideId, which stays the enforced direction.
     activeVersionId: text("active_version_id"),
     revision: integer("revision").notNull().default(0),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -161,7 +167,9 @@ export const promptOverrideVersions = pgTable(
       .notNull()
       .$type<readonly StyleStepOverride[]>()
       .default([]),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdBy: text("created_by").notNull(),
   },
   (table) => [

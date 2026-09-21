@@ -2,6 +2,7 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import { auditEvents, usageEvents } from "./audit";
+import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
@@ -11,6 +12,11 @@ describe("audit schema fragment", () => {
   it("names tables explicitly", () => {
     expect(getTableConfig(usageEvents).name).toBe("usage_events");
     expect(getTableConfig(auditEvents).name).toBe("audit_events");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(usageEvents, ["created_at"]);
+    expectTimezoneAwareInstants(auditEvents, ["created_at"]);
   });
 
   it("distinguishes measured usage kinds, units and quantities", () => {

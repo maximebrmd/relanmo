@@ -40,11 +40,13 @@ export const campaigns = pgTable(
     activeVersionId: text("active_version_id"),
     outboundPaused: boolean("outbound_paused").notNull().default(false),
     pauseReason: text("pause_reason"),
-    pausedAt: timestamp("paused_at"),
-    activatedAt: timestamp("activated_at"),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
     revision: integer("revision").notNull().default(0),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -85,7 +87,9 @@ export const campaignVersions = pgTable(
     businessWindow: jsonb("business_window")
       .notNull()
       .$type<BusinessWindowConfiguration>(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdBy: text("created_by").notNull(),
   },
   (table) => [

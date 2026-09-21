@@ -7,6 +7,7 @@ import {
   styleProfiles,
   styleProfileVersions,
 } from "./styles";
+import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
@@ -22,6 +23,13 @@ describe("styles schema fragment", () => {
     expect(getTableConfig(promptOverrideVersions).name).toBe(
       "prompt_override_versions"
     );
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(styleProfiles, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(styleProfileVersions, ["created_at"]);
+    expectTimezoneAwareInstants(promptOverrides, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(promptOverrideVersions, ["created_at"]);
   });
 
   it("scopes every writable row to a tenant, so no row is cross-tenant shared", () => {

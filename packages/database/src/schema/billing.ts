@@ -22,8 +22,10 @@ import {
 export const billingCustomers = pgTable("billing_customers", {
   tenantId: text("tenant_id").primaryKey(),
   providerCustomerId: text("provider_customer_id").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
@@ -36,8 +38,8 @@ export const subscriptions = pgTable(
     tenantId: text("tenant_id").notNull(),
     providerCustomerId: text("provider_customer_id").notNull(),
     state: text("state").notNull(),
-    currentPeriodEnd: timestamp("current_period_end"),
-    updatedAt: timestamp("updated_at")
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -60,10 +62,10 @@ export const billingEntitlements = pgTable(
     tenantId: text("tenant_id").primaryKey(),
     state: text("state").notNull(),
     active: boolean("active").notNull(),
-    effectiveAt: timestamp("effective_at").notNull(),
-    validUntil: timestamp("valid_until"),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
     providerSubscriptionId: text("provider_subscription_id"),
-    updatedAt: timestamp("updated_at")
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -83,14 +85,18 @@ export const billingEvents = pgTable(
     tenantId: text("tenant_id").notNull(),
     providerEventId: text("provider_event_id").notNull(),
     eventType: text("event_type").notNull(),
-    occurredAt: timestamp("occurred_at").notNull(),
-    providerEventCreatedAt: timestamp("provider_event_created_at").notNull(),
-    appliedAt: timestamp("applied_at").defaultNow().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    providerEventCreatedAt: timestamp("provider_event_created_at", {
+      withTimezone: true,
+    }).notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     providerCustomerId: text("provider_customer_id").notNull(),
     providerSubscriptionId: text("provider_subscription_id"),
     state: text("state").notNull(),
-    effectiveAt: timestamp("effective_at").notNull(),
-    validUntil: timestamp("valid_until"),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
     currency: text("currency"),
     amountMinorUnits: integer("amount_minor_units"),
   },

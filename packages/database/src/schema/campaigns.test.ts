@@ -2,6 +2,7 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import { campaigns, campaignVersions } from "./campaigns";
+import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
@@ -11,6 +12,16 @@ describe("campaigns schema fragment", () => {
   it("names tables distinctly", () => {
     expect(getTableConfig(campaigns).name).toBe("campaigns");
     expect(getTableConfig(campaignVersions).name).toBe("campaign_versions");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(campaigns, [
+      "paused_at",
+      "activated_at",
+      "created_at",
+      "updated_at",
+    ]);
+    expectTimezoneAwareInstants(campaignVersions, ["created_at"]);
   });
 
   it("scopes every writable row to a tenant, so no row is cross-tenant shared", () => {

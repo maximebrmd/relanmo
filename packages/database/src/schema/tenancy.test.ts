@@ -2,6 +2,7 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import { freelancerProfiles, memberships, tenants } from "./tenancy";
+import { expectTimezoneAwareInstants } from "./test-helpers";
 
 function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
@@ -12,6 +13,12 @@ describe("tenancy schema fragment", () => {
     expect(getTableConfig(tenants).name).toBe("tenants");
     expect(getTableConfig(memberships).name).toBe("memberships");
     expect(getTableConfig(freelancerProfiles).name).toBe("freelancer_profiles");
+  });
+
+  it("stores every fragment instant as a timezone-aware timestamp", () => {
+    expectTimezoneAwareInstants(tenants, ["created_at"]);
+    expectTimezoneAwareInstants(memberships, ["created_at", "updated_at"]);
+    expectTimezoneAwareInstants(freelancerProfiles, ["created_at"]);
   });
 
   it("keeps the documented tenant columns and a status check", () => {
