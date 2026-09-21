@@ -15,6 +15,7 @@ export type IcpProspectFacts = Readonly<{
   companyEvidence?: IcpCompanyEvidence | null;
   headline: string;
   observedSignalText: string | null;
+  prospectName?: string | null;
 }>;
 
 export type IcpCompanyEvidence = Readonly<{
@@ -180,6 +181,10 @@ function containsMarker(haystack: string, markers: readonly string[]): boolean {
   });
 }
 
+function normalizedIdentity(value: string): string {
+  return folded(value).replaceAll(/[^a-z0-9]+/gu, " ").trim();
+}
+
 function headlineCompany(headline: string): string | null {
   const delimiter = /\s+(?:@|\||·|—)\s+/u.exec(headline);
   if (delimiter?.index === undefined) {
@@ -187,7 +192,7 @@ function headlineCompany(headline: string): string | null {
   }
 
   const company = headline.slice(delimiter.index + delimiter[0].length).trim();
-  const normalized = folded(company).replaceAll(/[^a-z0-9]+/gu, " ").trim();
+  const normalized = normalizedIdentity(company);
   const hasProperNameLikeToken =
     /(?:^|[^\p{L}\p{N}])(?:\p{Lu}[\p{Ll}\p{M}][\p{L}\p{M}\p{N}.'’_-]*|[A-Z0-9]{2,})(?=$|[^\p{L}\p{N}])/u.test(
       company
@@ -227,6 +232,15 @@ function isSoloServicesWithoutProduct(
     evidence.kind === "SERVICES" &&
     !evidence.hasIdentifiableProduct
   );
+}
+
+function isProspectOwnNameCompany(facts: IcpProspectFacts): boolean {
+  const company = headlineCompany(facts.headline);
+  const prospectName =
+    facts.prospectName === null || facts.prospectName === undefined
+      ? ""
+      : normalizedIdentity(facts.prospectName);
+  return company !== null && prospectName.length > 0 && company === prospectName;
 }
 
 /** Explicit on-market freelance-demand wording is a hard ICP exclusion. */
@@ -311,11 +325,12 @@ export function qualifyIcp(facts: IcpProspectFacts): IcpQualification {
   }
 
 
-  if (
+  const isDisqualifiedExecutive =
     classified === "DECISION_MAKER" &&
     isExecutiveHeadline(facts.headline) &&
-    isSoloServicesWithoutProduct(facts.companyEvidence)
-  ) {
+    (isSoloServicesWithoutProduct(facts.companyEvidence) ||
+      isProspectOwnNameCompany(facts));
+  if (isDisqualifiedExecutive) {
     return Object.freeze({
       audience: null,
       eligible: false,

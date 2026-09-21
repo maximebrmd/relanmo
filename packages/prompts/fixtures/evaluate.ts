@@ -18,6 +18,7 @@ export function evaluateFixture(
   const qualification = qualifyIcp({
     headline: fixture.prospect.headline,
     observedSignalText: fixture.prospect.observedSignalText,
+    prospectName: fixture.prospect.fullName,
   });
   if (!qualification.eligible) {
     throw new Error(`fixture ${fixture.id} is not ICP eligible`);

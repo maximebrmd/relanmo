@@ -149,6 +149,18 @@ describe("French prompt defaults", () => {
     expect(soloProduct.audience).toBe("DECISION_MAKER");
   });
 
+  it("excludes executives whose company is their own name", () => {
+    const qualification = qualifyIcp({
+      headline: "Founder @ Maxime Bourmaud",
+      observedSignalText: null,
+      prospectName: "Maxime Bourmaud",
+    });
+
+    expect(qualification.eligible).toBe(false);
+    expect(qualification.exclusion).toBe("NOT_ICP");
+    expect(qualification.invitationAllowed).toBe(false);
+  });
+
   it("stops automated drafting when a historical reply is present", () => {
     const plan = planFrenchSequence({
       audience: "DECISION_MAKER",
