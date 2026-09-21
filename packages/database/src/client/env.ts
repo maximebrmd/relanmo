@@ -50,7 +50,11 @@ function connectionIdentity(url: URL): string {
   return `${url.hostname.toLowerCase()}:${port}${url.pathname}:${url.username}`;
 }
 
-type ParsedConnectionUrl = Readonly<{ identity: string; raw: string }>;
+type ParsedConnectionUrl = Readonly<{
+  identity: string;
+  raw: string;
+  username: string;
+}>;
 
 function parseConnectionUrl(value: string, key: string): ParsedConnectionUrl {
   let parsed: URL;
@@ -64,7 +68,24 @@ function parseConnectionUrl(value: string, key: string): ParsedConnectionUrl {
       `${key} must use the postgres:// or postgresql:// scheme`
     );
   }
-  return { identity: connectionIdentity(parsed), raw: value };
+  if (parsed.username.length === 0) {
+    throw new DatabaseConfigError(
+      `${key} must include an explicit database username`
+    );
+  }
+  let username: string;
+  try {
+    username = decodeURIComponent(parsed.username);
+  } catch {
+    throw new DatabaseConfigError(
+      `${key} must include a valid database username`
+    );
+  }
+  return {
+    identity: connectionIdentity(parsed),
+    raw: value,
+    username,
+  };
 }
 
 function parseBoundedInteger(
@@ -107,6 +128,11 @@ export function parseDatabaseEnv(source: EnvSource = process.env): DatabaseEnv {
   if (runtime.identity === migration.identity) {
     throw new DatabaseConfigError(
       "DATABASE_URL and DATABASE_URL_UNPOOLED must be separate connection strings; runtime traffic must not share the privileged migration connection"
+    );
+  }
+  if (runtime.username === migration.username) {
+    throw new DatabaseConfigError(
+      "DATABASE_URL and DATABASE_URL_UNPOOLED must use distinct database usernames so the runtime and migration principals are separate"
     );
   }
 

@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { DatabaseConfigError, parseDatabaseEnv } from "./env";
 
 const VALID_ENV = {
-  DATABASE_URL: "postgres://user:pass@pooler.example.com:5432/app",
-  DATABASE_URL_UNPOOLED: "postgres://user:pass@direct.example.com:5432/app",
+  DATABASE_URL: "postgres://runtime:pass@pooler.example.com:5432/app",
+  DATABASE_URL_UNPOOLED:
+    "postgres://migration:pass@direct.example.com:5432/app",
 };
 
 describe("parseDatabaseEnv", () => {
@@ -57,6 +58,15 @@ describe("parseDatabaseEnv", () => {
     ).toThrow(DatabaseConfigError);
   });
 
+  it("rejects a connection string without an explicit database username", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        ...VALID_ENV,
+        DATABASE_URL_UNPOOLED: "postgres://direct.example.com:5432/app",
+      })
+    ).toThrow("DATABASE_URL_UNPOOLED must include an explicit database username");
+  });
+
   it("rejects an identical runtime and migration URL", () => {
     expect(() =>
       parseDatabaseEnv({
@@ -87,13 +97,37 @@ describe("parseDatabaseEnv", () => {
     ).toThrow(DatabaseConfigError);
   });
 
-  it("accepts genuinely different endpoints that happen to reuse a hostname", () => {
+  it("rejects different endpoints that use the same database principal", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://shared:pass@host:5432/app",
+        DATABASE_URL_UNPOOLED: "postgres://shared:pass@host:5433/app",
+      })
+    ).toThrow(
+      "DATABASE_URL and DATABASE_URL_UNPOOLED must use distinct database usernames"
+    );
+  });
+
+  it("rejects the same database principal with percent-encoded characters", () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: "postgres://runtime:pass@host:5432/app",
+        DATABASE_URL_UNPOOLED: "postgres://%72untime:pass@host:5433/app",
+      })
+    ).toThrow(
+      "DATABASE_URL and DATABASE_URL_UNPOOLED must use distinct database usernames"
+    );
+  });
+
+  it("accepts separate endpoints with distinct database principals", () => {
     const env = parseDatabaseEnv({
-      DATABASE_URL: "postgres://user:pass@host:5432/app",
-      DATABASE_URL_UNPOOLED: "postgres://user:pass@host:5433/app",
+      DATABASE_URL: "postgres://runtime:pass@host:5432/app",
+      DATABASE_URL_UNPOOLED: "postgres://migration:pass@host:5433/app",
     });
-    expect(env.runtimeUrl).toBe("postgres://user:pass@host:5432/app");
-    expect(env.migrationUrl).toBe("postgres://user:pass@host:5433/app");
+    expect(env.runtimeUrl).toBe("postgres://runtime:pass@host:5432/app");
+    expect(env.migrationUrl).toBe(
+      "postgres://migration:pass@host:5433/app"
+    );
   });
 
   it("rejects a non-numeric pool size", () => {
