@@ -58,6 +58,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "test": "node ../../tooling/ci/run-database-tests.mjs",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -71,6 +72,7 @@
     "@types/node": "24.13.5",
     "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.10",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
   }
 }

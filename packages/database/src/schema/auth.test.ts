@@ -7,8 +7,6 @@ function columnNames(table: Parameters<typeof getTableConfig>[0]) {
   return getTableConfig(table).columns.map((column) => column.name);
 }
 
-// Literal table names below must match `authSchemaTableNames` in @relanmo/auth's
-// schema-config.ts; database cannot depend on auth, so cross-check lives there.
 describe("auth schema fragment", () => {
   it("names tables to stay distinct from provider_accounts", () => {
     expect(getTableConfig(user).name).toBe("user");

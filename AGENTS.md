@@ -16,6 +16,10 @@ Use next-forge, Neon PostgreSQL, Better Auth, Drizzle, Stripe, Ultracite with Ox
 
 Use `apps/app`, `apps/web`, `apps/api`, `apps/docs` with Fumadocs, and `apps/worker`. Set up R2 buckets through Wrangler; application object operations use the AWS S3 v3 SDK. Do not restore Clerk, Prisma, Supabase or Mintlify defaults over these choices.
 
+## Auth schema generation
+
+Generate Better Auth Drizzle tables with the command recorded in `packages/auth/src/schema-config.ts` (`authSchemaGeneratorVersions`). Use plain `bunx auth@<pin> generate`; `bunx --bun` changes the output by dropping `.defaultNow()` calls. Keep `packages/database/src/schema/auth.ts` aligned with that config.
+
 ## Product invariants
 
 Any incoming prospect message stops automated outreach before model classification. Humans handle replies. Preserve the send ledger, uncertain-send reconciliation, account isolation and bounded sequences.
