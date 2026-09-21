@@ -1,6 +1,7 @@
 import type {
   CampaignId,
   CurrentVersionSet,
+  ModelVersion,
   PromptVersionRef,
   TenantId,
 } from "@relanmo/domain/contracts";
@@ -37,6 +38,7 @@ export async function loadCurrentVersions(
   tenantId: TenantId,
   campaignId: CampaignId | null,
   defaultPrompt: PromptVersionRef,
+  model: ModelVersion,
   lock: boolean
 ): Promise<{
   current: CurrentVersionSet;
@@ -142,6 +144,7 @@ export async function loadCurrentVersions(
       explicitStyle: explicitStyle
         ? mapExplicitStyleVersionRef(explicitStyle)
         : null,
+      model,
       profile: profile?.version ?? null,
     },
     profile,

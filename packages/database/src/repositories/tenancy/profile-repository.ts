@@ -36,6 +36,7 @@ async function observedVersions(
     tx.scope.tenantId,
     campaignId,
     sources.defaultPromptVersion(),
+    sources.writingModelVersion(),
     lock
   );
 }

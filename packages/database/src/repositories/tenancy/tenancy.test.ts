@@ -9,6 +9,7 @@ import {
 import { createPersistenceTransactionRunner } from "@relanmo/database/transactions";
 import {
   parseCampaignId,
+  parseModelVersion,
   parseProfileVersionId,
   parsePromptVersionId,
   parseTenantId,
@@ -63,15 +64,19 @@ const DEFAULT_PROMPT_V2: PromptVersionRef = {
   kind: "PROMPT_DEFAULT",
   revision: 2,
 };
+const WRITING_MODEL_V1 = parseModelVersion("writer-test-v1");
+const WRITING_MODEL_V2 = parseModelVersion("writer-test-v2");
 
 let database: IsolatedTestDatabase | null = null;
 let appEnv: DatabaseEnv | null = null;
 let authEnv: DatabaseEnv | null = null;
 let workerEnv: DatabaseEnv | null = null;
 let activeDefaultPrompt = DEFAULT_PROMPT_V1;
+let activeWritingModel = WRITING_MODEL_V1;
 
 const repos = createTenancyRepositories({
   defaultPromptVersion: () => activeDefaultPrompt,
+  writingModelVersion: () => activeWritingModel,
 });
 
 function runtimeEnv(
@@ -224,6 +229,7 @@ function profileInput(
   expected = {
     ...emptyCurrentVersionSetFixture,
     defaultPrompt: activeDefaultPrompt,
+    model: activeWritingModel,
   }
 ): SaveProfileRevisionInput {
   return {
@@ -591,7 +597,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
           kind: "STYLE_EXPLICIT",
           revision: 1,
         },
-        model: null,
+        model: WRITING_MODEL_V1,
       });
 
       const secondCampaign = expectOk(
@@ -657,6 +663,28 @@ describe("membership and freelancer profile repositories (live local Postgres)",
       expect(promptStale.actual.campaign).toEqual(current.versions.campaign);
       expect(promptStale.actual.defaultPrompt).toEqual(DEFAULT_PROMPT_V2);
 
+      activeWritingModel = WRITING_MODEL_V2;
+      const modelStale = expectOk(
+        await runAsMember(TENANT_A, USER_A, (tx) =>
+          repos.profiles.saveRevision(
+            saveInput(
+              TENANT_A,
+              USER_A,
+              "profile-model-drift",
+              promptStale.actual,
+              "campaign-a"
+            ),
+            tx
+          )
+        )
+      );
+      expect(modelStale.outcome).toBe("REVISION_CONFLICT");
+      if (modelStale.outcome !== "REVISION_CONFLICT") {
+        throw new Error("expected writing-model drift to conflict");
+      }
+      expect(modelStale.actual.defaultPrompt).toEqual(DEFAULT_PROMPT_V2);
+      expect(modelStale.actual.model).toBe(WRITING_MODEL_V2);
+
       await withClient(database.migrationUrl, async (client) => {
         await client.query(
           `insert into campaign_versions (
@@ -686,7 +714,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
               TENANT_A,
               USER_A,
               "profile-version-drift",
-              promptStale.actual,
+              modelStale.actual,
               "campaign-a"
             ),
             tx
@@ -698,7 +726,7 @@ describe("membership and freelancer profile repositories (live local Postgres)",
         throw new Error("expected active-version drift to conflict");
       }
       expect(stale.actual.campaign?.id).toBe("campaign-version-a-1-revised");
-      expect(stale.expected).toEqual(promptStale.actual);
+      expect(stale.expected).toEqual(modelStale.actual);
 
       const updated = expectOk(
         await runAsMember(TENANT_A, USER_A, (tx) =>

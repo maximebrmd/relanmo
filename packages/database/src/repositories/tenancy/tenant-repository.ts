@@ -27,6 +27,7 @@ async function currentVersionsFor(
       tx.scope.tenantId,
       campaignId,
       sources.defaultPromptVersion(),
+      sources.writingModelVersion(),
       lock
     )
   ).current;
